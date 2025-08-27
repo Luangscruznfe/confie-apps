@@ -1,0 +1,6 @@
+[submodule "conferencia_app"]
+	path = conferencia_app
+	url = https://github.com/Luangscruznfe/conferencia-confie.git
+[submodule "pontuacao_app"]
+	path = pontuacao_app
+	url = https://github.com/Luangscruznfe/pontuacao-confie.git

@@ -1,0 +1,5 @@
+gunicorn>=21.2
+Werkzeug>=3
+
+-r conferencia_app/requirements.txt
+-r pontuacao_app/requirements.txt
