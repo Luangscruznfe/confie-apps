@@ -1,0 +1,144 @@
+{% extends 'base.html' %}
+
+{% block title %}Visão Geral{% endblock %}
+
+{% block content %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels"></script>
+
+<style>
+  .dashboard-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+  }
+
+  .card-setor {
+    background-color: #1e1e2f;
+    padding: 1rem;
+    border-radius: 12px;
+    box-shadow: 0 0 10px rgba(0,0,0,0.3);
+    color: white;
+  }
+
+  .card-setor h5 {
+    font-size: 1.1rem;
+    font-weight: bold;
+  }
+
+  .setor-loja { border-left: 5px solid #f39c12; }
+  .setor-expedicao { border-left: 5px solid #00a8ff; }
+  .setor-logistica { border-left: 5px solid #9b59b6; }
+  .setor-comercial { border-left: 5px solid #2ecc71; }
+
+  canvas {
+    background-color: white;
+    border-radius: 12px;
+    padding: 10px;
+  }
+</style>
+
+<div class="container mt-4">
+  <h2 class="mb-4 text-white">📊 Visão Geral das Pontuações</h2>
+
+  <div class="dashboard-container">
+    {% for nome, dados in setores.items() %}
+      <div class="card-setor setor-{{ nome.lower() }}">
+        <h5>{{ nome }}</h5>
+        <p>Total de Registros: {{ dados.total_registros }}</p>
+        <p>Soma Total: <strong>{{ dados.soma_total }}</strong></p>
+        {% if nome not in ['Loja', 'Expedição'] %}
+          <p>Média: <strong>{{ dados.media }}</strong></p>
+        {% endif %}
+      </div>
+    {% endfor %}
+  </div>
+
+  <div class="mb-5">
+    <canvas id="graficoSetores" height="100"></canvas>
+  </div>
+
+</div>
+
+<script>
+  const ctx = document.getElementById('graficoSetores').getContext('2d');
+
+  // Gradientes por setor
+  const gradientLoja = ctx.createLinearGradient(0, 0, 0, 400);
+  gradientLoja.addColorStop(0, '#f39c12');
+  gradientLoja.addColorStop(1, '#e67e22');
+
+  const gradientExp = ctx.createLinearGradient(0, 0, 0, 400);
+  gradientExp.addColorStop(0, '#00a8ff');
+  gradientExp.addColorStop(1, '#0097e6');
+
+  const gradientLog = ctx.createLinearGradient(0, 0, 0, 400);
+  gradientLog.addColorStop(0, '#9b59b6');
+  gradientLog.addColorStop(1, '#8e44ad');
+
+  const gradientCom = ctx.createLinearGradient(0, 0, 0, 400);
+  gradientCom.addColorStop(0, '#2ecc71');
+  gradientCom.addColorStop(1, '#27ae60');
+
+  new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: {{ setores.keys()|list|tojson }},
+      datasets: [{
+        label: 'Indicador por Setor',
+        data: [
+          {% for nome, dados in setores.items() %}
+            {% if nome in ['Logística', 'Comercial'] %}
+              {{ dados.media }},
+            {% else %}
+              {{ dados.soma_total }},
+            {% endif %}
+          {% endfor %}
+        ],
+        backgroundColor: [gradientLoja, gradientExp, gradientLog, gradientCom],
+        borderRadius: 12,
+        borderSkipped: false,
+        barPercentage: 0.7
+      }]
+    },
+    options: {
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: '#2c3e50',
+          titleColor: '#fff',
+          bodyColor: '#ecf0f1'
+        },
+        datalabels: {
+          anchor: 'end',
+          align: 'start',
+          color: '#fff',
+          font: {
+            weight: 'bold',
+            size: 12
+          },
+          formatter: function(value, context) {
+            return context.chart.data.labels[context.dataIndex];
+          }
+        }
+      },
+      scales: {
+        y: {
+          beginAtZero: true,
+          ticks: { color: '#fff' },
+          grid: { color: '#555' }
+        },
+        x: {
+          ticks: { color: '#fff' },
+          grid: { color: '#555' }
+        }
+      },
+      layout: {
+        padding: 20
+      }
+    },
+    plugins: [ChartDataLabels]
+  });
+</script>
+{% endblock %}

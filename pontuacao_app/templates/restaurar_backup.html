@@ -1,0 +1,16 @@
+{% extends 'base.html' %}
+
+{% block title %}Restaurar Backup{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>📦 Restaurar Backup</h2>
+    <form method="POST" enctype="multipart/form-data">
+        <div class="mb-3">
+            <label for="backup" class="form-label">Selecione o arquivo ZIP:</label>
+            <input class="form-control" type="file" name="backup" required>
+        </div>
+        <button class="btn btn-primary">Restaurar</button>
+    </form>
+</div>
+{% endblock %}

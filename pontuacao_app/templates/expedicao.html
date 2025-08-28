@@ -1,0 +1,106 @@
+
+{% extends 'base.html' %}
+
+{% block title %}Registro - Expedição{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2 class="mb-4">📦 Registro de Pontuação - Expedição</h2>
+
+    <form method="POST">
+        <div class="mb-3">
+            <label for="data" class="form-label">Data:</label>
+            <input type="text" class="form-control" name="data" id="data" required placeholder="dd/mm/aaaa" autocomplete="off">
+        </div>
+<div class="mb-3">
+  <label for="datas" class="form-label">Múltiplas datas (opcional):</label>
+  <input type="text" class="form-control" name="datas" id="datas"
+         placeholder="dd/mm/aaaa, dd/mm/aaaa, dd/mm/aaaa" autocomplete="off">
+  <small class="text-muted">Se preencher aqui, o campo “Data” acima será ignorado.</small>
+</div>
+
+
+        <div class="form-check mb-2">
+            <input class="form-check-input" type="checkbox" name="criterios" value="A" id="A">
+            <label class="form-check-label" for="A">
+                <span class="text-warning">Ger. ADM</span><br>Organização e limpeza estoque (+1)
+            </label>
+        </div>
+        <div class="form-check mb-2">
+            <input class="form-check-input" type="checkbox" name="criterios" value="B" id="B">
+            <label class="form-check-label" for="B">
+                <span style="color:#2ecc71;">Faturamento</span><br>Separação/conferência do mapa corretamente (+1)
+            </label>
+        </div>
+        <div class="form-check mb-2">
+            <input class="form-check-input" type="checkbox" name="criterios" value="C" id="C">
+            <label class="form-check-label" for="C">
+                <span class="text-danger">Financeiro</span><br>Faturamento OK (+1)
+            </label>
+        </div>
+        <div class="form-check mb-2">
+            <input class="form-check-input" type="checkbox" name="criterios" value="D" id="D">
+            <label class="form-check-label" for="D">
+                <span class="text-danger">Financeiro</span><br>Erro ou devolução / falta na entrega (-2)
+            </label>
+        </div>
+        <div class="form-check mb-2">
+            <input class="form-check-input" type="checkbox" name="criterios" value="E" id="E">
+            <label class="form-check-label" for="E">
+                <span style="color:#9b59b6;">RH</span><br>Finalização após horário (abaixo de 50k) (-1)
+            </label>
+        </div>
+
+        <hr>
+
+        <h5>Extras:</h5>
+        <div class="form-check mb-2">
+            <input class="form-check-input" type="checkbox" name="extras" value="meta" id="meta">
+            <label class="form-check-label" for="meta">>📈 Meta de faturamento (+2)</label>
+        </div>
+        <div class="form-check mb-2">
+            <input class="form-check-input" type="checkbox" name="extras" value="equipe90" id="equipe90">
+            <label class="form-check-label" for="equipe90">Equipe chegou a 90% (+1)</label>
+        </div>
+
+        <div class="mb-3 mt-3">
+            <label for="observacao" class="form-label">Observação:</label>
+            <textarea class="form-control" name="observacao" rows="2"></textarea>
+        </div>
+
+        <button type="submit" class="btn btn-success">Salvar</button>
+    </form>
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/pt.js"></script>
+
+<script>
+  flatpickr("#data", {
+    dateFormat: "d/m/Y",
+    locale: flatpickr.l10ns.pt,
+    disableMobile: true
+  });
+  flatpickr("#datas", {
+    mode: "multiple",
+    dateFormat: "d/m/Y",
+    conjunction: ", ",
+    locale: flatpickr.l10ns.pt,
+    disableMobile: true,
+    onChange: toggleRequired
+  });
+  const inputData  = document.getElementById("data");
+  const inputDatas = document.getElementById("datas");
+  function toggleRequired() {
+    if ((inputDatas.value || "").trim()) {
+      inputData.removeAttribute("required");
+    } else {
+      inputData.setAttribute("required", "required");
+    }
+  }
+  inputDatas && inputDatas.addEventListener("input", toggleRequired);
+  toggleRequired();
+</script>
+
+</div>
+{% endblock %}

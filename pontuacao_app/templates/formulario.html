@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+
+{% block title %}Registrar Pontuação{% endblock %}
+
+{% block content %}
+<h2 class="text-center mb-4">📌 Registro Manual de Pontuação</h2>
+
+<form method="POST" action="/enviar" class="card p-4">
+  <div class="mb-3">
+    <label for="setor" class="form-label fw-bold">Setor:</label>
+    <select name="setor" id="setor" class="form-select" required>
+      <option value="">Selecione</option>
+      {% for setor in obrigacoes.keys() %}
+        <option value="{{ setor }}">{{ setor }}</option>
+      {% endfor %}
+    </select>
+  </div>
+
+  <div class="mb-3">
+    <label for="obrigacao" class="form-label fw-bold">Obrigação:</label>
+    <select name="obrigacao" id="obrigacao" class="form-select" required>
+      <option value="">Selecione o setor primeiro</option>
+    </select>
+  </div>
+
+  <div class="mb-3">
+    <label for="pontuacao" class="form-label fw-bold">Pontuação:</label>
+    <input type="text" name="pontuacao" id="pontuacao" class="form-control" required>
+  </div>
+
+  <div class="mb-3">
+    <label for="observacao" class="form-label fw-bold">Observação:</label>
+    <textarea name="observacao" id="observacao" class="form-control" rows="3"></textarea>
+  </div>
+
+  <div class="d-grid">
+    <button type="submit" class="btn btn-success btn-lg">💾 Registrar</button>
+  </div>
+</form>
+
+<div class="text-center mt-4">
+  <a href="/historico" class="btn btn-outline-light">📖 Ver Histórico</a>
+</div>
+
+<script>
+  const obrigacoes = {{ obrigacoes | tojson }};
+  const setorSelect = document.getElementById('setor');
+  const obrigacaoSelect = document.getElementById('obrigacao');
+
+  setorSelect.addEventListener('change', function() {
+    const setor = this.value;
+    obrigacaoSelect.innerHTML = '<option value="">Selecione uma obrigação</option>';
+
+    if (obrigacoes[setor]) {
+      obrigacoes[setor].forEach(item => {
+        const option = document.createElement('option');
+        option.value = item[0];
+        option.textContent = `${item[0]} - ${item[1]}`;
+        obrigacaoSelect.appendChild(option);
+      });
+    }
+  });
+</script>
+{% endblock %}

@@ -1,0 +1,33 @@
+{% extends 'base.html' %}
+{% block title %}Deletar Pontuação{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+  <h3 class="text-danger mb-4">🗑️ Apagar Pontuação Manualmente</h3>
+
+  <form method="POST" class="bg-dark p-4 rounded">
+    <div class="mb-3">
+      <label for="tabela" class="form-label">Tabela:</label>
+      <select class="form-control" name="tabela" required>
+        <option value="">Selecione</option>
+        <option value="loja">Loja</option>
+        <option value="expedicao">Expedição</option>
+        <option value="logistica">Logística</option>
+        <option value="comercial">Comercial</option>
+      </select>
+    </div>
+
+    <div class="mb-3">
+      <label for="id" class="form-label">ID do Registro:</label>
+      <input type="number" class="form-control" name="id" required>
+    </div>
+
+    <div class="mb-3">
+      <label for="senha" class="form-label">Senha de Admin:</label>
+      <input type="password" class="form-control" name="senha" required>
+    </div>
+
+    <button type="submit" class="btn btn-danger">Deletar Registro</button>
+  </form>
+</div>
+{% endblock %}

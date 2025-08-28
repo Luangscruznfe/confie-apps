@@ -1,0 +1,10 @@
+# render.yaml
+services:
+  - type: web
+    name: sistema-pontuacao
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app
+    envVars:
+      - key: CLOUDINARY_URL
+        value: your_cloudinary_url_aqui

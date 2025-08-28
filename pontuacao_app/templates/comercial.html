@@ -1,0 +1,206 @@
+{% extends 'base.html' %}
+
+{% block title %}Registro de Pontuação - Comercial<script>
+  (function(){
+    const chk = document.getElementById("B");
+    const inp = document.getElementById("B_valor");
+    if (!chk || !inp) return;
+    function sync(){
+      inp.readOnly = !chk.checked; // readOnly evita edição mas ainda envia valor
+      if (!chk.checked) { inp.value = ""; }
+      else if (!inp.value) { inp.value = 1; }
+    }
+    chk.addEventListener("change", sync);
+    sync();
+  })();
+</script>
+{% endblock %}
+
+{% block content %}
+<style>
+.card {
+  background-color: rgba(13, 27, 42, 0.8);
+  color: white;
+}
+.setor-supervisor {
+  color: #00bcd4;
+  font-weight: bold;
+  display: block;
+  margin-bottom: -4px;
+}
+.setor-gerente {
+  color: #bdc3c7;
+  font-weight: bold;
+  display: block;
+  margin-bottom: -4px;
+}
+.setor-faturamento {
+  color: #2ecc71;
+  font-weight: bold;
+  display: block;
+  margin-bottom: -4px;
+}
+.setor-financeiro {
+  color: #e74c3c;
+  font-weight: bold;
+  display: block;
+  margin-bottom: -4px;
+}
+.setor-rh {
+  color: #8e44ad;
+  font-weight: bold;
+  display: block;
+  margin-bottom: -4px;
+}
+</style>
+
+<div class="card p-4 mt-5 shadow-sm">
+  <h2 class="mb-4 fw-bold">📊 Registro de Pontuação - Comercial</h2>
+
+  <form method="POST" onsubmit="return validarExtraEquipe()">
+    <div class="mb-3">
+      <label for="data" class="form-label">Data:</label>
+      <input type="text" class="form-control" name="data" id="data" required placeholder="dd/mm/aaaa" autocomplete="off">
+    </div>
+    <div class="mb-3">
+      <label for="datas" class="form-label">Múltiplas datas (opcional):</label>
+      <input type="text" class="form-control" name="datas" id="datas"
+             placeholder="dd/mm/aaaa, dd/mm/aaaa, dd/mm/aaaa" autocomplete="off">
+      <small class="text-muted">Se preencher aqui, o campo “Data” acima será ignorado.</small>
+    </div>
+
+
+    <div class="mb-3">
+      <label for="vendedor" class="form-label">Vendedor:</label>
+      <select class="form-select" name="vendedor" id="vendedor" required>
+        <option value="">Selecione o vendedor</option>
+        <option>EVERTON</option>
+        <option>MARCELO</option>
+        <option>PEDRO</option>
+        <option>SILVANA</option>
+        <option>TIAGO</option>
+        <option>RODOLFO</option>
+        <option>MARCOS</option>
+        <option>THYAGO</option>
+        <option>EQUIPE</option>
+      </select>
+    </div>
+
+    <div class="p-3 mb-4">
+      <div class="form-check mb-2">
+        <span class="setor-supervisor">Supervisor</span>
+        <input class="form-check-input" type="checkbox" name="A" value="2" id="A">
+        <label class="form-check-label" for="A">Meta diária batida / Conversão 70% (+2)</label>
+      </div>
+
+      <div class="form-check mb-2">
+        <span class="setor-gerente">Ger. Comercial</span>
+        <input class="form-check-input" type="checkbox" name="B" value="1" id="B">
+        <label class="form-check-label" for="B">Cliente novo / Prospecção (+1)</label>
+<div class="d-flex align-items-center mt-1">
+  <small class="me-2">Pontos:</small>
+  <input type="number" name="B_valor" id="B_valor" class="form-control" style="max-width:120px;" step="1" value="1" placeholder="1">
+</div>
+      </div>
+
+      <div class="form-check mb-2">
+        <span class="setor-faturamento">Faturamento</span>
+        <input class="form-check-input" type="checkbox" name="C" value="-1" id="C">
+        <label class="form-check-label" for="C">Erro de pedido ou cliente insatisfeito (-1)</label>
+      </div>
+
+      <div class="form-check mb-2">
+        <span class="setor-financeiro">Financeiro</span>
+        <input class="form-check-input" type="checkbox" name="D" value="-1" id="D">
+        <label class="form-check-label" for="D">Inadimplência (-1)</label>
+      </div>
+
+      <div class="form-check mb-3">
+        <span class="setor-rh">RH</span>
+        <input class="form-check-input" type="checkbox" name="E" value="-2" id="E">
+        <label class="form-check-label" for="E">Relatório diário em desacordo ou fora do horário comercial (-1)</label>
+      </div>
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label">✅ Pontos extras:</label>
+      <div class="form-check">
+        <input class="form-check-input" type="checkbox" name="extras" value="meta" id="extra-meta">
+        <label class="form-check-label" for="extra-meta">Positivação e faturamento batido individual (+2)</label>
+      </div>
+      <div class="form-check">
+        <input class="form-check-input" type="checkbox" name="extras" value="equipe90" id="extra-equipe">
+        <label class="form-check-label" for="extra-equipe">Equipe chegou a 90% da meta geral (+1)</label>
+      </div>
+    </div>
+
+    <div class="mb-3">
+      <label for="observacao" class="form-label">📝 Observação (Opcional):</label>
+      <textarea class="form-control" name="observacao" id="observacao" rows="2"></textarea>
+    </div>
+
+    <button type="submit" class="btn btn-primary">✅ Salvar Pontuação</button>
+  </form>
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/pt.js"></script>
+
+<script>
+  // Calendário dd/mm/aaaa para a data única
+  flatpickr("#data", {
+    dateFormat: "d/m/Y",
+    locale: flatpickr.l10ns.pt,
+    disableMobile: true
+  });
+
+  // Calendário dd/mm/aaaa com seleção múltipla
+  flatpickr("#datas", {
+    mode: "multiple",
+    dateFormat: "d/m/Y",
+    conjunction: ", ",
+    locale: flatpickr.l10ns.pt,
+    disableMobile: true,
+    onChange: toggleRequired
+  });
+
+  // Se “Múltiplas datas” estiver preenchido, o campo Data deixa de ser obrigatório
+  const inputData  = document.getElementById("data");
+  const inputDatas = document.getElementById("datas");
+  function toggleRequired(){
+    if ((inputDatas.value || "").trim()) { inputData.removeAttribute("required"); }
+    else { inputData.setAttribute("required", "required"); }
+  }
+  inputDatas && inputDatas.addEventListener("input", toggleRequired);
+  toggleRequired();
+</script>
+
+</div>
+
+<script>
+function validarExtraEquipe() {
+  const vendedor = document.getElementById('vendedor').value;
+  const extraEquipe = document.getElementById('extra-equipe');
+
+  if (extraEquipe.checked && vendedor !== 'EQUIPE') {
+    alert('⚠️ O ponto extra "Equipe chegou a 90% da meta geral" só pode ser marcado se o vendedor for "EQUIPE".');
+    return false;
+  }
+  return true;
+}
+</script>
+<script>
+  (function(){
+    const chk = document.getElementById("B");
+    const inp = document.getElementById("B_valor");
+    if (!chk || !inp) return;
+    function sync(){
+      inp.readOnly = !chk.checked; // readOnly evita edição mas ainda envia valor
+      if (!chk.checked) { inp.value = ""; }
+      else if (!inp.value) { inp.value = 1; }
+    }
+    chk.addEventListener("change", sync);
+    sync();
+  })();
+</script>
+{% endblock %}

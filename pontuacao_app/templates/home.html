@@ -1,0 +1,89 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-5">
+    <h2 class="text-white mb-4">📊 Visão Geral das Pontuações</h2>
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card text-white shadow" style="background-color: #f39c12;"> <!-- Loja -->
+                <div class="card-body">
+                    <h5 class="card-title">Loja</h5>
+                    <p>Total de Registros: {{ total_loja }}</p>
+                    <p>Soma Total: {{ soma_loja }}</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-white shadow" style="background-color: #3498db;"> <!-- Expedição -->
+                <div class="card-body">
+                    <h5 class="card-title">Expedição</h5>
+                    <p>Total de Registros: {{ total_expedicao }}</p>
+                    <p>Soma Total: {{ soma_expedicao }}</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-white shadow" style="background-color: #9b59b6;"> <!-- Logística -->
+                <div class="card-body">
+                    <h5 class="card-title">Logística</h5>
+                    <p>Total de Registros: {{ total_logistica }}</p>
+                    <p>Soma Total: {{ soma_logistica }}</p>
+                    <p>Média: <strong>{{ "%.2f"|format(media_logistica) }}</strong></p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-white shadow" style="background-color: #2ecc71;"> <!-- Comercial -->
+                <div class="card-body">
+                    <h5 class="card-title">Comercial</h5>
+                    <p>Total de Registros: {{ total_comercial }}</p>
+                    <p>Soma Total: {{ soma_comercial }}</p>
+                    <p>Média: <strong>{{ "%.2f"|format(media_comercial) }}</strong></p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card bg-dark p-4">
+        <canvas id="graficoPontuacoes"></canvas>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    const ctx = document.getElementById('graficoPontuacoes').getContext('2d');
+    new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: ['Loja', 'Expedição', 'Logística', 'Comercial'],
+            datasets: [{
+                label: 'Desempenho',
+                data: [{{ soma_loja }}, {{ soma_expedicao }}, {{ media_logistica }}, {{ media_comercial }}],
+                backgroundColor: [
+                    '#f39c12',  // Loja
+                    '#3498db',  // Expedição
+                    '#9b59b6',  // Logística
+                    '#2ecc71'   // Comercial
+                ],
+                borderRadius: 10
+            }]
+        },
+        options: {
+            plugins: {
+                legend: { display: false }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: { color: 'white' },
+                    grid: { color: '#444' }
+                },
+                x: {
+                    ticks: { color: 'white' },
+                    grid: { color: '#444' }
+                }
+            }
+        }
+    });
+</script>
+{% endblock %}

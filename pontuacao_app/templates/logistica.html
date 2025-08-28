@@ -1,0 +1,173 @@
+{% extends 'base.html' %}
+
+{% block title %}Registro de Pontuação - Logística{% endblock %}
+
+{% block content %}
+<style>
+.card {
+  background-color: rgba(13, 27, 42, 0.8); /* azul escuro com transparência */
+  color: white;
+}
+.setor-gerente {
+  color: #b58900;
+  font-weight: bold;
+  display: block;
+  margin-bottom: -4px;
+}
+.setor-rh {
+  color: #6c5ce7;
+  font-weight: bold;
+  display: block;
+  margin-bottom: -4px;
+}
+.setor-financeiro {
+  color: #e74c3c;
+  font-weight: bold;
+  display: block;
+  margin-bottom: -4px;
+}
+.setor-faturamento {
+  color: #2ecc71;
+  font-weight: bold;
+  display: block;
+  margin-bottom: -4px;
+}
+</style>
+
+<div class="card p-4 mt-5 shadow-sm">
+  <h2 class="mb-4 fw-bold">🚛 Registro de Pontuação - Logística</h2>
+
+  <form method="POST" onsubmit="return validarExtraEquipe()">
+    <div class="mb-3">
+      <label for="data" class="form-label">Data:</label>
+      <!-- trocado para text para o Flatpickr controlar -->
+      <input type="text" class="form-control" name="data" id="data" required
+             placeholder="dd/mm/aaaa" autocomplete="off">
+    </div>
+
+    <!-- NOVO: múltiplas datas clicáveis -->
+    <div class="mb-3">
+      <label for="datas" class="form-label">Múltiplas datas (opcional):</label>
+      <input type="text" class="form-control" name="datas" id="datas"
+             placeholder="dd/mm/aaaa, dd/mm/aaaa, dd/mm/aaaa" autocomplete="off">
+      <small class="text-muted">Se preencher aqui, o campo “Data” acima será ignorado.</small>
+    </div>
+
+    <div class="mb-3">
+      <label for="motorista" class="form-label">Motorista:</label>
+      <select class="form-select" name="motorista" id="motorista" required>
+        <option value="">Selecione o motorista</option>
+        <option>Denilson</option>
+        <option>Fabio</option>
+        <option>Rogerio</option>
+        <option>Robson</option>
+        <option>Simone</option>
+        <option>Vinicius</option>
+        <option>Equipe</option>
+      </select>
+    </div>
+
+    <div class="p-3 mb-4">
+
+      <div class="form-check mb-2">
+        <span class="setor-financeiro">Financeiro</span>
+        <input class="form-check-input" type="checkbox" name="A" value="1" id="A">
+        <label class="form-check-label" for="A">Entregas concluídas 100% (+1)</label>
+      </div>
+
+      <div class="form-check mb-2">
+        <span class="setor-gerente">Gerente ADM</span>
+        <input class="form-check-input" type="checkbox" name="B" value="1" id="B">
+        <label class="form-check-label" for="B">Veículo limpo e organizado (+1)</label>
+      </div>
+
+      <div class="form-check mb-2">
+        <span class="setor-financeiro">Financeiro</span>
+        <input class="form-check-input" type="checkbox" name="C" value="1" id="C">
+        <label class="form-check-label" for="C">Acerto organizado e correto (+1)</label>
+      </div>
+
+      <div class="form-check mb-2">
+        <span class="setor-rh">RH</span>
+        <input class="form-check-input" type="checkbox" name="D" value="-2" id="D">
+        <label class="form-check-label" for="D">Questões em relação à jornada (-2)</label>
+      </div>
+
+      <div class="form-check mb-3">
+        <span class="setor-faturamento">Faturamento</span>
+        <input class="form-check-input" type="checkbox" name="E" value="-1" id="E">
+        <label class="form-check-label" for="E">Erro do entregador (-1)</label>
+      </div>
+    </div>
+
+    <div class="mb-3">
+      <label for="observacao" class="form-label">📝 Observação (Opcional):</label>
+      <textarea class="form-control" name="observacao" id="observacao" rows="2"></textarea>
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label">✅ Pontos extras:</label>
+      <div class="form-check">
+        <input class="form-check-input" type="checkbox" name="extras" value="economia" id="extra-economia">
+        <label class="form-check-label" for="extra-economia">Economia de combustível 10% geral (+2)</label>
+      </div>
+      <div class="form-check">
+        <input class="form-check-input" type="checkbox" name="extras" value="equipe90" id="extra-equipe">
+        <label class="form-check-label" for="extra-equipe">Equipe chegou a 90% de pontuação (+1)</label>
+      </div>
+    </div>
+
+    <script>
+    function validarExtraEquipe() {
+      const motorista = document.getElementById('motorista').value;
+      const extraEquipe = document.getElementById('extra-equipe');
+
+      if (extraEquipe && extraEquipe.checked && motorista !== 'Equipe') {
+        alert('⚠️ O ponto extra "Equipe chegou a 90% de pontuação" só pode ser marcado se o motorista for "Equipe".');
+        return false;
+      }
+      return true;
+    }
+    </script>
+
+    <button type="submit" class="btn btn-primary mt-3">✅ Salvar Pontuação</button>
+  </form>
+</div>
+
+<!-- Flatpickr (CSS + JS) -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/pt.js"></script>
+
+<script>
+  // Data única em dd/mm/aaaa
+  flatpickr("#data", {
+    dateFormat: "d/m/Y",
+    locale: flatpickr.l10ns.pt,
+    disableMobile: true
+  });
+
+  // Múltiplas datas clicáveis em dd/mm/aaaa
+  flatpickr("#datas", {
+    mode: "multiple",
+    dateFormat: "d/m/Y",
+    conjunction: ", ",
+    locale: flatpickr.l10ns.pt,
+    disableMobile: true,
+    onChange: toggleRequired
+  });
+
+  // Se preencher múltiplas datas, "Data" deixa de ser obrigatório
+  const inputData  = document.getElementById('data');
+  const inputDatas = document.getElementById('datas');
+  function toggleRequired() {
+    if ((inputDatas.value || "").trim()) {
+      inputData.removeAttribute('required');
+    } else {
+      inputData.setAttribute('required', 'required');
+    }
+  }
+  inputDatas.addEventListener('input', toggleRequired);
+  toggleRequired();
+</script>
+{% endblock %}

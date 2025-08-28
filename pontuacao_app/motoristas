@@ -1,0 +1,14 @@
+-- Criação da tabela de motoristas
+CREATE TABLE IF NOT EXISTS motoristas (
+    id SERIAL PRIMARY KEY,
+    nome TEXT NOT NULL UNIQUE
+);
+
+-- Inserção de motoristas (exemplos)
+INSERT INTO motoristas (nome) VALUES 
+('Denilson'),
+('Fabio'),
+('Renan'),
+('Robson'),
+('Simone');
+('Vinicius');

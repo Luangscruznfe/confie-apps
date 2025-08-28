@@ -1,0 +1,37 @@
+<!-- templates/historico.html -->
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Histórico de Pontuações</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+    <h2>Histórico de Pontuações</h2>
+
+    <table border="1" cellpadding="6">
+        <thead>
+            <tr>
+                <th>Data</th>
+                <th>Setor</th>
+                <th>Obrigação</th>
+                <th>Pontuação</th>
+                <th>Observação</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for reg in registros %}
+            <tr>
+                <td>{{ reg[0] }}</td>
+                <td>{{ reg[1] }}</td>
+                <td>{{ reg[2] }}</td>
+                <td>{{ reg[3] }}</td>
+                <td>{{ reg[4] }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <br><a href="/">Voltar ao preenchimento</a>
+</body>
+</html>

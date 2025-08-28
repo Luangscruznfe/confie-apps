@@ -1,0 +1,113 @@
+{% extends 'base.html' %}
+
+{% block title %}Histórico - Logística{% endblock %}
+
+{% block content %}
+<style>
+  .setor-financeiro { color: #e74c3c; font-weight: bold; }
+  .setor-faturamento { color: #2ecc71; font-weight: bold; }
+  .setor-rh { color: #6c5ce7; font-weight: bold; }
+  .setor-gerente { color: #b58900; font-weight: bold; }
+</style>
+
+<div class="container">
+  <h2 class="mb-4">🚛 Histórico de Pontuação - Logística</h2>
+
+  <!-- FILTRO POR MOTORISTA -->
+  <form method="get" class="mb-3">
+    <label for="motorista">Filtrar por motorista:</label>
+    <select name="motorista" id="motorista" class="form-select" onchange="this.form.submit()">
+      <option value="">Todos</option>
+      {% for m in motoristas %}
+        <option value="{{ m }}" {% if m == motorista %}selected{% endif %}>{{ m }}</option>
+      {% endfor %}
+    </select>
+  </form>
+
+  <div class="table-responsive">
+    <table class="table table-bordered text-white">
+      <thead class="table-dark">
+  <tr>
+    <th>ID</th>
+    <th>Data</th>
+    <th>Motorista</th>
+    <th>
+      Entregas concluídas 100%<br>
+      <span class="setor-financeiro">(Financeiro)</span>
+    </th>
+    <th>
+      Veículo limpo e organizado<br>
+      <span class="setor-gerente">(Gerente ADM)</span>
+    </th>
+    <th>
+      Acerto organizado e correto<br>
+      <span class="setor-financeiro">(Financeiro)</span>
+    </th>
+    <th>
+      Questões em relação à jornada<br>
+      <span class="setor-rh">(RH)</span>
+    </th>
+    <th>
+      Erro do entregador<br>
+      <span class="setor-faturamento">(Faturamento)</span>
+    </th>
+    <th>Extras</th>
+    <th>Observação</th>
+    <th>Total</th>
+  </tr>
+</thead>
+
+<tbody>
+  {% set ns = namespace(total_geral=0) %}
+  {% for r in registros %}
+    {% set extras = r[8].split(',') if r[8] else [] %}
+    {% set total_parcial = (r[3]|int) + (r[4]|int) + (r[5]|int) + (r[6]|int) + (r[7]|int) %}
+    {% if 'meta' in extras %} {% set total_parcial = total_parcial + 2 %} {% endif %}
+    {% if 'equipe90' in extras %} {% set total_parcial = total_parcial + 1 %} {% endif %}
+    {% if 'economia' in extras %} {% set total_parcial = total_parcial + 2 %} {% endif %}
+    {% set ns.total_geral = ns.total_geral + total_parcial %}
+    <tr>
+      <td>{{ r[0] }}</td>  <!-- ID -->
+      <td>{{ r[1]|datetimeformat }}</td>  <!-- Data -->
+      <td>{{ r[2] }}</td>  <!-- Motorista -->
+      <td>{{ r[3] }}</td>  <!-- Entregas 100% -->
+      <td>{{ r[4] }}</td>  <!-- Veículo limpo -->
+      <td>{{ r[5] }}</td>  <!-- Acerto correto -->
+      <td>{{ r[6] }}</td>  <!-- Jornada -->
+      <td>{{ r[7] }}</td>  <!-- Erro entregador -->
+      <td>
+        {% for extra in extras %}
+          {% if extra == 'meta' %}
+            ⭐ Meta diária batida / Conversão 70%<br>
+          {% elif extra == 'equipe90' %}
+            🤝 Equipe chegou a 90% da meta geral<br>
+          {% elif extra == 'economia' %}
+            ⛽ Economia de combustível 10% geral<br>
+          {% endif %}
+        {% endfor %}
+      </td>
+      <td>{{ r[9] if r[9] and r[9]|string|lower != 'nan' else '' }}</td>  <!-- Observação -->
+      <td>{{ total_parcial }}</td>
+    </tr>
+  {% endfor %}
+</tbody>
+
+      <tfoot class="table-dark">
+  <tr>
+    <td colspan="10" class="text-end fw-bold">Total Geral:</td>
+    <td class="fw-bold {% if ns.total_geral >= 0 %}text-success{% else %}text-danger{% endif %}">
+      {{ ns.total_geral }}
+    </td>
+  </tr>
+  <tr>
+    <td colspan="10" class="text-end fw-bold">Média:</td>
+    <td class="fw-bold text-info">{{ media }}</td>
+  </tr>
+</tfoot>
+
+    </table>
+  </div>
+
+  <a href="/" class="btn btn-secondary mt-3">🔙 Voltar</a>
+</div>
+{% endblock %}

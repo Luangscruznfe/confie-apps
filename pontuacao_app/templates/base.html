@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8">
+  <title>{% block title %}Sistema de Pontuação{% endblock %}</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- Bootstrap CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+
+  <style>
+    body {
+      background-color: #0d1b2a;
+      color: white;
+    }
+    .card {
+      background-color: #1e1e1e; /* fundo escuro */
+      color: white;
+      border-radius: 10px;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    }
+    .navbar {
+      background-color: #1b263b;
+    }
+    .navbar a {
+      color: #ffffff !important;
+    }
+
+    .navbar-toggler-icon {
+      filter: invert(1);
+    }
+
+    .setor-gerente { color: #b58900; font-weight: bold; }
+    .setor-rh { color: #6c5ce7; font-weight: bold; }
+    .setor-financeiro { color: #e74c3c; font-weight: bold; }
+    .setor-faturamento { color: #2ecc71; font-weight: bold; }
+    .text-purple { color: #9b59b6; }
+  </style>
+</head>
+<body>
+
+<!-- Navbar -->
+<nav class="navbar navbar-expand-lg bg-dark">
+  <div class="container-fluid">
+    <a class="navbar-brand fw-bold text-white d-flex align-items-center" href="/">
+      <img src="{{ url_for('static', filename='img/logo_sol.png') }}" alt="Logo" style="height: 32px; margin-right: 10px;">
+      Sistema de Pontuação
+    </a>
+
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"
+            aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+
+    <div class="collapse navbar-collapse" id="navbarNav">
+      <ul class="navbar-nav ms-auto">
+        <li class="nav-item"><a class="nav-link" href="/">🏠 Início</a></li>
+        <li class="nav-item"><a class="nav-link" href="/loja">🏬 Loja</a></li>
+        <li class="nav-item"><a class="nav-link" href="/expedicao">📦 Expedição</a></li>
+        <li class="nav-item"><a class="nav-link" href="/logistica">🚚 Logística</a></li>
+        <li class="nav-item"><a class="nav-link" href="/comercial">💼 Comercial</a></li>
+        <li class="nav-item"><a class="nav-link" href="/historico_loja">📊 Histórico Loja</a></li>
+        <li class="nav-item"><a class="nav-link" href="/historico_expedicao">📈 Histórico Expedição</a></li>
+        <li class="nav-item"><a class="nav-link" href="/historico_logistica">📋 Histórico Logística</a></li>
+        <li class="nav-item"><a class="nav-link" href="/historico_comercial">📉 Histórico Comercial</a></li>
+
+        <li class="nav-item">
+          <a class="btn btn-sm btn-outline-success ms-2" href="{{ url_for('baixar_relatorio_excel') }}">
+            📥 Baixar Relatório
+          </a>
+        </li>
+
+        <li class="nav-item">
+          <a class="btn btn-sm btn-outline-light ms-2" href="{{ url_for('restaurar_backup') }}">
+            🔄 Restaurar Backup
+          </a>
+        </li>
+
+        <li class="nav-item">
+          <button class="btn btn-sm btn-outline-danger ms-2" data-bs-toggle="modal" data-bs-target="#modalZerar">
+            🗑️ Zerar Pontuações
+          </button>
+        </li>
+      </ul>
+    </div>
+  </div>
+</nav>
+
+<div class="container mt-4">
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      {% for category, message in messages %}
+        <div class="alert alert-{{ category }} alert-dismissible fade show mt-3" role="alert">
+          {{ message }}
+          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+      {% endfor %}
+    {% endif %}
+  {% endwith %}
+  {% block content %}{% endblock %}
+</div>
+
+<!-- Modal de Confirmação -->
+<div class="modal fade" id="modalZerar" tabindex="-1" aria-labelledby="modalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <form method="POST" action="/zerar_tudo">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="modalLabel">🛑 Confirmar Zerar Pontuações</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+        </div>
+        <div class="modal-body">
+          <p class="mb-3 text-dark">Insira a <strong>senha do administrador</strong> para zerar as pontuações do sistema.</p>
+          <input 
+            type="password" 
+            class="form-control form-control-lg" 
+            name="senha" 
+            placeholder="Digite a senha..." 
+            required
+            style="border: 2px solid #ced4da; border-radius: 8px; box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);"
+          >
+        </div>
+        <div class="modal-footer">
+          <button type="submit" class="btn btn-danger">🗑️ Zerar</button>
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Bootstrap JS -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
