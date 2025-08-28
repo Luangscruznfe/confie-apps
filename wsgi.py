@@ -1,45 +1,36 @@
-# wsgi.py
-import os, sys, importlib.util
-from flask import Flask, redirect, request
+# wsgi.py (na raiz do projeto confie-apps)
 from werkzeug.middleware.dispatcher import DispatcherMiddleware
+from flask import Flask, render_template_string
 
-BASE_DIR = os.path.dirname(__file__)
+# importe os apps reais
+from conferencia_app.app import app as conferencia
+from pontuacao_app.sistema_pontuacao_flask import app as pontuacao
 
-# Deixa os submódulos no sys.path para suportar imports locais
-sys.path.insert(0, os.path.join(BASE_DIR, "conferencia_app"))
-sys.path.insert(0, os.path.join(BASE_DIR, "pontuacao_app"))
+# app raiz (menu)
+root = Flask(__name__)
 
-def load_flask_app(folder, candidates=("app.py", "main.py"), var_candidates=("app", "create_app")):
-    """Carrega <folder>/<arquivo>.py e retorna a Flask app ('app' ou 'create_app()')."""
-    base = os.path.join(BASE_DIR, folder)
-    for fname in candidates:
-        path = os.path.join(base, fname)
-        if os.path.exists(path):
-            spec = importlib.util.spec_from_file_location(f"{folder}.{fname[:-3]}", path)
-            m = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(m)
-            # primeiro tenta variável 'app', depois função 'create_app()'
-            if hasattr(m, "app"):
-                return getattr(m, "app")
-            if hasattr(m, "create_app") and callable(m.create_app):
-                return m.create_app()
-    raise RuntimeError(f"Não encontrei app em {folder} (tentei {candidates}).")
+@root.route("/", strict_slashes=False)
+def index():
+    return render_template_string("""
+    <!doctype html><html lang="pt-br"><head>
+      <meta charset="utf-8"><title>Confie Apps</title>
+      <style>
+        body{font-family:Arial;padding:40px;background:#0b0f1a;color:#fff}
+        .grid{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(240px,1fr))}
+        a.btn{display:block;padding:18px 22px;border-radius:10px;text-decoration:none;text-align:center;background:#1f2937;color:#fff}
+        a.btn:hover{background:#374151}
+      </style>
+    </head><body>
+      <h2>Escolha o aplicativo</h2>
+      <div class="grid">
+        <a class="btn" href="/conferencia/">Conferência de Mercadorias</a>
+        <a class="btn" href="/pontuacao/">Pontuação</a>
+      </div>
+    </body></html>
+    """)
 
-# Carrega as duas apps
-conferencia_app = load_flask_app("conferencia_app")
-pontuacao_app   = load_flask_app("pontuacao_app")
-
-# Alias para compatibilidade: /conferencia/... -> /...
-# (Se alguém acessar /conferencia/gestao, redireciona para /gestao)
-alias = Flask("alias")
-@alias.route("/", defaults={"subpath": ""})
-@alias.route("/<path:subpath>")
-def alias_to_root(subpath):
-    qs = ("?" + request.query_string.decode()) if request.query_string else ""
-    return redirect("/" + subpath + qs, code=302)
-
-# Monta: conferência na RAIZ; pontuação em /pontuacao; e mantém /conferencia como atalho
-app = DispatcherMiddleware(conferencia_app, {
-    "/pontuacao":  pontuacao_app,
-    "/conferencia": alias,   # opcional: atalho/compat
+# monta os dois apps sob prefixos
+app = DispatcherMiddleware(root, {
+    "/conferencia": conferencia,
+    "/pontuacao": pontuacao,
 })
