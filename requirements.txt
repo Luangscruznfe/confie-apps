@@ -1,5 +1,21 @@
+# Servidor e framework
+Flask==3.0.3
 gunicorn>=21.2
-Werkzeug>=3
+Werkzeug>=3.0.0
+Jinja2>=3.1.0
+itsdangerous>=2.1.0
+click>=8.1.0
 
--r conferencia_app/requirements.txt
--r pontuacao_app/requirements.txt
+# Banco de dados
+psycopg2-binary==2.9.9
+
+# Upload e nuvem
+cloudinary==1.41.0
+
+# PDF e relatórios
+PyMuPDF==1.24.11
+pandas==2.2.2
+openpyxl==3.1.5
+
+# Utilidades
+python-dateutil>=2.8.2
