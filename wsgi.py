@@ -1,12 +1,16 @@
-# wsgi.py (na raiz do projeto confie-apps)
 from werkzeug.middleware.dispatcher import DispatcherMiddleware
 from flask import Flask, render_template_string
+import importlib
 
-# importe os apps reais
-from conferencia_app.app import app as conferencia
-from pontuacao_app.sistema_pontuacao_flask import app as pontuacao
+# carrega conferencia (arquivo costuma ser conferencia_app/app.py)
+conferencia = importlib.import_module("conferencia_app.app").app
 
-# app raiz (menu)
+# tenta carregar pontuacao por dois nomes comuns
+try:
+    pontuacao = importlib.import_module("pontuacao_app.app").app
+except ModuleNotFoundError:
+    pontuacao = importlib.import_module("pontuacao_app.sistema_pontuacao_flask").app
+
 root = Flask(__name__)
 
 @root.route("/", strict_slashes=False)
@@ -29,7 +33,6 @@ def index():
     </body></html>
     """)
 
-# monta os dois apps sob prefixos
 app = DispatcherMiddleware(root, {
     "/conferencia": conferencia,
     "/pontuacao": pontuacao,
