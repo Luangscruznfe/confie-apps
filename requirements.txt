@@ -13,7 +13,7 @@ psycopg2-binary==2.9.9
 cloudinary==1.41.0
 
 # PDF e relatórios
-PyMuPDF==1.23.26
+PyMuPDF==1.25.5
 pandas==2.2.2
 openpyxl==3.1.5
 
