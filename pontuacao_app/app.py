@@ -165,7 +165,7 @@ def datetimeformat(value, format='%d/%m/%Y'):
     except:
         return value
 
-@app.route('/')
+@app.route('/', endpoint='home_pontuacao')
 def home():
     conn = get_db_connection()
     c = conn.cursor()
@@ -255,7 +255,8 @@ def enviar():
     conn.close()
 
     flash("✅ Pontuação registrada com sucesso!", "success")
-    return redirect('/')
+    return redirect(url_for('home_pontuacao'))
+
 
 @app.route('/historico')
 def historico():
@@ -316,7 +317,7 @@ def loja():
             iso = norm_date_to_iso(data_unica or '')
             if not iso:
                 flash('❌ Informe a data ou selecione múltiplas datas no formato dd/mm/aaaa.', 'danger')
-                return redirect('/loja')
+                return redirect(url_for('loja'))
             lista_datas = [iso]
 
         # Evita datas repetidas e ordena
@@ -387,7 +388,7 @@ def loja():
         fazer_backup_e_enviar()
         return redirect('/loja')
 
-    return render_template('loja.html')
+    return redirect(url_for('loja'))
 
 
 # =======================================================================
@@ -436,7 +437,7 @@ def expedicao():
             iso = norm_date_to_iso(data_unica or '')
             if not iso:
                 flash('❌ Informe a data ou selecione múltiplas datas no formato dd/mm/aaaa.', 'danger')
-                return redirect('/expedicao')
+                return redirect(url_for('expedicao'))
             lista_datas = [iso]
 
         # Evita datas duplicadas
@@ -488,7 +489,7 @@ def expedicao():
         fazer_backup_e_enviar()
         return redirect('/expedicao')
 
-    return render_template('expedicao.html')
+    return redirect(url_for('expedicao'))
 
 @app.route('/historico_expedicao')
 def historico_expedicao():
@@ -554,7 +555,7 @@ def logistica():
         if 'equipe90' in extras and motorista != 'Equipe':
             flash("❌ O ponto extra 'Equipe chegou a 90%' só pode ser usado com o motorista 'Equipe'.", "danger")
             conn.close()
-            return redirect('/logistica')
+            return redirect(url_for('logistica'))
         if 'equipe90' in extras:
             total += 1
 
@@ -626,7 +627,7 @@ def logistica():
 
         flash(' '.join(msgs) if msgs else "Nada a fazer.", "success" if inseridos else "warning")
         fazer_backup_e_enviar()
-        return redirect('/logistica')
+        return redirect(url_for('logistica'))
 
     conn.close()
     return render_template('logistica.html', motoristas=motoristas)
@@ -737,7 +738,7 @@ def comercial():
         if 'equipe90' in extras and vendedor.upper() != 'EQUIPE':
             flash("❌ O ponto extra 'Equipe chegou a 90%' só pode ser usado com o vendedor 'EQUIPE'.", "danger")
             conn.close()
-            return redirect('/comercial')
+            return redirect(url_for('comercial'))
 
         # 🔒 Travas por vendedor e data (agora considerando qualquer valor diferente de zero)
         c.execute("SELECT A, B, C, D, E FROM comercial WHERE data = %s AND vendedor = %s", (data, vendedor))
@@ -780,7 +781,7 @@ def comercial():
 
         flash("✅ Pontuação registrada com sucesso!", "success")
         fazer_backup_e_enviar()
-        return redirect('/comercial')
+        return redirect(url_for('comercial'))
 
     conn.close()
     return render_template('comercial.html', vendedores=vendedores)
@@ -835,7 +836,7 @@ def zerar_tudo():
     else:
         flash("❌ Senha incorreta. Ação cancelada.", "danger")
 
-    return redirect('/')
+    return redirect(url_for('home_pontuacao'))
 
 
 @app.route('/criar_banco')
@@ -885,7 +886,7 @@ def restaurar_backup():
                     return redirect('/')
             except Exception as e:
                 flash(f"❌ Erro ao restaurar backup: {e}", "danger")
-                return redirect('/restaurar_backup')
+                return redirect(url_for('restaurar_backup'))
 
     return render_template('restaurar_backup.html')
 
