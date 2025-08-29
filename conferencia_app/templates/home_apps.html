@@ -1,38 +1,87 @@
-{% extends 'base.html' %}
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Confie • Escolha o aplicativo</title>
 
-{% block content %}
-<style>
-.btn-primary:hover {
-    background-color: #0d6efd; /* Azul Bootstrap padrão mais escuro */
-    filter: brightness(90%);
-}
+  <!-- Bootstrap -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 
-.btn-warning:hover {
-    background-color: #d4ac0d; /* Amarelo dourado */
-    color: #000;
-}
-</style>
+  <style>
+    body {
+      background: #0f1115;
+      color: #e8eaed;
+    }
+    .title {
+      font-weight: 700;
+      text-align: center;
+      margin: 40px 0 24px;
+    }
+    .app-card {
+      background: #171a21;
+      border: 1px solid #282c34;
+      border-radius: 16px;
+      padding: 28px;
+      height: 100%;
+      box-shadow: 0 10px 30px rgba(0,0,0,.2);
+    }
+    .app-card h3 {
+      color: #cfd3da;
+      margin-bottom: 8px;
+      font-weight: 600;
+    }
+    .app-card p {
+      color: #9aa0a6;
+      min-height: 48px;
+    }
+    .btn-lg {
+      border-radius: 12px;
+      padding: 12px 18px;
+      font-weight: 600;
+    }
+    /* Hovers pedidos */
+    .btn-primary:hover {
+      background-color: #0d6efd;
+      filter: brightness(90%);
+    }
+    .btn-warning {
+      color: #000;
+      border: none;
+    }
+    .btn-warning:hover {
+      background-color: #d4ac0d;
+      color: #000;
+    }
+  </style>
+</head>
+<body>
+  <div class="container py-4">
+    <h1 class="title display-6">Confie • Escolha o aplicativo</h1>
 
-<div class="container mt-5">
-    <div class="row">
-        <div class="col-md-6 mb-4">
-            <div class="card bg-dark text-white shadow rounded-4">
-                <div class="card-body text-center">
-                    <h3 class="card-title mb-4">Conferência de Mercadorias</h3>
-                    <!-- Alterado para azul -->
-                    <a class="btn btn-primary btn-lg w-100" href="/conferencia/">Abrir Conferência</a>
-                </div>
-            </div>
+    <div class="row g-4">
+      <!-- Cartão Conferência -->
+      <div class="col-12 col-md-6">
+        <div class="app-card h-100">
+          <h3>Conferência de Mercadorias</h3>
+          <p>Upload/gestão de mapas, conferência e cortes.</p>
+          <a href="/conferencia/" class="btn btn-primary btn-lg w-100">Abrir Conferência</a>
         </div>
-        <div class="col-md-6 mb-4">
-            <div class="card bg-dark text-white shadow rounded-4">
-                <div class="card-body text-center">
-                    <h3 class="card-title mb-4">Sistema de Pontuação</h3>
-                    <!-- Alterado para amarelo -->
-                    <a class="btn btn-warning btn-lg w-100" href="/pontuacao/">Abrir Pontuação</a>
-                </div>
-            </div>
+      </div>
+
+      <!-- Cartão Pontuação -->
+      <div class="col-12 col-md-6">
+        <div class="app-card h-100">
+          <h3>Sistema de Pontuação</h3>
+          <p>Registros por setor, históricos e relatórios.</p>
+          <!-- Amarelo -->
+          <a href="/pontuacao/" class="btn btn-warning btn-lg w-100">Abrir Pontuação</a>
         </div>
+      </div>
     </div>
-</div>
-{% endblock %}
+  </div>
+
+  <!-- Bootstrap JS -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
