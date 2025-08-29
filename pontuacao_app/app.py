@@ -282,37 +282,32 @@ def safe_int(value):
 def loja():
     if request.method == 'POST':
         data_unica = request.form.get('data', '').strip()
-        criterios  = request.form.getlist('criterios')  # checkboxes A-E
+        criterios  = request.form.getlist('criterios')
         observacao = request.form.get('observacao', '')
         extras     = request.form.getlist('extras')
 
-        # Pesos fixos de cada critério (igual ao seu)
         pesos = {'A': 1, 'B': 1, 'C': 1, 'D': -1, 'E': -2}
 
-        # Flags (1 se marcou, 0 se não) – igual ao seu
         A = int('A' in criterios)
         B = int('B' in criterios)
         C = int('C' in criterios)
         D = int('D' in criterios)
         E = int('E' in criterios)
 
-        # === NOVO: ler múltiplas datas (opcional) com suporte a dd/mm/aaaa ===
         datas_raw = request.form.get('datas', '').strip()
         lista_datas, invalidas = [], []
 
         if datas_raw:
-            # aceita vírgula, espaço ou quebra de linha
             tokens = re.split(r'[,\n;\s]+', datas_raw)
             for t in tokens:
                 if not t:
                     continue
-                iso = norm_date_to_iso(t)  # aceita dd/mm/aaaa ou yyyy-mm-dd
+                iso = norm_date_to_iso(t)
                 if iso:
                     lista_datas.append(iso)
                 else:
                     invalidas.append(t)
 
-        # Se não veio múltipla, usa a data única (também normalizada)
         if not lista_datas:
             iso = norm_date_to_iso(data_unica or '')
             if not iso:
@@ -320,7 +315,6 @@ def loja():
                 return redirect(url_for('loja'))
             lista_datas = [iso]
 
-        # Evita datas repetidas e ordena
         lista_datas = sorted(set(lista_datas))
 
         inseridos = 0
@@ -330,19 +324,12 @@ def loja():
         c = conn.cursor()
         try:
             for dia in lista_datas:
-                # Mesmas travas que você já usa: A–E não podem repetir no mesmo dia
                 c.execute("SELECT A, B, C, D, E FROM loja WHERE data = %s", (dia,))
                 registros = c.fetchall()
 
                 conflito = False
                 for registro in registros:
-                    crits_existentes = {
-                        'A': registro[0],
-                        'B': registro[1],
-                        'C': registro[2],
-                        'D': registro[3],
-                        'E': registro[4],
-                    }
+                    crits_existentes = {'A': registro[0], 'B': registro[1], 'C': registro[2], 'D': registro[3], 'E': registro[4]}
                     for c_sel in criterios:
                         if crits_existentes.get(c_sel, 0) == 1:
                             conflito = True
@@ -351,18 +338,15 @@ def loja():
                         break
 
                 if conflito:
-                    # Em vez de abortar tudo, só pula esse dia
                     pulados += 1
                     continue
 
-                # Total por dia (mesmas regras + extras)
                 total = sum([pesos[c] for c in criterios])
                 if 'meta' in extras:
                     total += 2
                 if 'equipe90' in extras:
                     total += 1
 
-                # Inserir no banco para este dia
                 c.execute("""
                     INSERT INTO loja (data, A, B, C, D, E, extras, observacao, total)
                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
@@ -373,22 +357,18 @@ def loja():
         finally:
             conn.close()
 
-        # Resumo amigável
         msgs = []
-        if inseridos:
-            msgs.append(f"✅ {inseridos} registro(s) inserido(s).")
-        if pulados:
-            msgs.append(f"⚠️ {pulados} dia(s) pulado(s) por já conterem os mesmos critérios.")
-        if invalidas:
-            msgs.append(f"❌ Datas inválidas ignoradas: {', '.join(invalidas)}")
+        if inseridos: msgs.append(f"✅ {inseridos} registro(s) inserido(s).")
+        if pulados:   msgs.append(f"⚠️ {pulados} dia(s) pulado(s) por já conterem os mesmos critérios.")
+        if invalidas: msgs.append(f"❌ Datas inválidas ignoradas: {', '.join(invalidas)}")
 
         flash(' '.join(msgs) if msgs else "Nada a fazer.", "success" if inseridos else "warning")
-
-        # mantém seu backup automático
         fazer_backup_e_enviar()
-        return redirect('/loja')
+        return redirect(url_for('loja'))
 
-    return redirect(url_for('loja'))
+    # GET ➜ renderiza (sem redirect!)
+    return render_template('loja.html')
+
 
 
 # =======================================================================
@@ -409,25 +389,18 @@ def expedicao():
         observacao = request.form.get('observacao', '')
         extras     = request.form.getlist('extras')
 
-        extras_pontos = 0
-        if 'meta' in extras:
-            extras_pontos += 2
-        if 'equipe90' in extras:
-            extras_pontos += 1
-
+        extras_pontos = (2 if 'meta' in extras else 0) + (1 if 'equipe90' in extras else 0)
         total_base = A + B + C + D + E + extras_pontos
 
-        # === NOVO: múltiplas datas (aceita dd/mm/aaaa) ===
         datas_raw = request.form.get('datas', '').strip()
         lista_datas, invalidas = [], []
 
         if datas_raw:
-            import re
-            tokens = re.split(r'[,\n;\s]+', datas_raw)  # vírgula, espaço ou quebra de linha
+            tokens = re.split(r'[,\n;\s]+', datas_raw)
             for t in tokens:
                 if not t:
                     continue
-                iso = norm_date_to_iso(t)  # usa seu helper (dd/mm/aaaa ou yyyy-mm-dd -> yyyy-mm-dd)
+                iso = norm_date_to_iso(t)
                 if iso:
                     lista_datas.append(iso)
                 else:
@@ -440,7 +413,6 @@ def expedicao():
                 return redirect(url_for('expedicao'))
             lista_datas = [iso]
 
-        # Evita datas duplicadas
         lista_datas = sorted(set(lista_datas))
 
         inseridos, pulados = 0, []
@@ -449,7 +421,6 @@ def expedicao():
         c = conn.cursor()
         try:
             for dia in lista_datas:
-                # ✅ Travas por dia (mesmo comportamento de antes)
                 c.execute("SELECT A, B, C, D, E FROM expedicao WHERE data = %s", (dia,))
                 registros_dia = c.fetchall()
 
@@ -460,12 +431,10 @@ def expedicao():
                     ('D' in criterios and any(r[3] == -2  for r in registros_dia)) or
                     ('E' in criterios and any(r[4] == -1  for r in registros_dia))
                 )
-
                 if conflito:
                     pulados.append(dia)
                     continue
 
-                # INSERT mantendo sua estrutura
                 c.execute("""
                     INSERT INTO expedicao (data, A, B, C, D, E, extras, observacao, total)
                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
@@ -476,20 +445,18 @@ def expedicao():
         finally:
             conn.close()
 
-        # Feedback
         msgs = []
-        if inseridos:
-            msgs.append(f"✅ {inseridos} registro(s) inserido(s).")
-        if pulados:
-            msgs.append(f"⚠️ Dias pulados por já conterem os mesmos critérios: {', '.join(pulados)}.")
-        if invalidas:
-            msgs.append(f"❌ Datas inválidas ignoradas: {', '.join(invalidas)}")
+        if inseridos: msgs.append(f"✅ {inseridos} registro(s) inserido(s).")
+        if pulados:   msgs.append(f"⚠️ Dias pulados por já conterem os mesmos critérios: {', '.join(pulados)}.")
+        if invalidas: msgs.append(f"❌ Datas inválidas ignoradas: {', '.join(invalidas)}")
 
         flash(' '.join(msgs) if msgs else "Nada a fazer.", "success" if inseridos else "warning")
         fazer_backup_e_enviar()
-        return redirect('/expedicao')
+        return redirect(url_for('expedicao'))
 
-    return redirect(url_for('expedicao'))
+    # GET ➜ renderiza (sem redirect!)
+    return render_template('expedicao.html')
+
 
 @app.route('/historico_expedicao')
 def historico_expedicao():
@@ -580,7 +547,7 @@ def logistica():
             if not iso:
                 flash('❌ Informe a data ou selecione múltiplas datas no formato dd/mm/aaaa.', 'danger')
                 conn.close()
-                return redirect('/logistica')
+                return redirect(url_for('logistica'))
             lista_datas = [iso]
 
         # Evita datas duplicadas
@@ -747,23 +714,23 @@ def comercial():
         if A != 0 and any(r[0] != 0 for r in registros):
             flash("⚠️ O critério A já foi registrado para esse vendedor nesse dia.", "danger")
             conn.close()
-            return redirect('/comercial')
+            return redirect(url_for('comercial'))
         if B != 0 and any(r[1] != 0 for r in registros):
             flash("⚠️ O critério B já foi registrado para esse vendedor nesse dia.", "danger")
             conn.close()
-            return redirect('/comercial')
+            return redirect(url_for('comercial'))
         if C != 0 and any(r[2] != 0 for r in registros):
             flash("⚠️ O critério C já foi registrado para esse vendedor nesse dia.", "danger")
             conn.close()
-            return redirect('/comercial')
+            return redirect(url_for('comercial'))
         if D != 0 and any(r[3] != 0 for r in registros):
             flash("⚠️ O critério D já foi registrado para esse vendedor nesse dia.", "danger")
             conn.close()
-            return redirect('/comercial')
+            return redirect(url_for('comercial'))
         if E != 0 and any(r[4] != 0 for r in registros):
             flash("⚠️ O critério E já foi registrado para esse vendedor nesse dia.", "danger")
             conn.close()
-            return redirect('/comercial')
+            return redirect(url_for('comercial'))
 
         total = A + B + C + D + E
         if 'meta' in extras:
@@ -883,7 +850,7 @@ def restaurar_backup():
                     conn.commit()
                     conn.close()
                     flash("✅ Backup restaurado com sucesso!", "success")
-                    return redirect('/')
+                    return redirect(url_for('home_pontuacao'))
             except Exception as e:
                 flash(f"❌ Erro ao restaurar backup: {e}", "danger")
                 return redirect(url_for('restaurar_backup'))
@@ -1013,12 +980,11 @@ def deletar():
 
         if senha != DELETE_PASSWORD:
             flash("❌ Senha incorreta.", "danger")
-            return redirect('/deletar')
+            return redirect(url_for('deletar'))
 
         if tabela not in ['loja', 'expedicao', 'logistica', 'comercial']:
             flash("❌ Tabela inválida.", "danger")
-            return redirect('/deletar')
-
+            return redirect(url_for('deletar'))
         try:
             conn = get_db_connection()
             c = conn.cursor()
@@ -1029,7 +995,7 @@ def deletar():
         except Exception as e:
             flash(f"❌ Erro ao deletar: {str(e)}", "danger")
 
-        return redirect('/deletar')
+        return redirect(url_for('deletar'))
 
     return render_template('deletar.html')
 
