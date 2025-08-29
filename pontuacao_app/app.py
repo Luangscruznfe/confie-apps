@@ -857,6 +857,12 @@ def restaurar_backup():
 
     return render_template('restaurar_backup.html')
 
+from io import BytesIO
+from datetime import datetime
+from flask import send_file
+from openpyxl import Workbook
+from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+
 @app.route('/baixar_relatorio_excel')
 def baixar_relatorio_excel():
     conn = get_db_connection()
@@ -897,79 +903,96 @@ def baixar_relatorio_excel():
     wb = Workbook()
     wb.remove(wb.active)
 
-    for tabela in tabelas:
-        c.execute(f"SELECT * FROM {tabela}")
-        dados = c.fetchall()
-        colunas = [desc[0] for desc in c.description]
+    try:
+        for tabela in tabelas:
+            # Tenta ler a tabela; se não existir, apenas pula
+            try:
+                c.execute(f'SELECT * FROM {tabela}')
+                dados = c.fetchall()
+                colunas = [desc[0] for desc in c.description]
+            except Exception:
+                # tabela ausente (ou outro erro de SELECT) → ignora esta aba
+                conn.rollback()
+                continue
 
-        if not dados:
-            continue
+            if not dados:
+                continue
 
-        ws = wb.create_sheet(title=tabela.capitalize())
+            ws = wb.create_sheet(title=tabela.capitalize())
 
-        # Cabeçalhos amigáveis
-        headers = []
-        for col in colunas:
-            if tabela in nomes_formatados and col.upper() in nomes_formatados[tabela]:
-                headers.append(nomes_formatados[tabela][col.upper()])
-            else:
-                headers.append(col.capitalize())
-        ws.append(headers)
-
-        # Estilo do cabeçalho
-        for col in ws[1]:
-            col.font = Font(bold=True, color="FFFFFF")
-            col.fill = PatternFill(start_color="1f4e78", end_color="1f4e78", fill_type="solid")
-            col.alignment = Alignment(horizontal="center", vertical="center")
-
-        total_geral = 0
-        for linha in dados:
-            linha_formatada = []
-            for i, cell in enumerate(linha):
-                if cell is None or str(cell).lower() == 'nan':
-                    linha_formatada.append('')
-                elif isinstance(cell, str) and cell.lower() == 'nan':
-                    linha_formatada.append('')
-                elif isinstance(cell, datetime):
-                    linha_formatada.append(cell.strftime("%d/%m/%Y"))
+            # Cabeçalhos amigáveis
+            headers = []
+            for col in colunas:
+                if tabela in nomes_formatados and col.upper() in nomes_formatados[tabela]:
+                    headers.append(nomes_formatados[tabela][col.upper()])
                 else:
-                    linha_formatada.append(cell)
-            ws.append(linha_formatada)
+                    headers.append(col.capitalize())
+            ws.append(headers)
 
-            if 'total' in colunas:
-                total_geral += linha[colunas.index('total')]
+            # Estilo do cabeçalho
+            for col in ws[1]:
+                col.font = Font(bold=True, color="FFFFFF")
+                col.fill = PatternFill(start_color="1f4e78", end_color="1f4e78", fill_type="solid")
+                col.alignment = Alignment(horizontal="center", vertical="center")
 
-        # Linha do total
-        if 'total' in colunas:
-            idx_total = colunas.index('total') + 1
-            ws.append([""] * (idx_total - 1) + ["Total Geral:", total_geral])
-            ultima_linha = ws.max_row
-            ws[f"{chr(64 + idx_total)}{ultima_linha}"].font = Font(bold=True, color="1f4e78")
+            # Linhas + soma do total (tratando None)
+            total_geral = 0
+            idx_total = colunas.index('total') + 1 if 'total' in colunas else None
 
-        # Estilo geral
-        thin = Side(border_style="thin", color="999999")
-        for row in ws.iter_rows(min_row=1, max_row=ws.max_row, max_col=ws.max_column):
-            for cell in row:
-                cell.border = Border(left=thin, right=thin, top=thin, bottom=thin)
-                cell.alignment = Alignment(horizontal="left", vertical="top", wrap_text=True)
+            for linha in dados:
+                linha_formatada = []
+                for cell in linha:
+                    if cell is None or (isinstance(cell, str) and cell.lower() == 'nan'):
+                        linha_formatada.append('')
+                    elif isinstance(cell, datetime):
+                        linha_formatada.append(cell.strftime("%d/%m/%Y"))
+                    else:
+                        linha_formatada.append(cell)
+                ws.append(linha_formatada)
 
-        # Ajuste de largura
-        for col in ws.columns:
-            max_len = max(len(str(cell.value)) if cell.value else 0 for cell in col)
-            ws.column_dimensions[col[0].column_letter].width = max_len + 2
+                if idx_total:
+                    v = linha[colunas.index('total')]
+                    try:
+                        total_geral += (0 if v is None else float(v))
+                    except Exception:
+                        # se vier string ou algo não numérico, ignora na soma
+                        pass
 
-    conn.close()
+            # Linha do total
+            if idx_total:
+                ws.append([""] * (idx_total - 1) + ["Total Geral:", total_geral])
+                ultima_linha = ws.max_row
+                # Coluna da palavra "Total Geral:" é idx_total, o valor fica na próxima
+                # Realça a célula do rótulo
+                col_letter = ws.cell(row=1, column=idx_total).column_letter
+                ws[f"{col_letter}{ultima_linha}"].font = Font(bold=True, color="1f4e78")
 
-    output = io.BytesIO()
+            # Bordas e alinhamento
+            thin = Side(border_style="thin", color="999999")
+            for row in ws.iter_rows(min_row=1, max_row=ws.max_row, max_col=ws.max_column):
+                for cell in row:
+                    cell.border = Border(left=thin, right=thin, top=thin, bottom=thin)
+                    cell.alignment = Alignment(horizontal="left", vertical="top", wrap_text=True)
+
+            # Ajuste de largura
+            for col in ws.columns:
+                max_len = max(len(str(cell.value)) if cell.value else 0 for cell in col)
+                ws.column_dimensions[col[0].column_letter].width = min(max_len + 2, 60)  # limite amigável
+
+    finally:
+        conn.close()
+
+    # Envia em memória
+    output = BytesIO()
     wb.save(output)
     output.seek(0)
-
     return send_file(
         output,
         as_attachment=True,
         download_name=f'relatorio_pontuacoes_{datetime.now().strftime("%Y-%m-%d")}.xlsx',
         mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
     )
+
 
 @app.route('/deletar', methods=['GET', 'POST'])
 def deletar():
