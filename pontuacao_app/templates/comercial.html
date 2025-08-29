@@ -57,7 +57,7 @@
 <div class="card p-4 mt-5 shadow-sm">
   <h2 class="mb-4 fw-bold">📊 Registro de Pontuação - Comercial</h2>
 
-  <form method="POST" onsubmit="return validarExtraEquipe()">
+  <form method="POST" action="{{ url_for('comercial') }}" onsubmit="return validarExtraEquipe()">
     <div class="mb-3">
       <label for="data" class="form-label">Data:</label>
       <input type="text" class="form-control" name="data" id="data" required placeholder="dd/mm/aaaa" autocomplete="off">

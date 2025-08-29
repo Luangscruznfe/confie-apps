@@ -37,7 +37,7 @@
 <div class="card p-4 mt-5 shadow-sm">
   <h2 class="mb-4 fw-bold">🚛 Registro de Pontuação - Logística</h2>
 
-  <form method="POST" onsubmit="return validarExtraEquipe()">
+  <form method="POST" action="{{ url_for('logistica') }}" onsubmit="return validarExtraEquipe()">
     <div class="mb-3">
       <label for="data" class="form-label">Data:</label>
       <!-- trocado para text para o Flatpickr controlar -->

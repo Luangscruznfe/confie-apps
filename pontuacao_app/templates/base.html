@@ -41,7 +41,7 @@
 <!-- Navbar -->
 <nav class="navbar navbar-expand-lg bg-dark">
   <div class="container-fluid">
-    <a class="navbar-brand fw-bold text-white d-flex align-items-center" href="/">
+    <a class="navbar-brand fw-bold text-white d-flex align-items-center" href="{{ url_for('home_pontuacao') }}">
       <img src="{{ url_for('static', filename='img/logo_sol.png') }}" alt="Logo" style="height: 32px; margin-right: 10px;">
       Sistema de Pontuação
     </a>
@@ -53,15 +53,15 @@
 
     <div class="collapse navbar-collapse" id="navbarNav">
       <ul class="navbar-nav ms-auto">
-        <li class="nav-item"><a class="nav-link" href="/">🏠 Início</a></li>
-        <li class="nav-item"><a class="nav-link" href="/loja">🏬 Loja</a></li>
-        <li class="nav-item"><a class="nav-link" href="/expedicao">📦 Expedição</a></li>
-        <li class="nav-item"><a class="nav-link" href="/logistica">🚚 Logística</a></li>
-        <li class="nav-item"><a class="nav-link" href="/comercial">💼 Comercial</a></li>
-        <li class="nav-item"><a class="nav-link" href="/historico_loja">📊 Histórico Loja</a></li>
-        <li class="nav-item"><a class="nav-link" href="/historico_expedicao">📈 Histórico Expedição</a></li>
-        <li class="nav-item"><a class="nav-link" href="/historico_logistica">📋 Histórico Logística</a></li>
-        <li class="nav-item"><a class="nav-link" href="/historico_comercial">📉 Histórico Comercial</a></li>
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('home_pontuacao') }}">🏠 Início</a></li>
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('loja') }}">🏬 Loja</a></li>
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('expedicao') }}">📦 Expedição</a></li>
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('logistica') }}">🚚 Logística</a></li>
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('comercial') }}">💼 Comercial</a></li>
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('historico_loja') }}">📊 Histórico Loja</a></li>
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('historico_expedicao') }}">📈 Histórico Expedição</a></li>
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('historico_logistica') }}">📋 Histórico Logística</a></li>
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('historico_comercial') }}">📉 Histórico Comercial</a></li>
 
         <li class="nav-item">
           <a class="btn btn-sm btn-outline-success ms-2" href="{{ url_for('baixar_relatorio_excel') }}">
@@ -102,7 +102,7 @@
 <!-- Modal de Confirmação -->
 <div class="modal fade" id="modalZerar" tabindex="-1" aria-labelledby="modalLabel" aria-hidden="true">
   <div class="modal-dialog">
-    <form method="POST" action="/zerar_tudo">
+    <form method="POST" action="{{ url_for('zerar_tudo') }}">
       <div class="modal-content">
         <div class="modal-header">
           <h5 class="modal-title" id="modalLabel">🛑 Confirmar Zerar Pontuações</h5>

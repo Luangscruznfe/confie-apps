@@ -6,7 +6,7 @@
 <div class="container mt-4">
     <h2 class="mb-4">🛒 Registro de Pontuação - Loja</h2>
 
-    <form method="POST">
+    <form method="POST" action="{{ url_for('loja') }}">
   <div class="mb-3">
     <label for="data" class="form-label">Data:</label>
     <input type="text" class="form-control" name="data" id="data" required placeholder="dd/mm/aaaa" autocomplete="off">
