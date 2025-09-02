@@ -1,4 +1,4 @@
-# parser_mapa.py (versão robusta)
+# parser_mapa.py (versão robusta e corrigida para packs)
 import re, fitz
 
 HEAD_IGNORES = (
@@ -11,14 +11,13 @@ HEAD_IGNORES = (
     "PEDIDOS:", "NÚMERO DA CARGA", "NUMERO DA CARGA"
 )
 
-
-
 # Unidades de picking aceitas (quantidade separada)
 PICK_UNIDADES = {"UN","CX","FD","CJ","DP","PC","PT","DZ","SC","KT","JG","BF","PA"}
 # Unidades de peso/volume que NÃO são picking (vão ficar na descrição)
 WEIGHT_UNIDADES = {"G","KG","ML","L"}
 
-
+# Estes regex auxiliares não serão mais usados diretamente por try_parse_line,
+# mas podem ser úteis para outras validações ou debug.
 PACK_ONLY_RE = re.compile(r"^C/\s*(\d+)\s*([A-Z]{1,4})$", re.IGNORECASE)
 QTY_ONLY_RE  = re.compile(r"^(\d+)\s*([A-Z]{1,4})$", re.IGNORECASE)
 
@@ -36,7 +35,6 @@ def _is_only_qty(s: str):
     if un not in PICK_UNIDADES:   # ignora peso/volume como “quantidade”
         return None
     return int(m.group(1)), un
-
 
 # =========================
 # 1) Cabeçalho (tolerante)
@@ -164,13 +162,53 @@ def parse_header_and_pedidos(all_text: str):
 # =========================
 # 5) Parse de grupos/itens
 # =========================
-def _match_item(line: str):
-    """Tenta casar a linha com os padrões de item (com fallback)."""
-    line_compact = " ".join(line.strip().split())
-    m = RE_ITEM.match(line_compact)
-    if not m:
-        m = RE_ITEM_FLEX.match(line_compact)
-    return m
+
+def try_parse_line(line: str):
+    """
+    Tenta parsear UMA linha de item usando os padrões RE_ITEM e RE_ITEM_FLEX.
+    Prioriza RE_ITEM (mais completo) e depois RE_ITEM_FLEX.
+    """
+    s = " ".join((line or "").strip().split())
+    if not s:
+        return None
+
+    # Tenta casar com o padrão mais completo primeiro
+    match = RE_ITEM.match(s)
+    if not match:
+        # Se não casar, tenta com o padrão flexível
+        match = RE_ITEM_FLEX.match(s)
+
+    if match:
+        # Extrai os grupos nomeados do match
+        data = match.groupdict()
+
+        # Converte quantidades para int, se existirem
+        # Usa .get() para lidar com grupos que podem não existir em RE_ITEM_FLEX
+        data['qtd_unidades'] = int(data['qtd_unidades']) if data.get('qtd_unidades') else 0
+        data['pack_qtd'] = int(data['pack_qtd']) if data.get('pack_qtd') else 0
+
+        # Garante que unidades e pack_unid sejam maiúsculas
+        data['unidade'] = (data.get('unidade') or '').upper()
+        data['pack_unid'] = (data.get('pack_unid') or '').upper()
+
+        # Filtra unidades que não são de picking para não serem consideradas como 'unidade' principal
+        # Se a unidade não é de picking, a qtd_unidades também não faz sentido aqui
+        if data['unidade'] not in PICK_UNIDADES:
+            data['unidade'] = ''
+            data['qtd_unidades'] = 0
+
+        # Retorna apenas os campos relevantes e limpos
+        return {
+            "fabricante": (data.get('fabricante') or '').strip().upper(),
+            "codigo": (data.get('codigo') or '').strip(),
+            "cod_barras": (data.get('cod_barras') or '').strip(),
+            "descricao": (data.get('descricao') or '').strip(),
+            "qtd_unidades": data['qtd_unidades'],
+            "unidade": data['unidade'],
+            "pack_qtd": data['pack_qtd'],
+            "pack_unid": data['pack_unid'],
+        }
+    return None # Não houve match
 
 def parse_groups_and_items(all_text: str):
     grupos, itens, current_group = [], [], None
@@ -232,6 +270,8 @@ def parse_groups_and_items(all_text: str):
                 pending_pack = None
 
             # 4) olha LINHAS SEGUINTES imediatas para completar qtd e pack
+            # Esta lógica pode ser simplificada ou removida se try_parse_line for robusto o suficiente
+            # para pegar tudo em uma única linha.
             if i + 1 < len(lines):
                 nxt = lines[i+1]
                 got = False
@@ -260,9 +300,6 @@ def parse_groups_and_items(all_text: str):
 
     return grupos, itens
 
-
-
-
 # =========================
 # 6) Orquestração
 # =========================
@@ -285,130 +322,11 @@ def parse_mapa(path_pdf: str):
 
     return header, pedidos, grupos, itens
 
-
-
-def _strip_pack_suffix(s: str):
-    m = re.search(r"\sC/\s*(\d+)\s*([A-Z]+)\s*$", s, re.IGNORECASE)
-    if not m:
-        return s, 0, ""
-    return s[:m.start()].rstrip(), int(m.group(1)), (m.group(2) or "").upper()
-
-def _strip_qty_unit(s: str):
-    # Só aceita como QTD/UN se UN estiver em PICK_UNIDADES
-    m = re.search(r"\s(\d+)\s*([A-Z]{1,4})\s*$", s)
-    if not m:
-        return s, 0, ""
-    un = (m.group(2) or "").upper()
-    if un not in PICK_UNIDADES:
-        return s, 0, ""
-    return s[:m.start()].rstrip(), int(m.group(1)), un
-
-def _strip_pack_prefix(s: str):
-    """
-    Captura 'C/ 12UN' no COMEÇO da linha, mesmo se vier grudado no fabricante,
-    ex.: 'C/ 12UNRICLAN...' → retorna ('RICLAN...', 12, 'UN')
-    """
-    s0 = (s or "").lstrip()
-    m = re.match(r"^C/\s*(\d+)\s*([A-Z]{1,4})", s0, re.IGNORECASE)
-    if not m:
-        return s, 0, ""
-    rest = s0[m.end():].lstrip()
-    return rest, int(m.group(1)), (m.group(2) or "").upper()
-
-
-def try_parse_line(line: str):
-    """
-    Tenta parsear UMA linha de item.
-    Exemplos cobertos:
-      - 'C/ 12UN RICLAN 24661 7891151040457 GOMA GO JELLY ... 2 CX'
-      - 'RICLAN24661 7891151040457 GOMA GO JELLY ... 2 CX'
-      - 'EAN DESCRICAO COD FAB 7 DP (C/ 21UN)'
-      - com/sem EAN, com pack no início/fim/linha separada
-    """
-    s = " ".join((line or "").strip().split())
-    if not s:
-        return None
-
-    # linhas-ruído (só qtd/un ou só pack) NÃO viram item
-    if _is_only_qty(s) or _is_only_pack(s):
-        return None
-
-    # 0) Pack no INÍCIO (ex.: 'C/ 12UNRICLAN...')
-    s, pack_qtd_pref, pack_unid_pref = _strip_pack_prefix(s)
-
-    # 1) Pack no FIM (ex.: '... (C/ 12UN)' ou '... C/ 12 UN')
-    s, pack_qtd_suf, pack_unid_suf = _strip_pack_suffix(s)
-
-    # 2) Quantidade+unidade no FIM (só unidades de picking)
-    s, qtd, un = _strip_qty_unit(s)
-
-    # 3) EAN no começo ou no MEIO (aceita 12–14 dígitos, pega o primeiro bloco)
-    cod_barras = ""
-    m = re.match(r"^(\d{12,14})\s+(.*)$", s)   # começo
-    if m:
-        cod_barras = m.group(1); s = m.group(2)
-    if not cod_barras:
-        mm = re.search(r"(\d{12,14})", s)     # no meio
-        if mm:
-            cod_barras = mm.group(1)
-            s = (s[:mm.start()] + " " + s[mm.end():]).strip()
-            s = re.sub(r"\s{2,}", " ", s)
-
-    # 4) fabricante + código
-    codigo = ""; fabricante = ""
-
-    # 4a) padrão no INÍCIO grudado: ex. 'RICLAN24661 ...'
-    m = re.match(r"^([A-Z][A-Z0-9À-Ú\-\&\.]{2,}?)(\d{3,})\b(?:\s+|$)", s)
-    if m:
-        fabricante = m.group(1).strip().upper()
-        codigo = m.group(2)
-        s = s[m.end():].lstrip()
-    else:
-        # 4b) início com espaço: 'RICLAN 24661 ...'
-        m = re.match(r"^([A-Z][A-Z0-9À-Ú\-\&\. ]+?)\s+(\d{3,})\b", s)
-        if m and len(m.group(1).split()) <= 3:  # evita capturar descrição longa como “fabricante”
-            fabricante = m.group(1).strip().upper()
-            codigo = m.group(2)
-            s = s[m.end():].lstrip()
-        else:
-            # 4c) fim da linha: '... 24661 RICLAN'
-            m = re.search(r"\s(\d{3,})\s+([A-Z0-9À-Ú\-\&\. ]+)$", s)
-            if m:
-                codigo = m.group(1)
-                fabricante = (m.group(2) or "").strip().upper()
-                s = s[:m.start()].rstrip()
-            else:
-                # 4d) só o código no fim
-                m = re.search(r"\s(\d{3,})\s*$", s)
-                if m:
-                    codigo = m.group(1)
-                    s = s[:m.start()].rstrip()
-
-    descricao = s.strip()
-    if not descricao:
-        return None
-
-    # escolhe o pack capturado (prefere prefixo; se não tiver, usa sufixo)
-    pack_qtd = pack_qtd_pref or pack_qtd_suf or 0
-    pack_unid = (pack_unid_pref or pack_unid_suf or "").upper()
-
-    return {
-        "fabricante": fabricante,
-        "codigo": codigo,
-        "cod_barras": cod_barras,
-        "descricao": descricao,
-        "qtd_unidades": qtd,
-        "unidade": (un or "").upper(),
-        "pack_qtd": pack_qtd,
-        "pack_unid": pack_unid,
-    }
-
-
-
-
 def debug_extrator(path_pdf: str):
     """Devolve as linhas cruas e como cada uma foi parseada (ou não)."""
-    from parser_mapa import extract_text_from_pdf  # evita import circular se mover
+    # Importação local para evitar circularidade se este arquivo for importado por outro
+    # que também importa debug_extrator.
+    from .parser_mapa import extract_text_from_pdf # Ajustado para importação relativa
     raw = extract_text_from_pdf(path_pdf)
     lines = [l for l in raw.splitlines()]
     out = []
