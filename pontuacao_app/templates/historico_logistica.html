@@ -13,16 +13,52 @@
 <div class="container">
   <h2 class="mb-4">🚛 Histórico de Pontuação - Logística</h2>
 
-  <!-- FILTRO POR MOTORISTA -->
-  <form method="get" class="mb-3">
-    <label for="motorista">Filtrar por motorista:</label>
-    <select name="motorista" id="motorista" class="form-select" onchange="this.form.submit()">
-      <option value="">Todos</option>
+<!-- FILTROS (colar após o <h2> e antes da tabela) -->
+<form method="get" class="row g-2 mb-3">
+  <!-- Motorista -->
+  <div class="col-12 col-md-3">
+    <label class="form-label">Motorista</label>
+    <select name="motorista" class="form-select">
+      <option value="">(Todos)</option>
       {% for m in motoristas %}
-        <option value="{{ m }}" {% if m == motorista %}selected{% endif %}>{{ m }}</option>
+        <option value="{{ m }}" {{ 'selected' if motorista==m else '' }}>{{ m }}</option>
       {% endfor %}
     </select>
-  </form>
+  </div>
+
+  <!-- Responsável -->
+  <div class="col-12 col-md-3">
+    <label class="form-label">Responsável</label>
+    <select name="responsavel" class="form-select">
+      <option value="">(Todos)</option>
+      <option value="FINANCEIRO"  {{ 'selected' if responsavel=='FINANCEIRO'  else '' }}>Financeiro</option>
+      <option value="GERENTE_ADM" {{ 'selected' if responsavel=='GERENTE_ADM' else '' }}>Ger. ADM</option>
+      <option value="RH"          {{ 'selected' if responsavel=='RH'          else '' }}>RH</option>
+      <option value="FATURAMENTO" {{ 'selected' if responsavel=='FATURAMENTO' else '' }}>Faturamento</option>
+    </select>
+    <small class="text-muted d-block">
+      A/C = Financeiro • B = Ger. ADM • D = RH • E = Faturamento
+    </small>
+  </div>
+
+  <!-- Período -->
+  <div class="col-6 col-md-2">
+    <label class="form-label">Início</label>
+    <input type="text" name="inicio" class="form-control" placeholder="dd/mm/aaaa" value="{{ inicio or '' }}">
+  </div>
+  <div class="col-6 col-md-2">
+    <label class="form-label">Fim</label>
+    <input type="text" name="fim" class="form-control" placeholder="dd/mm/aaaa" value="{{ fim or '' }}">
+  </div>
+
+  <!-- Ações -->
+  <div class="col-6 col-md-1 d-flex align-items-end">
+    <button class="btn btn-primary w-100" type="submit">Filtrar</button>
+  </div>
+  <div class="col-6 col-md-1 d-flex align-items-end">
+    <a class="btn btn-secondary w-100" href="{{ request.path }}">Limpar</a>
+  </div>
+</form>
 
   <div class="table-responsive">
     <table class="table table-bordered text-white">

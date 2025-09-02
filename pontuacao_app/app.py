@@ -18,6 +18,52 @@ from openpyxl.styles import Font, PatternFill, Border, Side, Alignment
 DELETE_PASSWORD = 'confie123'
 
 
+# --- Responsáveis por critério (A–E) por setor/tabela ---
+RESPONSABILIDADES = {
+    'loja': {
+        'GERENTE_ADM': ['A', 'E'],
+        'RH':          ['B', 'D'],
+        'FINANCEIRO':  ['C'],
+        # Faturamento não atua na Loja
+    },
+    'expedicao': {
+        'GERENTE_ADM': ['A'],
+        'FATURAMENTO': ['B'],
+        'FINANCEIRO':  ['C', 'D'],
+        'RH':          ['E'],
+    },
+    'logistica': {
+        'FINANCEIRO':  ['A', 'C'],
+        'GERENTE_ADM': ['B'],
+        'RH':          ['D'],
+        'FATURAMENTO': ['E'],
+    },
+    'comercial': {
+        'SUPERVISOR':        ['A'],
+        'GERENTE_COMERCIAL': ['B'],
+        'FATURAMENTO':       ['C'],
+        'FINANCEIRO':        ['D'],
+        'RH':                ['E'],
+    }
+}
+
+def _filtro_responsavel_sql(tabela: str, responsavel: str):
+    """
+    Monta o trecho de WHERE para filtrar registros onde *esse responsável atuou*.
+    Regra: atuou se QUALQUER coluna atribuída a ele for diferente de 0 (<> 0).
+    Retorna (sql_fragment, params). Ex.: ("(A <> 0 OR C <> 0)", [])
+    """
+    if not responsavel:
+        return "", []
+    tab = tabela.lower().strip()
+    resp = responsavel.strip().upper()
+    cols = RESPONSABILIDADES.get(tab, {}).get(resp)
+    if not cols:
+        return "", []
+    conds = [f"{c} <> 0" for c in cols]
+    return "(" + " OR ".join(conds) + ")", []
+
+
 
 app = Flask(__name__)
 app.secret_key = 'confie'
@@ -460,16 +506,44 @@ def expedicao():
 
 @app.route('/historico_expedicao')
 def historico_expedicao():
+    responsavel = request.args.get('responsavel', '').strip()
+    inicio = request.args.get('inicio', '').strip()
+    fim    = request.args.get('fim', '').strip()
+
     conn = get_db_connection()
     c = conn.cursor()
 
-    c.execute("SELECT id, data, A, B, C, D, E, extras, total, observacao FROM expedicao ORDER BY data DESC")
-    registros = c.fetchall()
+    where, params = [], []
 
-    total_geral = sum([r[8] for r in registros])  # índice do total
+    if inicio:
+        iso = norm_date_to_iso(inicio)
+        if iso: where.append("data >= %s"); params.append(iso)
+    if fim:
+        iso = norm_date_to_iso(fim)
+        if iso: where.append("data <= %s"); params.append(iso)
+
+    sql_resp, p_resp = _filtro_responsavel_sql('expedicao', responsavel)
+    if sql_resp:
+        where.append(sql_resp)
+        params += p_resp
+
+    where_sql = (" WHERE " + " AND ".join(where)) if where else ""
+    c.execute(f"""
+        SELECT id, data, A, B, C, D, E, extras, total, observacao
+        FROM expedicao{where_sql} ORDER BY data DESC
+    """, params)
+    registros = c.fetchall()
     conn.close()
 
-    return render_template('historico_expedicao.html', registros=registros, total_geral=total_geral)
+    total_geral = sum([r[8] for r in registros]) if registros else 0
+
+    return render_template('historico_expedicao.html',
+                           registros=registros,
+                           total_geral=total_geral,
+                           responsavel=responsavel,
+                           inicio=inicio,
+                           fim=fim)
+
 	
 
 # Nova rota para a Logística com menu de motoristas e formulário de pontuação
@@ -603,62 +677,107 @@ def logistica():
 
 @app.route('/historico_logistica')
 def historico_logistica():
+    motorista   = request.args.get('motorista', '').strip()
+    responsavel = request.args.get('responsavel', '').strip()
+    inicio      = request.args.get('inicio', '').strip()
+    fim         = request.args.get('fim', '').strip()
+
     conn = get_db_connection()
     c = conn.cursor()
 
-    motorista = request.args.get('motorista', '')
     motoristas = ['Denilson', 'Fabio', 'Rogerio', 'Robson', 'Simone', 'Vinicius', 'Equipe']
 
-    if motorista:
-        c.execute('''
-            SELECT id, data, motorista, A, B, C, D, E, extras, observacao, total  
-            FROM logistica 
-            WHERE motorista = %s 
-            ORDER BY data DESC
-        ''', (motorista,))
-    else:
-        c.execute('''
-            SELECT id, data, motorista, A, B, C, D, E, extras, observacao, total 
-            FROM logistica 
-            ORDER BY data DESC
-        ''')
+    where, params = [], []
 
+    if motorista:
+        where.append("motorista = %s"); params.append(motorista)
+
+    if inicio:
+        iso = norm_date_to_iso(inicio)
+        if iso: where.append("data >= %s"); params.append(iso)
+    if fim:
+        iso = norm_date_to_iso(fim)
+        if iso: where.append("data <= %s"); params.append(iso)
+
+    sql_resp, p_resp = _filtro_responsavel_sql('logistica', responsavel)
+    if sql_resp:
+        where.append(sql_resp)
+        params += p_resp
+
+    where_sql = (" WHERE " + " AND ".join(where)) if where else ""
+    c.execute(f"""
+        SELECT id, data, motorista, A, B, C, D, E, extras, observacao, total
+        FROM logistica{where_sql} ORDER BY data DESC
+    """, params)
     registros = c.fetchall()
     conn.close()
 
     total_geral = sum([int(r[10]) for r in registros]) if registros else 0
 
+    # média: mesma lógica que você já tinha, só reaproveitei
     if motorista:
+        from decimal import Decimal, ROUND_HALF_UP
         media = Decimal(total_geral).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
     else:
+        from decimal import Decimal, ROUND_HALF_UP
         motoristas_reais = [m for m in motoristas if m != 'Equipe']
-        media = (
-            Decimal(total_geral / len(motoristas_reais)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
-            if motoristas_reais else Decimal('0.00')
-        )
+        media = (Decimal(total_geral / len(motoristas_reais)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+                 if motoristas_reais else Decimal('0.00'))
 
-    return render_template(
-        'historico_logistica.html',
-        registros=registros,
-        motorista=motorista,
-        motoristas=motoristas,
-        total_geral=total_geral,
-        media=media
-    )
+    return render_template('historico_logistica.html',
+                           registros=registros,
+                           motorista=motorista,
+                           motoristas=motoristas,
+                           total_geral=total_geral,
+                           media=media,
+                           responsavel=responsavel,
+                           inicio=inicio,
+                           fim=fim)
 
 
 @app.route('/historico_loja')
 def historico_loja():
+    responsavel = request.args.get('responsavel', '').strip()
+    inicio = request.args.get('inicio', '').strip()
+    fim    = request.args.get('fim', '').strip()
+
     conn = get_db_connection()
     c = conn.cursor()
-    c.execute("SELECT id, data, A, B, C, D, E, extras, total, observacao FROM loja ORDER BY data DESC")
+
+    where = []
+    params = []
+
+    if inicio:
+        iso = norm_date_to_iso(inicio)
+        if iso: where.append("data >= %s"); params.append(iso)
+    if fim:
+        iso = norm_date_to_iso(fim)
+        if iso: where.append("data <= %s"); params.append(iso)
+
+    sql_resp, p_resp = _filtro_responsavel_sql('loja', responsavel)
+    if sql_resp:
+        where.append(sql_resp)
+        params += p_resp
+
+    where_sql = (" WHERE " + " AND ".join(where)) if where else ""
+    c.execute(f"""
+        SELECT id, data, A, B, C, D, E, extras, total, observacao
+        FROM loja{where_sql} ORDER BY data DESC
+    """, params)
     registros = c.fetchall()
     conn.close()
 
-    total_geral = sum([r[8] for r in registros]) if registros else 0  # índice 8 = campo 'total'
+    total_geral = sum([r[8] for r in registros]) if registros else 0
     media = round(total_geral / len(registros), 1) if registros else 0
 
-    return render_template('historico_loja.html', registros=registros, total_geral=total_geral, media=media)
+    return render_template('historico_loja.html',
+                           registros=registros,
+                           total_geral=total_geral,
+                           media=media,
+                           responsavel=responsavel,
+                           inicio=inicio,
+                           fim=fim)
+
 
 # =======================================================================
 # COMERCIAL
@@ -757,36 +876,55 @@ def comercial():
 
 @app.route('/historico_comercial')
 def historico_comercial():
+    vendedor    = request.args.get('vendedor', '').strip()
+    responsavel = request.args.get('responsavel', '').strip()
+    inicio      = request.args.get('inicio', '').strip()
+    fim         = request.args.get('fim', '').strip()
+
     conn = get_db_connection()
     c = conn.cursor()
 
-    vendedor = request.args.get('vendedor', '')
-
-    # Lista fixa de vendedores
     lista_vendedores = ['EVERTON', 'MARCELO', 'PEDRO', 'SILVANA', 'TIAGO', 'RODOLFO', 'MARCOS', 'THYAGO', 'EQUIPE']
 
-    # Busca registros com ou sem filtro
-    if vendedor:
-        c.execute("SELECT * FROM comercial WHERE vendedor = %s ORDER BY data DESC", (vendedor,))
-    else:
-        c.execute("SELECT * FROM comercial ORDER BY data DESC")
+    where, params = [], []
 
+    if vendedor:
+        where.append("vendedor = %s"); params.append(vendedor)
+
+    if inicio:
+        iso = norm_date_to_iso(inicio)
+        if iso: where.append("data >= %s"); params.append(iso)
+    if fim:
+        iso = norm_date_to_iso(fim)
+        if iso: where.append("data <= %s"); params.append(iso)
+
+    sql_resp, p_resp = _filtro_responsavel_sql('comercial', responsavel)
+    if sql_resp:
+        where.append(sql_resp)
+        params += p_resp
+
+    where_sql = (" WHERE " + " AND ".join(where)) if where else ""
+    c.execute(f"""
+        SELECT * FROM comercial{where_sql} ORDER BY data DESC
+    """, params)
     registros = c.fetchall()
 
-    # Cálculo do total geral e média (com base no número de registros)
-    total_geral = sum([r[10] for r in registros])  # campo total = índice 10
-    media = Decimal(total_geral / 8).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+    total_geral = sum([r[10] for r in registros]) if registros else 0
+    from decimal import Decimal, ROUND_HALF_UP
+    media = Decimal(total_geral / 8).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP) if registros else Decimal('0.00')
 
     conn.close()
 
-    return render_template(
-        'historico_comercial.html',
-        registros=registros,
-        total_geral=total_geral,
-        media=media,
-        vendedores=lista_vendedores,
-        vendedor=vendedor
-    )
+    return render_template('historico_comercial.html',
+                           registros=registros,
+                           total_geral=total_geral,
+                           media=media,
+                           vendedores=lista_vendedores,
+                           vendedor=vendedor,
+                           responsavel=responsavel,
+                           inicio=inicio,
+                           fim=fim)
+
 
 
 @app.route('/zerar_tudo', methods=['POST'])
@@ -1021,6 +1159,11 @@ def deletar():
         return redirect(url_for('deletar'))
 
     return render_template('deletar.html')
+
+@app.route('/ping')
+def ping():
+    return "OK", 200
+
 
 
 if __name__ == '__main__':

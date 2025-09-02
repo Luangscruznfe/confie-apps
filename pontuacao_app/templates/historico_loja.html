@@ -6,6 +6,33 @@
 <div class="container mt-4">
   <h2 class="mb-4">🛍️ Histórico de Pontuação - Loja</h2>
 
+<form method="get" class="row g-2 mb-3">
+  <div class="col-12 col-md-3">
+    <label class="form-label">Responsável</label>
+    <select name="responsavel" class="form-select">
+      <option value="">(Todos)</option>
+      <option value="GERENTE_ADM" {{ 'selected' if responsavel=='GERENTE_ADM' else '' }}>Ger. ADM</option>
+      <option value="RH"          {{ 'selected' if responsavel=='RH'          else '' }}>RH</option>
+      <option value="FINANCEIRO"  {{ 'selected' if responsavel=='FINANCEIRO'  else '' }}>Financeiro</option>
+    </select>
+    <small class="text-muted d-block">A/E = Ger. ADM • B/D = RH • C = Financeiro</small>
+  </div>
+  <div class="col-6 col-md-2">
+    <label class="form-label">Início</label>
+    <input type="text" name="inicio" class="form-control" placeholder="dd/mm/aaaa" value="{{ inicio or '' }}">
+  </div>
+  <div class="col-6 col-md-2">
+    <label class="form-label">Fim</label>
+    <input type="text" name="fim" class="form-control" placeholder="dd/mm/aaaa" value="{{ fim or '' }}">
+  </div>
+  <div class="col-6 col-md-2 d-flex align-items-end">
+    <button class="btn btn-primary w-100" type="submit">Filtrar</button>
+  </div>
+  <div class="col-6 col-md-2 d-flex align-items-end">
+    <a class="btn btn-secondary w-100" href="{{ request.path }}">Limpar</a>
+  </div>
+</form>
+
   <table class="table table-bordered table-striped">
     <thead>
       <tr>

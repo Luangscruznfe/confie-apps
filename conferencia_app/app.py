@@ -56,6 +56,10 @@ def init_db():
         );
     ''')
 
+# Garante a coluna 'conferente' no pedidos
+    cur.execute("ALTER TABLE pedidos ADD COLUMN IF NOT EXISTS conferente TEXT;")
+
+
     # === NOVO: Tabelas do Mapa de Separação ===
     cur.execute('''
         CREATE TABLE IF NOT EXISTS cargas (
@@ -1171,4 +1175,7 @@ def mapa_extrator():
     return head + "\n".join(rows_html) + tail
 
 
+@app.route('/ping')
+def ping():
+    return "OK", 200
 

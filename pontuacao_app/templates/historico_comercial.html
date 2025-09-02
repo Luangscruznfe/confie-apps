@@ -1,78 +1,147 @@
 {% extends 'base.html' %}
 
-{% block title %}Histórico de Pontuação - Comercial{% endblock %}
+{% block title %}Histórico - Comercial{% endblock %}
 
 {% block content %}
-<div class="container mt-4">
-  <h2 class="mb-4">📈 Histórico de Pontuação - Comercial</h2>
-
-  <form method="get" class="mb-3">
-    <label for="vendedor">Filtrar por vendedor:</label>
-    <select name="vendedor" id="vendedor" class="form-select" onchange="this.form.submit()">
-      <option value="">Todos</option>
-      {% for v in vendedores %}
-        <option value="{{ v }}" {% if v == vendedor %}selected{% endif %}>{{ v }}</option>
-      {% endfor %}
-    </select>
-  </form>
-
-  <table class="table table-bordered table-striped">
-    <thead>
-  <tr>
-    <th>Data</th>
-    <th>Vendedor</th>
-    <th>Meta diária batida / Conversão 70% <span class="setor-supervisor">(Supervisor)</span></th>
-    <th>Cliente novo / Prospecção <span class="setor-gerente-comercial">(Ger. Comercial)</span></th>
-    <th>Erro de pedido ou cliente insatisfeito <span class="setor-faturamento">(Faturamento)</span></th>
-    <th>Inadimplência <span class="setor-financeiro">(Financeiro)</span></th>
-    <th>Relatório diário em desacordo e fora do horário comercial <span class="setor-rh">(RH)</span></th>
-    <th>Extras</th>
-    <th>Total</th>
-    <th>Observação</th>
-  </tr>
-</thead>
-    <tbody>
-      {% for r in registros %}
-      <tr>
-        <td>{{ r[1]|datetimeformat }}</td>
-        <td>{{ r[2] }}</td>
-        <td>{{ r[3] }}</td>
-        <td>{{ r[4] }}</td>
-        <td>{{ r[5] }}</td>
-        <td>{{ r[6] }}</td>
-        <td>{{ r[7] }}</td>
-        <td>
-          {% set extras = [] %}
-          {% if 'meta' in r[8] %} {% set _ = extras.append('📊 Positivação e faturamento batido individual') %} {% endif %}
-          {% if 'equipe90' in r[8] %} {% set _ = extras.append('🤝 Equipe chegou a 90% da meta geral') %} {% endif %}
-          {{ extras|join(', ') }}
-        </td>
-        <td>{{ r[10] }}</td>
-        <td>{{ r[9] if r[9] and r[9]|string|lower != 'nan' else '' }}</td>
-      </tr>
-      {% endfor %}
-
-      <tr>
-        <td colspan="8" class="text-end fw-bold">Total Geral:</td>
-        <td class="fw-bold {% if total_geral >= 0 %}text-success{% else %}text-danger{% endif %}">{{ total_geral }}</td>
-        <td></td>
-      </tr>
-      <tr>
-        <td colspan="8" class="text-end fw-bold">Média por Vendedor:</td>
-        <td class="fw-bold {% if media >= 0 %}text-primary{% else %}text-danger{% endif %}">{{ media }}</td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
-
-  <a href="{{ url_for('home_pontuacao') }}" class="btn btn-secondary mt-3">🔙 Voltar</a>
-</div>
-
 <style>
   .setor-supervisor { color: #3498db; font-weight: bold; }
-  .setor-gerente-comercial { color: #495057; font-weight: bold; }
+  .setor-gerente { color: #b58900; font-weight: bold; }
   .setor-faturamento { color: #2ecc71; font-weight: bold; }
   .setor-financeiro { color: #e74c3c; font-weight: bold; }
   .setor-rh { color: #6c5ce7; font-weight: bold; }
 </style>
+
+<div class="container">
+  <h2 class="mb-4">📊 Histórico de Pontuação - Comercial</h2>
+
+  <!-- FILTROS -->
+  <form method="get" class="row g-2 mb-3">
+    <!-- Vendedor -->
+    <div class="col-12 col-md-3">
+      <label class="form-label">Vendedor</label>
+      <select name="vendedor" class="form-select">
+        <option value="">(Todos)</option>
+        {% for v in vendedores %}
+          <option value="{{ v }}" {{ 'selected' if vendedor==v else '' }}>{{ v }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <!-- Responsável -->
+    <div class="col-12 col-md-3">
+      <label class="form-label">Responsável</label>
+      <select name="responsavel" class="form-select">
+        <option value="">(Todos)</option>
+        <option value="SUPERVISOR"        {{ 'selected' if responsavel=='SUPERVISOR'        else '' }}>Supervisor</option>
+        <option value="GERENTE_COMERCIAL" {{ 'selected' if responsavel=='GERENTE_COMERCIAL' else '' }}>Ger. Comercial</option>
+        <option value="FATURAMENTO"       {{ 'selected' if responsavel=='FATURAMENTO'       else '' }}>Faturamento</option>
+        <option value="FINANCEIRO"        {{ 'selected' if responsavel=='FINANCEIRO'        else '' }}>Financeiro</option>
+        <option value="RH"                {{ 'selected' if responsavel=='RH'                else '' }}>RH</option>
+      </select>
+      <small class="text-muted d-block">
+        A = Supervisor • B = Ger. Comercial • C = Faturamento • D = Financeiro • E = RH
+      </small>
+    </div>
+
+    <!-- Período -->
+    <div class="col-6 col-md-2">
+      <label class="form-label">Início</label>
+      <input type="text" name="inicio" class="form-control" placeholder="dd/mm/aaaa" value="{{ inicio or '' }}">
+    </div>
+    <div class="col-6 col-md-2">
+      <label class="form-label">Fim</label>
+      <input type="text" name="fim" class="form-control" placeholder="dd/mm/aaaa" value="{{ fim or '' }}">
+    </div>
+
+    <!-- Ações -->
+    <div class="col-6 col-md-1 d-flex align-items-end">
+      <button class="btn btn-primary w-100" type="submit">Filtrar</button>
+    </div>
+    <div class="col-6 col-md-1 d-flex align-items-end">
+      <a class="btn btn-secondary w-100" href="{{ request.path }}">Limpar</a>
+    </div>
+  </form>
+
+  <div class="table-responsive">
+    <table class="table table-bordered text-white">
+      <thead class="table-dark">
+        <tr>
+          <th>ID</th>
+          <th>Data</th>
+          <th>Vendedor</th>
+          <th>
+            Meta diária batida / Conversão 70%<br>
+            <span class="setor-supervisor">(Supervisor)</span>
+          </th>
+          <th>
+            Cliente novo / Prospecção<br>
+            <span class="setor-gerente">(Gerente Comercial)</span>
+          </th>
+          <th>
+            Erro de pedido ou cliente insatisfeito<br>
+            <span class="setor-faturamento">(Faturamento)</span>
+          </th>
+          <th>
+            Inadimplência<br>
+            <span class="setor-financeiro">(Financeiro)</span>
+          </th>
+          <th>
+            Relatório diário em desacordo / fora do horário<br>
+            <span class="setor-rh">(RH)</span>
+          </th>
+          <th>Extras</th>
+          <th>Observação</th>
+          <th>Total</th>
+        </tr>
+      </thead>
+
+      <tbody>
+        {% set ns = namespace(total_geral=0) %}
+        {% for r in registros %}
+          {% set extras = r[8].split(',') if r[8] else [] %}
+          {% set total_parcial = (r[3]|int) + (r[4]|int) + (r[5]|int) + (r[6]|int) + (r[7]|int) %}
+          {% if 'meta' in extras %} {% set total_parcial = total_parcial + 2 %} {% endif %}
+          {% if 'equipe90' in extras and vendedor == 'EQUIPE' %} {% set total_parcial = total_parcial + 1 %} {% endif %}
+          {% set ns.total_geral = ns.total_geral + total_parcial %}
+          <tr>
+            <td>{{ r[0] }}</td>
+            <td>{{ r[1]|datetimeformat }}</td>
+            <td>{{ r[2] }}</td>
+            <td>{{ r[3] }}</td>
+            <td>{{ r[4] }}</td>
+            <td>{{ r[5] }}</td>
+            <td>{{ r[6] }}</td>
+            <td>{{ r[7] }}</td>
+            <td>
+              {% for extra in extras %}
+                {% if extra == 'meta' %}
+                  ⭐ Meta individual batida (+2)<br>
+                {% elif extra == 'equipe90' and vendedor == 'EQUIPE' %}
+                  🤝 Equipe chegou a 90% (+1)<br>
+                {% endif %}
+              {% endfor %}
+            </td>
+            <td>{{ r[9] if r[9] and r[9]|string|lower != 'nan' else '' }}</td>
+            <td>{{ total_parcial }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+
+      <tfoot class="table-dark">
+        <tr>
+          <td colspan="10" class="text-end fw-bold">Total Geral:</td>
+          <td class="fw-bold {% if ns.total_geral >= 0 %}text-success{% else %}text-danger{% endif %}">
+            {{ ns.total_geral }}
+          </td>
+        </tr>
+        <tr>
+          <td colspan="10" class="text-end fw-bold">Média:</td>
+          <td class="fw-bold text-info">{{ media }}</td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+
+  <a href="{{ url_for('home_pontuacao') }}" class="btn btn-secondary mt-3">🔙 Voltar</a>
+</div>
 {% endblock %}
