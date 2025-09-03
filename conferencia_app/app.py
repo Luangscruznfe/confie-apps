@@ -1,7 +1,7 @@
 # =================================================================
 # 1. IMPORTAÇÕES
 # =================================================================
-from flask import Flask, jsonify, render_template, abort, request, Response
+from flask import Flask, jsonify, render_template, abort, request, Response, redirect, flash, url_for
 import cloudinary, cloudinary.uploader, cloudinary.api
 import psycopg2, psycopg2.extras
 import json, os, re, io, fitz, shutil, requests
@@ -9,13 +9,10 @@ from werkzeug.utils import secure_filename
 from collections import defaultdict
 from datetime import datetime
 from zipfile import ZipFile
-from flask import render_template, redirect
-import io
 import pandas as pd
-import fitz
-import re
 import sys
 import logging
+
 try:
     from conferencia_app.parser_mapa import parse_mapa, debug_extrator
 except ImportError:
@@ -763,47 +760,7 @@ def api_mapas():
          "criado_em": r[3].isoformat() if r[3] else None}
     for r in rows])
 
-@app.route('/mapa')
-def mapa_lista():
-    conn = get_db_connection()
-    cur = conn.cursor()
-    cur.execute("""
-        SELECT numero_carga, motorista, data_emissao
-        FROM cargas
-        ORDER BY criado_em DESC
-    """)
-    mapas = cur.fetchall()
-    cur.close(); conn.close()
 
-    html = ['''<!DOCTYPE html><html lang="pt-br"><head>
-    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mapas</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    </head><body class="bg-dark text-light"><div class="container mt-4">
-    <nav class="mb-3">
-      <a class="btn btn-outline-light me-2" href="/conferencia">Conferência</a>
-      <a class="btn btn-outline-light me-2" href="/gestao">Gestão</a>
-      <a class="btn btn-warning" href="/mapa/upload">Importar novo mapa</a>
-    </nav>
-    <h2 class="mb-3">🗺️ Mapas de Separação</h2>
-    <p class="text-secondary">Escolha um mapa para iniciar a separação.</p>
-    <div class="list-group">''']
-    if mapas:
-        for num, mot, data in mapas:
-            html.append(f'''
-              <a class="list-group-item list-group-item-action d-flex justify-content-between align-items-center bg-dark text-light"
-                 href="/mapa/{num}">
-                <div>
-                  <div class="fw-bold">{num}</div>
-                  <small class="text-secondary">Motorista: {mot or '-'} | Emissão: {data or '-'}</small>
-                </div>
-                <span class="bi bi-chevron-right"></span>
-              </a>''')
-    else:
-        html.append('''<div class="alert alert-secondary">Nenhum mapa importado ainda.
-        Use a aba <b>Gestão</b> para subir um PDF.</div>''')
-    html.append('</div></div></body></html>')
-    return ''.join(html)
 
 # ========== MAPA: APIs de listagem e atualização (NOVO) ==========
 
@@ -1173,6 +1130,41 @@ def mapa_extrator():
                          f"</tr>")
     tail = "</tbody></table></div></body></html>"
     return head + "\n".join(rows_html) + tail
+
+# ------------------------------
+# ROTA: LISTAGEM DE MAPAS
+# ------------------------------
+@app.route('/mapa')
+def mapa():
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT numero_carga, motorista, data_emissao
+        FROM cargas
+        ORDER BY criado_em DESC
+    """)
+    mapas = cur.fetchall()
+    cur.close(); conn.close()
+    return render_template('mapa.html', mapas=mapas)
+
+
+
+@app.route('/mapa/deletar/<numero_carga>', methods=['POST'])
+def mapa_deletar(numero_carga):
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute("DELETE FROM cargas WHERE numero_carga = %s", (numero_carga,))
+        conn.commit()
+        flash(f"Mapa {numero_carga} excluído com sucesso.", "success")
+    except Exception as e:
+        conn.rollback()
+        app.logger.exception(e)
+        flash(f"Erro ao excluir o mapa {numero_carga}.", "danger")
+    finally:
+        cur.close(); conn.close()
+    return redirect(url_for('mapa'))
+
 
 
 @app.route('/ping')
