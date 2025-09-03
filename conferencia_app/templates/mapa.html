@@ -50,17 +50,22 @@
     <ul class="list-group">
       {% for m in mapas %}
         <li class="list-group-item d-flex justify-content-between align-items-center">
-          <div>
-            <div><strong>ID:</strong> {{ m[0] }}</div>
-            <div class="mapa-info">
-              Motorista: {{ m[1] or '-' }} · Romaneio: {{ m[2] or '-' }} · Emissão: {{ m[3] or '-' }}
-            </div>
-          </div>
-          <form action="{{ url_for('mapa_deletar', numero_carga=m[0]) }}" method="post"
-                onsubmit="return confirm('Excluir mapa {{ m[0] }} e todos os itens vinculados?');">
-            <button type="submit" class="btn btn-sm btn-danger">🗑️ Excluir</button>
-          </form>
-        </li>
+  <!-- LINK para abrir o mapa -->
+  <a class="text-decoration-none text-light flex-grow-1"
+     href="{{ url_for('mapa_detalhe', numero_carga=m[0]) }}">
+    <div><strong>ID:</strong> {{ m[0] }}</div>
+    <div class="mapa-info">
+      Motorista: {{ m[1] or '-' }}
+      {% if m|length > 2 %} · Emissão: {{ m[2] or '-' }}{% endif %}
+      {% if m|length > 3 %} · Romaneio: {{ m[2] or '-' }}{% endif %}
+    </div>
+  </a>
+
+  <form action="{{ url_for('mapa_deletar', numero_carga=m[0]) }}" method="post"
+        onsubmit="return confirm('Excluir mapa {{ m[0] }} e todos os itens vinculados?');">
+    <button type="submit" class="btn btn-sm btn-danger">🗑️ Excluir</button>
+  </form>
+</li>
       {% endfor %}
     </ul>
   {% else %}
