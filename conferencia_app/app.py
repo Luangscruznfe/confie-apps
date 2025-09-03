@@ -694,94 +694,75 @@ def normalizar_quantidade_item(it: dict) -> dict:
 
 
 
-@app.route('/mapa/upload', methods=['GET', 'POST'])
+@app.route('/mapa/upload', methods=['POST'])
 def mapa_upload():
-    if request.method == 'GET':
-        return '''
-        <form method="post" enctype="multipart/form-data" style="padding:20px">
-          <h3>Upload do Mapa de Separação (PDF)</h3>
-          <input type="file" name="pdf" accept="application/pdf" required />
-          <button type="submit">Enviar</button>
-        </form>
-        '''
+    file = request.files['file']
+    if not file or not file.filename.endswith('.pdf'):
+        flash("Envie um arquivo PDF válido.", "danger")
+        return redirect(url_for('mapa'))  # << antes era mapa_listar
 
-    f = request.files.get('pdf')
-    if not f:
-        return "Envie um PDF", 400
-
-    path_tmp = f"/tmp/{f.filename}"
-    f.save(path_tmp)
+    # Salva temporário
+    filepath = os.path.join("/tmp", file.filename)
+    file.save(filepath)
 
     try:
-        header, pedidos_map, grupos, itens = parse_mapa(path_tmp)
+        header, grupos, itens = parse_mapa(filepath)
     except Exception as e:
-        # erro explícito para o front
-        return (f"Erro ao ler mapa: {str(e)}", 400)
+        flash(f"Erro ao processar PDF: {e}", "danger")
+        return redirect(url_for('mapa'))  # << antes era mapa_listar
 
     conn = get_db_connection()
     cur = conn.cursor()
 
-    # UPSERT da carga
+    # Limpa dados anteriores dessa carga
+    # (se suas FKs já estão ON DELETE CASCADE, bastaria deletar só em 'cargas')
+    cur.execute("DELETE FROM carga_itens   WHERE numero_carga = %s", (header["numero_carga"],))
+    cur.execute("DELETE FROM carga_grupos  WHERE numero_carga = %s", (header["numero_carga"],))
+    cur.execute("DELETE FROM carga_pedidos WHERE numero_carga = %s", (header["numero_carga"],))
+    cur.execute("DELETE FROM cargas        WHERE numero_carga = %s", (header["numero_carga"],))
+
+    # Insere o cabeçalho na TABELA CERTA: 'cargas'
     cur.execute("""
-        INSERT INTO cargas (numero_carga, motorista, descricao_romaneio, peso_total, entregas, data_emissao)
-        VALUES (%s,%s,%s,%s,%s,%s)
-        ON CONFLICT (numero_carga) DO UPDATE SET
-            motorista=EXCLUDED.motorista,
-            descricao_romaneio=EXCLUDED.descricao_romaneio,
-            peso_total=EXCLUDED.peso_total,
-            entregas=EXCLUDED.entregas,
-            data_emissao=EXCLUDED.data_emissao
+        INSERT INTO cargas (numero_carga, motorista, descricao_romaneio, data_emissao)
+        VALUES (%s, %s, %s, %s)
+        ON CONFLICT (numero_carga) DO UPDATE
+        SET motorista = EXCLUDED.motorista,
+            descricao_romaneio = EXCLUDED.descricao_romaneio,
+            data_emissao = EXCLUDED.data_emissao
     """, (
         header.get("numero_carga"),
         header.get("motorista"),
-        header.get("descricao_romaneio"),
-        str(header.get("peso_total") or "").replace('.', '').replace(',', '.'),
-        int(header.get("entregas") or 0),
-        header.get("data_emissao"),
+        header.get("romaneio"),      # mapeado para descricao_romaneio
+        header.get("emissao")
     ))
 
-    # Sincroniza tabelas filhas
-    cur.execute("DELETE FROM carga_pedidos WHERE numero_carga=%s", (header["numero_carga"],))
-    cur.execute("DELETE FROM carga_grupos  WHERE numero_carga=%s", (header["numero_carga"],))
-    cur.execute("DELETE FROM carga_itens   WHERE numero_carga=%s", (header["numero_carga"],))
-
-    for p in pedidos_map:
-        cur.execute(
-            "INSERT INTO carga_pedidos (numero_carga, pedido_numero) VALUES (%s,%s)",
-            (header["numero_carga"], p)
-        )
-
+    # Insere grupos
     for g in grupos:
         cur.execute("""
             INSERT INTO carga_grupos (numero_carga, grupo_codigo, grupo_titulo)
-            VALUES (%s,%s,%s)
-        """, (header["numero_carga"], g["codigo"], g["titulo"]))
+            VALUES (%s, %s, %s)
+        """, (header["numero_carga"], g["grupo_codigo"], g.get("descricao") or g.get("grupo_titulo") or ""))
 
+    # Insere itens (com normalização)
     for it in itens:
-        it = normalizar_quantidade_item(it)  # <<< aplica correção
-
-    cur.execute("""
-        INSERT INTO carga_itens
-            (numero_carga, grupo_codigo, fabricante, codigo, cod_barras, descricao,
-             qtd_unidades, unidade, pack_qtd, pack_unid)
-        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
-    """, (
-        header["numero_carga"], it["grupo_codigo"], it["fabricante"], it["codigo"],
-        it["cod_barras"], it["descricao"], it["qtd_unidades"], it["unidade"],
-        it["pack_qtd"], it["pack_unid"]
-    ))
-
+        it = normalizar_quantidade_item(it)
+        cur.execute("""
+            INSERT INTO carga_itens
+                (numero_carga, grupo_codigo, fabricante, codigo, cod_barras, descricao,
+                 qtd_unidades, unidade, pack_qtd, pack_unid)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+        """, (
+            header["numero_carga"], it["grupo_codigo"], it["fabricante"], it["codigo"],
+            it["cod_barras"], it["descricao"], it["qtd_unidades"], it["unidade"],
+            it["pack_qtd"], it["pack_unid"]
+        ))
 
     conn.commit()
     cur.close(); conn.close()
 
-    return jsonify({
-        "ok": True,
-        "numero_carga": header["numero_carga"],
-        "pedidos": pedidos_map,
-        "grupos": len(grupos),
-        "itens": len(itens)
-    })
+    flash(f"Mapa {header['numero_carga']} importado com sucesso!", "success")
+    return redirect(url_for('mapa'))  # << antes era mapa_listar
+
 
 
 @app.route('/api/mapas')
@@ -1179,14 +1160,13 @@ def mapa():
     conn = get_db_connection()
     cur = conn.cursor()
     cur.execute("""
-        SELECT numero_carga, motorista, data_emissao
+        SELECT numero_carga, motorista, descricao_romaneio, data_emissao
         FROM cargas
         ORDER BY criado_em DESC
     """)
     mapas = cur.fetchall()
     cur.close(); conn.close()
     return render_template('mapa.html', mapas=mapas)
-
 
 
 @app.route('/mapa/deletar/<numero_carga>', methods=['POST'])
