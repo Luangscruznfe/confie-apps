@@ -656,6 +656,43 @@ def resetar_dia():
         finally:
             if conn: conn.close()
 
+# =================================================================
+# FUNÇÃO AUXILIAR: normaliza quantidade do item de mapa
+# =================================================================
+QTD_UNIDS_TOKEN = r"(UN|PC|PT|DZ|SC|KT|JG|BF|PA)"
+QTD_PACOTE_RE = re.compile(r"C\s*/\s*(\d+)\s*" + QTD_UNIDS_TOKEN + r"?", re.IGNORECASE)
+QTD_FINAL_RE  = re.compile(r"(\d+)\s*(FD|CX|CJ|DP|UN)\s*$", re.IGNORECASE)
+
+def normalizar_quantidade_item(it: dict) -> dict:
+    """
+    Ajusta pack_qtd/pack_unid e qtd_unidades/unidade a partir da descrição
+    (ex.: 'C/30UN ... 1 FD' -> pack_qtd=30, pack_unid=UN, qtd_unidades=1, unidade=FD).
+    """
+    desc = (it.get("descricao") or "").upper().strip()
+
+    # 1) C/ 30UN
+    if not it.get("pack_qtd"):
+        m = QTD_PACOTE_RE.search(desc)
+        if m:
+            it["pack_qtd"] = int(m.group(1))
+            it["pack_unid"] = (m.group(2) or "UN").upper()
+
+    # 2) Final: 1 FD
+    if not it.get("qtd_unidades") or not it.get("unidade"):
+        m2 = QTD_FINAL_RE.search(desc)
+        if m2:
+            it["qtd_unidades"] = int(m2.group(1))
+            it["unidade"] = m2.group(2).upper()
+
+    # defaults
+    if not it.get("pack_qtd"):
+        it["pack_qtd"] = 1
+    if not it.get("pack_unid"):
+        it["pack_unid"] = "UN"
+
+    return it
+
+
 
 @app.route('/mapa/upload', methods=['GET', 'POST'])
 def mapa_upload():
@@ -721,16 +758,19 @@ def mapa_upload():
         """, (header["numero_carga"], g["codigo"], g["titulo"]))
 
     for it in itens:
-        cur.execute("""
-            INSERT INTO carga_itens
-                (numero_carga, grupo_codigo, fabricante, codigo, cod_barras, descricao,
-                 qtd_unidades, unidade, pack_qtd, pack_unid)
-            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
-        """, (
-            header["numero_carga"], it["grupo_codigo"], it["fabricante"], it["codigo"],
-            it["cod_barras"], it["descricao"], it["qtd_unidades"], it["unidade"],
-            it["pack_qtd"], it["pack_unid"]
-        ))
+        it = normalizar_quantidade_item(it)  # <<< aplica correção
+
+    cur.execute("""
+        INSERT INTO carga_itens
+            (numero_carga, grupo_codigo, fabricante, codigo, cod_barras, descricao,
+             qtd_unidades, unidade, pack_qtd, pack_unid)
+        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+    """, (
+        header["numero_carga"], it["grupo_codigo"], it["fabricante"], it["codigo"],
+        it["cod_barras"], it["descricao"], it["qtd_unidades"], it["unidade"],
+        it["pack_qtd"], it["pack_unid"]
+    ))
+
 
     conn.commit()
     cur.close(); conn.close()
