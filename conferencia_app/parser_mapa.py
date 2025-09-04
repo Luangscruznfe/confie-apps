@@ -7,228 +7,154 @@ try:
 except ImportError:
     raise RuntimeError("PyMuPDF (fitz) não encontrado. Instale com: pip install pymupdf")
 
+# ===== NOVAS REGRAS DE EXTRAÇÃO (REGEX) =====
+
+# Regex para o cabeçalho do grupo (ex: "GBA1 - BALAS/GOMAS")
+# Tornada mais flexível para encontrar o padrão em qualquer lugar da linha.
+GRUPO_RE = re.compile(r"([A-Z0-9]{3,}\s*-\s*.+)")
+
+# Regex para identificar a parte da quantidade no final da linha de um item.
+# Ex: "1 UN", "2 DP C/30UN", "1 CX C/20UN"
+QTD_RE = re.compile(r"(\d+\s+(?:UN|FD|CX|CJ|DP|PC|PT|DZ|SC|KT|JG|BF|PA)\s*(?:C\/\s*\d+UN)?)", re.IGNORECASE)
+
+# Regex para identificar o código de barras (EAN) no início da linha.
+EAN_RE = re.compile(r"^\d{12,14}")
+
+# Regex para identificar o código interno do produto (geralmente após o EAN).
+COD_RE = re.compile(r"^\d{3,}")
+
 # ---------- utils ----------
-QTD_UNIDS_TOKEN = r"(UN|FD|CX|CJ|DP|PC|PT|DZ|SC|KT|JG|BF|PA)"
 
 def _clean(s: str) -> str:
+    """Limpa a string de caracteres indesejados e espaços múltiplos."""
     if not s:
         return ""
     s = s.replace("\x0c", " ").replace("\u00ad", "")
-    s = re.sub(r"[ \t]+", " ", s)
-    return s.strip()
+    return re.sub(r"\s+", " ", s).strip()
 
 def _iter_lines(doc: "fitz.Document"):
     """Gera linhas em ordem de leitura (y, depois x) para TODAS as páginas."""
     for p in range(doc.page_count):
         page = doc.load_page(p)
-        blocks = page.get_text("blocks") or []
-        blocks.sort(key=lambda b: (round(b[1], 2), round(b[0], 2)))
+        # Usar 'blocks' com sort=True é uma boa maneira de obter a ordem de leitura.
+        blocks = page.get_text("blocks", sort=True) or []
         for b in blocks:
+            # O bloco 4 contém o texto
             txt = b[4] if len(b) > 4 else ""
             for raw in (txt.splitlines() if txt else []):
                 line = _clean(raw)
-                if line:
+                # Ignora linhas que são cabeçalhos de tabela repetidos
+                if line and "Cód. Barras" not in line and "Código Descrição" not in line:
                     yield line
 
-# ---------- padrões ----------
-GRUPO_RE = re.compile(r"^\s*([A-Z0-9]{3,})\s*-\s*(.+?)\s*$")             # ex.: GBA1 - BALAS/GOMAS
-EAN_RE   = re.compile(r"^\d{12,14}$")                                     # 12-14 dígitos
-COD_RE   = re.compile(r"^\d{3,}$")                                        # código numérico (3+)
-QTD_RE   = re.compile(rf"^(\d+)\s*{QTD_UNIDS_TOKEN}$", re.IGNORECASE)     # "3 UN", "1 DP", ...
-PACK_RE  = re.compile(r"^C\s*/\s*(\d+)\s*UN$", re.IGNORECASE)             # "C/ 12UN"
-# fabricante: linha curta, toda maiúscula, sem números (ex.: RICLAN, DORI, HARCCLIN)
-FAB_RE   = re.compile(r"^[A-ZÀ-ÖØ-Þ]{2,}(?:\s+[A-ZÀ-ÖØ-Þ]{2,})*$")
+# ===== PARSER PRINCIPAL (LÓGICA REESCRITA) =====
 
-# ---------- principal ----------
 def parse_mapa(pdf_path: str) -> Tuple[Dict[str, str], Any, List[Dict[str, str]], List[Dict[str, Any]]]:
     """
-    Retorna: header, None, grupos, itens
-
-    grupos: [{"grupo_codigo": "...", "grupo_titulo": "..."}]
-    itens:  [{"grupo_codigo": "...", "fabricante": "...", "codigo": "...", "cod_barras": "...",
-              "descricao": "...", "qtd_unidades": int, "unidade": "UN",
-              "pack_qtd": int, "pack_unid": "UN"}]
+    Nova versão do parser, adaptada para o layout colunar do arquivo mk.pdf.
     """
     doc = fitz.open(pdf_path)
-
-    # Lê todas as linhas uma vez (ordem visual)
     lines = list(_iter_lines(doc))
-    header_text = "\n".join(lines[:200])  # primeiras linhas bastam p/ cabeçalho
+    header_text = "\n".join(lines[:30]) # Primeiras linhas para cabeçalho
 
-    # Inicializa header ANTES de popular
     header: Dict[str, str] = {}
+    m = re.search(r"N[uú]mero da Carga:\s*(\d+)", header_text, re.IGNORECASE)
+    if m: header["numero_carga"] = m.group(1).strip()
 
-    # Extrai campos do cabeçalho (formas flexíveis)
-    m = re.search(r"(?:N[uú]mero\s+da\s+Carga|Numero\s+da\s+Carga)\s*[:\-]?\s*(\d{1,10})",
-                  header_text, re.IGNORECASE)
-    if m:
-        header["numero_carga"] = m.group(1).strip()
+    m = re.search(r"Data Emiss[aã]o:\s*([0-3]?\d\/[01]?\d\/\d{2,4})", header_text, re.IGNORECASE)
+    if m: header["data"] = m.group(1).strip()
 
-    m = re.search(r"(?:Data\s+Emiss[aã]o|Data)\s*[:\-]?\s*([0-3]?\d\/[01]?\d\/\d{2,4})",
-                  header_text, re.IGNORECASE)
-    if m:
-        header["data"] = m.group(1).strip()
+    m = re.search(r"Motorista:\s*(.+)", header_text, re.IGNORECASE)
+    if m: header["motorista"] = m.group(1).strip()
 
-    m = re.search(r"Motorista\s*[:\-]?\s*([A-ZÀ-ÖØ-ö0-9 \-\.]{1,40})?", header_text, re.IGNORECASE)
-    if m:
-        header["motorista"] = (m.group(1) or "").strip()
+    m = re.search(r"Desc\.?\s*Romaneio:\s*([A-Z0-9 \-\/]+)", header_text, re.IGNORECASE)
+    if m: header["romaneio"] = m.group(1).strip()
 
-    m = re.search(r"(?:Desc\.?\s*Romaneio|Romaneio)\s*[:\-]?\s*([A-Z0-9 \-\/]{1,40})",
-                  header_text, re.IGNORECASE)
-    if m:
-        header["romaneio"] = m.group(1).strip()
 
     grupos: List[Dict[str, str]] = []
-    itens:  List[Dict[str, Any]] = []
+    itens: List[Dict[str, Any]] = []
+    grupo_codigo_atual = ""
 
-    grupo_codigo = ""
-    grupo_titulo = ""
-
-    # estado do item em construção (FSM)
-    cur: Dict[str, Any] = {}
-    esperando = "fabricante"  # fabricante -> codigo -> ean -> descricao -> qtd -> (pack opcional)
-
-    def flush_item():
-        """Encerra o item atual se houver descrição; seta defaults e empilha."""
-        nonlocal cur, esperando
-        if not cur.get("descricao"):
-            cur = {}
-            esperando = "fabricante"
-            return
-        cur.setdefault("qtd_unidades", 0)
-        cur.setdefault("unidade", "UN")
-        cur.setdefault("pack_qtd", 1)
-        cur.setdefault("pack_unid", "UN")
-        cur["grupo_codigo"] = grupo_codigo or cur.get("grupo_codigo") or ""
-        itens.append(cur)
-        cur = {}
-        esperando = "fabricante"
-
-    # loop principal sobre as linhas
     for line in lines:
-        # 1) Grupo?
-        mg = GRUPO_RE.match(line)
-        if mg:
-            if cur:
-                flush_item()
-            grupo_codigo, grupo_titulo = mg.group(1).strip(), _clean(mg.group(2))
-            grupos.append({"grupo_codigo": grupo_codigo, "grupo_titulo": grupo_titulo})
+        # 1. Tenta identificar se a linha é (ou contém) um grupo
+        match_grupo = GRUPO_RE.search(line)
+        if match_grupo:
+            texto_grupo = match_grupo.group(1).strip()
+            # Divide o código da descrição (ex: "GBA1 - BALAS/GOMAS")
+            partes_grupo = [p.strip() for p in texto_grupo.split('-', 1)]
+            if len(partes_grupo) == 2:
+                grupo_codigo_atual = partes_grupo[0]
+                grupos.append({"grupo_codigo": grupo_codigo_atual, "grupo_titulo": partes_grupo[1]})
+                # Remove a informação do grupo da linha para que o resto possa ser processado como item
+                line = GRUPO_RE.sub('', line).strip()
+
+        # 2. Se sobrou texto na linha, tenta processá-lo como um item
+        if not line:
             continue
+            
+        # 3. Disseca a linha do item (lógica principal)
+        # A estratégia é extrair as partes conhecidas (como quantidade e fabricante)
+        # e o que sobra é a descrição/código.
+        
+        item = {"grupo_codigo": grupo_codigo_atual}
+        
+        # Extrai a quantidade do final da linha
+        match_qtd = QTD_RE.search(line)
+        if match_qtd:
+            qtd_str = match_qtd.group(1)
+            item["quantidade_str"] = qtd_str # Armazena a string completa da qtd
+            line = line.replace(qtd_str, "").strip() # Remove da linha
 
-        # 2) Pack "C/ 12UN" pode vir após a quantidade
-        mpk = PACK_RE.match(line)
-        if mpk and cur:
-            cur["pack_qtd"]  = int(mpk.group(1))
-            cur["pack_unid"] = "UN"
-            continue
+            # Tenta extrair o "pack" (C/ 12UN)
+            match_pack = re.search(r'C\/\s*(\d+)', qtd_str, re.IGNORECASE)
+            if match_pack:
+                item["pack_qtd"] = int(match_pack.group(1))
 
-        # 3) FSM do item
-        if esperando == "fabricante":
-            # muitos mapas trazem um número de sequência (ex.: "22") sozinho — ignorar
-            if line.isdigit():
-                continue
-            if FAB_RE.match(line) and len(line) <= 30:
-                cur = {"fabricante": line}
-                esperando = "codigo"
-                continue
-            if COD_RE.match(line):  # sem fabricante
-                cur = {"codigo": line}
-                esperando = "ean"
-                continue
-            if EAN_RE.match(line):  # raríssimo
-                cur = {"cod_barras": line}
-                esperando = "descricao"
-                continue
-            if len(line) > 3:       # fallback vira descrição
-                cur = {"descricao": line}
-                esperando = "qtd"
-                continue
+            # Extrai a unidade principal (UN, FD, CX, etc.)
+            match_unidade = re.match(r'(\d+)\s*([A-Z]+)', qtd_str)
+            if match_unidade:
+                item["qtd_unidades"] = int(match_unidade.group(1))
+                item["unidade"] = match_unidade.group(2).upper()
 
-        elif esperando == "codigo":
-            if COD_RE.match(line):
-                cur["codigo"] = line
-                esperando = "ean"
-                continue
-            if FAB_RE.match(line):  # fabricante repetido
-                cur["fabricante"] = line
-                continue
-            if len(line) > 3 and not line.isdigit():  # descrição antes do EAN
-                cur["descricao"] = line
-                esperando = "qtd"
-                continue
+        # O que sobrou na linha são EAN, Código, Descrição e Fabricante
+        # O fabricante é a última palavra (ou conjunto de palavras em maiúsculo)
+        partes = line.split()
+        if len(partes) > 1 and partes[-1].isupper():
+            item["fabricante"] = partes[-1]
+            line = " ".join(partes[:-1]).strip()
 
-        elif esperando == "ean":
-            if EAN_RE.match(line):
-                cur["cod_barras"] = line
-                esperando = "descricao"
-                continue
-            if len(line) > 3 and not QTD_RE.match(line):  # sem EAN
-                cur["descricao"] = line
-                esperando = "qtd"
-                continue
+        # Agora, processa o início da linha para EAN e Código
+        match_ean = EAN_RE.match(line)
+        if match_ean:
+            item["cod_barras"] = match_ean.group(0)
+            line = line.replace(item["cod_barras"], "").strip()
+        
+        match_cod = COD_RE.match(line)
+        if match_cod:
+            item["codigo"] = match_cod.group(0)
+            line = line.replace(item["codigo"], "").strip()
 
-        elif esperando == "descricao":
-            mq = QTD_RE.match(line)
-            if mq:
-                cur["qtd_unidades"] = int(mq.group(1))
-                cur["unidade"] = mq.group(2).upper()
-                flush_item()
-                continue
-            # descrição pode quebrar em 2+ linhas
-            desc = cur.get("descricao", "")
-            cur["descricao"] = (desc + " " + line).strip() if desc else line
-            continue
+        # O que finalmente restou é a descrição
+        item["descricao"] = line.strip()
 
-        elif esperando == "qtd":
-            mq = QTD_RE.match(line)
-            if mq:
-                cur["qtd_unidades"] = int(mq.group(1))
-                cur["unidade"] = mq.group(2).upper()
-                flush_item()
-                continue
-            # não reconheceu qtd? pode ser início de novo item; fecha o atual
-            if GRUPO_RE.match(line) or FAB_RE.match(line) or COD_RE.match(line) or EAN_RE.match(line):
-                flush_item()
-                # recomeça estado a partir do que reconheceu
-                if FAB_RE.match(line):
-                    cur = {"fabricante": line}; esperando = "codigo"
-                elif COD_RE.match(line):
-                    cur = {"codigo": line}; esperando = "ean"
-                elif EAN_RE.match(line):
-                    cur = {"cod_barras": line}; esperando = "descricao"
-                continue
-            # se nada casa, anexa à descrição
-            cur["descricao"] = (cur.get("descricao", "") + " " + line).strip()
+        # Adiciona o item à lista apenas se ele tiver uma descrição, para evitar itens vazios
+        if item.get("descricao"):
+            itens.append(item)
 
-    # flush do último item
-    if cur:
-        flush_item()
+    return header, None, grupos, itens
 
-    return header, grupos, itens, []
 
-# ---------- depuração ----------
+# ---------- Função de depuração (mantida para testes futuros) ----------
 def debug_extrator(pdf_path: str):
     """
-    Retorna linhas + tentativa de interpretação parcial (grupo/cód/EAN/quantidade).
-    Útil para inspecionar rapidamente o que o parser está vendo em /mapa/extrator.
+    Retorna linhas + tentativa de interpretação parcial.
+    Útil para inspecionar rapidamente o que o parser está vendo.
     """
     doc = fitz.open(pdf_path)
     rows = []
     n = 0
     for line in _iter_lines(doc):
         n += 1
-        parsed = {}
-        mg = GRUPO_RE.match(line)
-        if mg:
-            parsed = {"grupo_codigo": mg.group(1), "grupo_titulo": mg.group(2)}
-        else:
-            if COD_RE.match(line):
-                parsed = {"codigo": line}
-            elif EAN_RE.match(line):
-                parsed = {"cod_barras": line}
-            elif QTD_RE.match(line):
-                m = QTD_RE.match(line)
-                parsed = {"qtd_unidades": int(m.group(1)), "unidade": m.group(2).upper()}
-        rows.append({"n": n, "line": line, "parsed": parsed})
+        rows.append({"n": n, "line": line, "parsed": {}})
     doc.close()
     return rows
