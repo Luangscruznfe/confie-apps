@@ -1,4 +1,5 @@
-# -*- coding: utf-8 -*-
+# Arquivo: parser_mapa.py (Versão final e completa)
+
 import re
 from typing import Dict, List, Tuple, Any
 
@@ -11,8 +12,6 @@ except ImportError:
 X_FABRICANTE = 430
 X_QUANTIDADE = 500
 Y_LINE_TOLERANCE = 4
-
-# Padrão flexível para encontrar o código de um grupo (ex: GAA9, GBA1, GCA1)
 GRUPO_CODE_PATTERN = re.compile(r"([A-Z]{2,}\d{1,2})")
 
 # ---------- Funções Auxiliares ----------
@@ -23,7 +22,6 @@ def _clean(s: str) -> str:
 def group_words_into_lines(words: list, y_tolerance: int) -> List[List[Tuple]]:
     if not words: return []
     lines = []
-    # Ordena primariamente por Y, depois por X
     words.sort(key=lambda w: (w[1], w[0]))
     
     current_line = [words[0]]
@@ -32,20 +30,17 @@ def group_words_into_lines(words: list, y_tolerance: int) -> List[List[Tuple]]:
     for i in range(1, len(words)):
         word = words[i]
         y0 = word[1]
-        # Agrupa palavras se a diferença vertical for pequena
         if abs(y0 - last_y) <= y_tolerance:
             current_line.append(word)
         else:
             lines.append(sorted(current_line, key=lambda w: w[0]))
             current_line = [word]
-        # Atualiza a referência Y com a do primeiro item da linha para maior estabilidade
         last_y = current_line[0][1]
         
     lines.append(sorted(current_line, key=lambda w: w[0]))
     return lines
 
 # ===== PARSER PRINCIPAL (VERSÃO FINAL E CORRIGIDA) =====
-
 def parse_mapa(pdf_path: str) -> Tuple[Dict[str, str], Any, List[Dict[str, str]], List[Dict[str, Any]]]:
     doc = fitz.open(pdf_path)
     header, grupos, itens = {}, [], []
@@ -67,7 +62,6 @@ def parse_mapa(pdf_path: str) -> Tuple[Dict[str, str], Any, List[Dict[str, str]]
             if not full_line_text or "Cód. Barras" in full_line_text:
                 continue
             
-            # Divide as palavras da linha em colunas
             desc_parts, fab_parts, qtd_parts = [], [], []
             for x0, _, _, _, text, *_ in line_words:
                 if x0 < X_FABRICANTE: desc_parts.append(text)
@@ -78,30 +72,25 @@ def parse_mapa(pdf_path: str) -> Tuple[Dict[str, str], Any, List[Dict[str, str]]
             fabricante = _clean(" ".join(fab_parts))
             quantidade = _clean(" ".join(qtd_parts))
 
-            # Lógica de detecção de grupo
-            # Um grupo pode ser uma linha inteira ou estar no início da descrição de um item
             match_grupo_code = GRUPO_CODE_PATTERN.match(full_desc)
             is_group_line = (match_grupo_code and not fabricante and not quantidade)
             is_item_with_group = (match_grupo_code and (fabricante or quantidade))
 
             if is_group_line or is_item_with_group:
                 grupo_codigo_atual = match_grupo_code.group(1)
-                # Remove o código do grupo da descrição
                 temp_desc = GRUPO_CODE_PATTERN.sub('', full_desc).strip()
-                # O que sobra é o título do grupo, limpando hífens e espaços
                 titulo_grupo = re.sub(r"^-?\s*", "", temp_desc)
 
                 if not any(g['grupo_codigo'] == grupo_codigo_atual for g in grupos):
                     grupos.append({"grupo_codigo": grupo_codigo_atual, "grupo_titulo": titulo_grupo})
                 
                 if is_group_line:
-                    continue # Se a linha é SÓ um grupo, pula para a próxima
+                    continue
                 
-                full_desc = titulo_grupo # O resto da descrição é o início do item
+                full_desc = titulo_grupo
             
             if not full_desc: continue
             
-            # Processa o item
             item = {"grupo_codigo": grupo_codigo_atual, "fabricante": fabricante}
             
             desc_words = full_desc.split()
@@ -131,3 +120,14 @@ def parse_mapa(pdf_path: str) -> Tuple[Dict[str, str], Any, List[Dict[str, str]]
 
     doc.close()
     return header, None, grupos, itens
+
+# A FUNÇÃO ABAIXO ESTAVA FALTANDO NO SEU ARQUIVO
+def debug_extrator(pdf_path: str):
+    """Função de depuração que o app.py precisa para a rota /mapa/extrator."""
+    doc = fitz.open(pdf_path)
+    rows = []
+    # Esta é uma versão simplificada, apenas para garantir que a função exista
+    for page in doc:
+        rows.extend(page.get_text("text").splitlines())
+    doc.close()
+    return [{"n": i + 1, "line": line, "parsed": {}} for i, line in enumerate(rows)]
