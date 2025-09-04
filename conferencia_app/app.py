@@ -745,36 +745,53 @@ def overlay_quantidades_com_conferencia(itens_mapa: list, pdf_path: str) -> list
 @app.route('/mapa/upload', methods=['POST'])
 def mapa_upload():
     try:
-        f = request.files.get('pdf')
+        # 1) Arquivo
+        f = request.files.get('pdf')  # <- o form deve usar name="pdf"
         if not f or not f.filename.lower().endswith('.pdf'):
             flash("Envie um arquivo PDF válido.", "danger")
             return redirect(url_for('mapa'))
 
-        # salva temporário
-        path_tmp = os.path.join("/tmp", f.filename)
+        # 2) Salva temporário
+        path_tmp = os.path.join("/tmp", secure_filename(f.filename))
         f.save(path_tmp)
+        app.logger.info("[MAPA] arquivo recebido: %s", path_tmp)
 
-        # extrai do PDF com parse_mapa
+        # 3) Extrai do PDF
         header, _, grupos, itens = parse_mapa(path_tmp)
+        numero_carga = (header or {}).get("numero_carga")
 
-        numero_carga = header.get("numero_carga")
+        app.logger.info("[MAPA] parse_mapa OK: numero_carga=%s", numero_carga)
+        app.logger.info("[MAPA] header=%s", header)
+        app.logger.info("[MAPA] grupos=%d  itens=%d", len(grupos or []), len(itens or []))
+        for idx, it_dbg in enumerate((itens or [])[:5]):
+            app.logger.info("[MAPA] item[%d]=%s", idx, it_dbg)
+
         if not numero_carga:
             flash("Número da carga não encontrado no PDF.", "danger")
             return redirect(url_for('mapa'))
 
-        # sobrepõe quantidades usando a conferência (se disponível)
-        itens = overlay_quantidades_com_conferencia(itens, path_tmp)
+        # 4) (Opcional) sobrepor quantidades com extrator da conferência, se existir
+        try:
+            if 'overlay_quantidades_com_conferencia' in globals():
+                itens = overlay_quantidades_com_conferencia(itens, path_tmp)
+                app.logger.info("[MAPA] apos overlay com conferencia: itens=%d", len(itens or []))
+                for idx, it_dbg in enumerate((itens or [])[:5]):
+                    app.logger.info("[MAPA] item_overlay[%d]=%s", idx, it_dbg)
+        except Exception as e_overlay:
+            app.logger.warning("[MAPA] overlay com conferencia falhou: %s", e_overlay)
 
+        # 5) Banco
         conn = get_db_connection()
         cur = conn.cursor()
 
-        # limpa dados prévios dessa carga
+        # Limpa dados prévios dessa carga
         cur.execute("DELETE FROM carga_itens   WHERE numero_carga = %s", (numero_carga,))
         cur.execute("DELETE FROM carga_grupos  WHERE numero_carga = %s", (numero_carga,))
         cur.execute("DELETE FROM carga_pedidos WHERE numero_carga = %s", (numero_carga,))
         cur.execute("DELETE FROM cargas        WHERE numero_carga = %s", (numero_carga,))
+        app.logger.info("[MAPA] limpeza anterior concluída para carga %s", numero_carga)
 
-        # insere header em 'cargas'
+        # Cabeçalho em 'cargas'
         cur.execute("""
             INSERT INTO cargas (numero_carga, motorista, descricao_romaneio, data_emissao)
             VALUES (%s,%s,%s,%s)
@@ -788,32 +805,69 @@ def mapa_upload():
             header.get("romaneio"),
             header.get("emissao")
         ))
+        app.logger.info("[MAPA] header inserido/atualizado em 'cargas'")
 
-        # insere grupos
-        for g in grupos:
+        # Grupos
+        for g in grupos or []:
             cur.execute("""
                 INSERT INTO carga_grupos (numero_carga, grupo_codigo, grupo_titulo)
                 VALUES (%s,%s,%s)
             """, (
                 numero_carga,
-                g.get("grupo_codigo"),
-                g.get("descricao") or g.get("grupo_titulo") or ""
+                g.get("grupo_codigo") or g.get("codigo"),
+                g.get("grupo_titulo") or g.get("titulo") or g.get("descricao") or ""
             ))
 
-        # insere itens (normalização final)
-        for it in itens:
-            it = normalizar_quantidade_item(it)
+        app.logger.info("[MAPA] grupos inseridos: %d", len(grupos or []))
+
+        # Itens (normaliza e insere 1 a 1, logando)
+        total_insert = 0
+        for it in itens or []:
+            # normalização final (sua função já existente)
+            try:
+                it = normalizar_quantidade_item(it)
+            except Exception as e_norm:
+                app.logger.warning("[MAPA] normalizar_quantidade_item falhou: %s | it=%s", e_norm, it)
+
+            total_un = (it.get("qtd_unidades") or 0) * (it.get("pack_qtd") or 1)
+            if not it.get("descricao"):
+                app.logger.warning("[MAPA] item sem descricao: %s", it)
+            if not it.get("codigo") and not it.get("cod_barras") and not it.get("ean"):
+                app.logger.warning("[MAPA] item sem codigo/ean: %s", it)
+
+            app.logger.info(
+                "[MAPA] INSERINDO: grp=%s cod=%s ean=%s qtd=%s %s pack=%s %s total=%s desc=%.60s",
+                it.get("grupo_codigo") or it.get("grupo"),
+                it.get("codigo"),
+                it.get("cod_barras") or it.get("ean"),
+                it.get("qtd_unidades"), (it.get("unidade") or "UN"),
+                it.get("pack_qtd"), (it.get("pack_unid") or "UN"),
+                total_un,
+                (it.get("descricao") or "").replace("\n"," ")
+            )
+
             cur.execute("""
                 INSERT INTO carga_itens
                     (numero_carga, grupo_codigo, fabricante, codigo, cod_barras, descricao,
                      qtd_unidades, unidade, pack_qtd, pack_unid)
                 VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
             """, (
-                numero_carga, it.get("grupo_codigo"), it.get("fabricante"), it.get("codigo"),
-                it.get("cod_barras"), it.get("descricao"), it.get("qtd_unidades"), it.get("unidade"),
-                it.get("pack_qtd"), it.get("pack_unid")
+                numero_carga,
+                it.get("grupo_codigo") or it.get("grupo"),
+                it.get("fabricante"),
+                it.get("codigo"),
+                it.get("cod_barras") or it.get("ean"),
+                it.get("descricao"),
+                it.get("qtd_unidades") or 0,
+                (it.get("unidade") or "UN").upper(),
+                it.get("pack_qtd") or 1,
+                (it.get("pack_unid") or "UN").upper(),
             ))
+            total_insert += 1
 
+        app.logger.info("[MAPA] itens inseridos: %d", total_insert)
+
+        # Commit
         conn.commit()
         cur.close(); conn.close()
 
@@ -822,6 +876,7 @@ def mapa_upload():
 
     except Exception as e:
         import traceback; traceback.print_exc()
+        app.logger.exception("[MAPA] erro no upload: %s", e)
         flash(f"Erro ao importar mapa: {e}", "danger")
         return redirect(url_for('mapa'))
 
@@ -1245,6 +1300,46 @@ def mapa_deletar(numero_carga):
     finally:
         cur.close(); conn.close()
     return redirect(url_for('mapa'))
+
+
+@app.route('/api/mapa/<numero_carga>/debug')
+def api_mapa_debug(numero_carga):
+    conn = get_db_connection()
+    cur = conn.cursor()
+
+    cur.execute("SELECT count(*) FROM carga_itens WHERE numero_carga = %s", (numero_carga,))
+    total_itens = cur.fetchone()[0]
+
+    cur.execute("""
+        SELECT grupo_codigo, count(*) 
+        FROM carga_itens 
+        WHERE numero_carga = %s 
+        GROUP BY grupo_codigo
+        ORDER BY grupo_codigo
+    """, (numero_carga,))
+    por_grupo = cur.fetchall()
+
+    cur.execute("""
+        SELECT numero_carga, motorista, descricao_romaneio, data_emissao 
+        FROM cargas WHERE numero_carga = %s
+    """, (numero_carga,))
+    header = cur.fetchone()
+
+    cur.close()
+    conn.close()
+
+    return jsonify({
+        "header": {
+            "numero_carga": header[0] if header else numero_carga,
+            "motorista": header[1] if header else None,
+            "romaneio": header[2] if header else None,
+            "emissao": header[3] if header else None,
+        },
+        "total_itens": total_itens,
+        "por_grupo": [{"grupo_codigo": g, "qtd": q} for (g, q) in por_grupo]
+    })
+
+
 
 
 
