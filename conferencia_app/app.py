@@ -1,7 +1,7 @@
 # =================================================================
 # 1. IMPORTAÇÕES
 # =================================================================
-from flask import Flask, jsonify, render_template, abort, request, Response, redirect, flash, url_for
+from flask import Flask, jsonify, render_template, abort, request, Response
 import cloudinary, cloudinary.uploader, cloudinary.api
 import psycopg2, psycopg2.extras
 import json, os, re, io, fitz, shutil, requests
@@ -9,10 +9,13 @@ from werkzeug.utils import secure_filename
 from collections import defaultdict
 from datetime import datetime
 from zipfile import ZipFile
+from flask import render_template, redirect
+import io
 import pandas as pd
+import fitz
+import re
 import sys
 import logging
-
 try:
     from conferencia_app.parser_mapa import parse_mapa, debug_extrator
 except ImportError:
@@ -24,7 +27,6 @@ except ImportError:
 # 2. CONFIGURAÇÃO DA APP FLASK
 # =================================================================
 app = Flask(__name__)
-app.secret_key = os.environ.get("FLASK_SECRET_KEY", "confie123")
 print("RODANDO ESTE APP:", __file__)
 
 # =================================================================
@@ -53,13 +55,6 @@ def init_db():
             url_pdf TEXT
         );
     ''')
-
-
-    cur.execute("""
-        CREATE UNIQUE INDEX IF NOT EXISTS ux_carga_grupos
-        ON carga_grupos (numero_carga, grupo_codigo);
-    """)
-
 
 # Garante a coluna 'conferente' no pedidos
     cur.execute("ALTER TABLE pedidos ADD COLUMN IF NOT EXISTS conferente TEXT;")
@@ -664,204 +659,92 @@ def resetar_dia():
         finally:
             if conn: conn.close()
 
-# =================================================================
-# FUNÇÃO AUXILIAR: normaliza quantidade do item de mapa
-# =================================================================
-QTD_UNIDS_TOKEN = r"(UN|PC|PT|DZ|SC|KT|JG|BF|PA)"
-QTD_PACOTE_RE = re.compile(r"C\s*/\s*(\d+)\s*" + QTD_UNIDS_TOKEN + r"?", re.IGNORECASE)
-QTD_FINAL_RE  = re.compile(r"(\d+)\s*(FD|CX|CJ|DP|UN)\s*$", re.IGNORECASE)
 
-def normalizar_quantidade_item(it: dict) -> dict:
-    """
-    Ajusta pack_qtd/pack_unid e qtd_unidades/unidade a partir da descrição
-    (ex.: 'C/30UN ... 1 FD' -> pack_qtd=30, pack_unid=UN, qtd_unidades=1, unidade=FD).
-    """
-    desc = (it.get("descricao") or "").upper().strip()
+@app.route('/mapa/upload', methods=['GET', 'POST'])
+def mapa_upload():
+    if request.method == 'GET':
+        return '''
+        <form method="post" enctype="multipart/form-data" style="padding:20px">
+          <h3>Upload do Mapa de Separação (PDF)</h3>
+          <input type="file" name="pdf" accept="application/pdf" required />
+          <button type="submit">Enviar</button>
+        </form>
+        '''
 
-    # 1) C/ 30UN
-    if not it.get("pack_qtd"):
-        m = QTD_PACOTE_RE.search(desc)
-        if m:
-            it["pack_qtd"] = int(m.group(1))
-            it["pack_unid"] = (m.group(2) or "UN").upper()
+    f = request.files.get('pdf')
+    if not f:
+        return "Envie um PDF", 400
 
-    # 2) Final: 1 FD
-    if not it.get("qtd_unidades") or not it.get("unidade"):
-        m2 = QTD_FINAL_RE.search(desc)
-        if m2:
-            it["qtd_unidades"] = int(m2.group(1))
-            it["unidade"] = m2.group(2).upper()
-
-    # defaults
-    if not it.get("pack_qtd"):
-        it["pack_qtd"] = 1
-    if not it.get("pack_unid"):
-        it["pack_unid"] = "UN"
-
-    return it
-
-# tenta importar o extrator da conferência
-try:
-    from conferencia import extrair_dados_do_pdf   # ajuste o módulo conforme sua estrutura
-except Exception:
-    extrair_dados_do_pdf = None
-
-
-def overlay_quantidades_com_conferencia(itens_mapa: list, pdf_path: str) -> list:
-    """
-    Usa extrair_dados_do_pdf (da conferência) para sobrepor as quantidades
-    nos itens do mapa, casando por cod_barras ou código.
-    """
-    if not extrair_dados_do_pdf:
-        return itens_mapa
+    path_tmp = f"/tmp/{f.filename}"
+    f.save(path_tmp)
 
     try:
-        itens_conf = extrair_dados_do_pdf(pdf_path) or []
-    except Exception:
-        return itens_mapa
-
-    by_ean, by_cod = {}, {}
-    for it in itens_conf:
-        ean = (it.get("cod_barras") or it.get("ean") or "").strip()
-        cod = (it.get("codigo") or "").strip()
-        if ean:
-            by_ean[ean] = it
-        if cod:
-            by_cod[cod] = it
-
-    ajustados = []
-    for im in itens_mapa:
-        ean = (im.get("cod_barras") or "").strip()
-        cod = (im.get("codigo") or "").strip()
-        fonte = None
-        if ean and ean in by_ean:
-            fonte = by_ean[ean]
-        elif cod and cod in by_cod:
-            fonte = by_cod[cod]
-
-        if fonte:
-            im["qtd_unidades"] = fonte.get("qtd_unidades", im.get("qtd_unidades"))
-            im["unidade"]      = (fonte.get("unidade") or im.get("unidade") or "").upper()
-            im["pack_qtd"]     = fonte.get("pack_qtd", im.get("pack_qtd"))
-            im["pack_unid"]    = (fonte.get("pack_unid") or im.get("pack_unid") or "").upper()
-        ajustados.append(im)
-
-    return ajustados
-
-
-@app.route("/mapa/upload", methods=["POST"])
-def mapa_upload():
-    file = request.files.get("file")
-    if not file:
-        flash("Selecione um PDF do mapa.")
-        return redirect(url_for("mapa_extrator"))
-
-    # salva o PDF temporariamente
-    filename = secure_filename(file.filename)
-    path_tmp = os.path.join("/tmp", filename)
-    file.save(path_tmp)
-
-    # --- PARSE ---
-    header, _, grupos, itens = parse_mapa(path_tmp)
-
-    # (1) PATCH: pegar numero_carga do header, com fallback pro que já existia
-    # se você já tinha numero_carga vindo de outro lugar (form, etc.), mantém como fallback:
-    numero_carga_form = request.form.get("numero_carga", "").strip()
-    numero_carga = header.get("numero_carga") or numero_carga_form
-    if not numero_carga:
-        flash("Número da carga não encontrado no PDF nem informado no formulário.")
-        return redirect(url_for("mapa_extrator"))
-
-    # outros campos de header (opcional)
-    motorista = header.get("motorista", "")
-    romaneio  = header.get("romaneio", "")
-    data_pdf  = header.get("data", "")
+        header, pedidos_map, grupos, itens = parse_mapa(path_tmp)
+    except Exception as e:
+        # erro explícito para o front
+        return (f"Erro ao ler mapa: {str(e)}", 400)
 
     conn = get_db_connection()
     cur = conn.cursor()
 
-    try:
-            # cria/atualiza cabeçalho da carga
+    # UPSERT da carga
+    cur.execute("""
+        INSERT INTO cargas (numero_carga, motorista, descricao_romaneio, peso_total, entregas, data_emissao)
+        VALUES (%s,%s,%s,%s,%s,%s)
+        ON CONFLICT (numero_carga) DO UPDATE SET
+            motorista=EXCLUDED.motorista,
+            descricao_romaneio=EXCLUDED.descricao_romaneio,
+            peso_total=EXCLUDED.peso_total,
+            entregas=EXCLUDED.entregas,
+            data_emissao=EXCLUDED.data_emissao
+    """, (
+        header.get("numero_carga"),
+        header.get("motorista"),
+        header.get("descricao_romaneio"),
+        str(header.get("peso_total") or "").replace('.', '').replace(',', '.'),
+        int(header.get("entregas") or 0),
+        header.get("data_emissao"),
+    ))
+
+    # Sincroniza tabelas filhas
+    cur.execute("DELETE FROM carga_pedidos WHERE numero_carga=%s", (header["numero_carga"],))
+    cur.execute("DELETE FROM carga_grupos  WHERE numero_carga=%s", (header["numero_carga"],))
+    cur.execute("DELETE FROM carga_itens   WHERE numero_carga=%s", (header["numero_carga"],))
+
+    for p in pedidos_map:
+        cur.execute(
+            "INSERT INTO carga_pedidos (numero_carga, pedido_numero) VALUES (%s,%s)",
+            (header["numero_carga"], p)
+        )
+
+    for g in grupos:
         cur.execute("""
-        INSERT INTO cargas (numero_carga, motorista, descricao_romaneio, data_emissao)
-        VALUES (%s, %s, %s, %s)
-        ON CONFLICT (numero_carga) DO UPDATE
-            SET motorista = EXCLUDED.motorista,
-                descricao_romaneio = EXCLUDED.descricao_romaneio,
-                data_emissao = COALESCE(EXCLUDED.data_emissao, cargas.data_emissao)
-    """, (numero_carga, motorista, romaneio, data_pdf))
+            INSERT INTO carga_grupos (numero_carga, grupo_codigo, grupo_titulo)
+            VALUES (%s,%s,%s)
+        """, (header["numero_carga"], g["codigo"], g["titulo"]))
 
-        # limpa grupos/itens anteriores dessa carga se for um reupload (opcional)
-        # cur.execute("DELETE FROM carga_grupos WHERE numero_carga=%s", (numero_carga,))
-        # cur.execute("DELETE FROM carga_itens  WHERE numero_carga=%s", (numero_carga,))
+    for it in itens:
+        cur.execute("""
+            INSERT INTO carga_itens
+                (numero_carga, grupo_codigo, fabricante, codigo, cod_barras, descricao,
+                 qtd_unidades, unidade, pack_qtd, pack_unid)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+        """, (
+            header["numero_carga"], it["grupo_codigo"], it["fabricante"], it["codigo"],
+            it["cod_barras"], it["descricao"], it["qtd_unidades"], it["unidade"],
+            it["pack_qtd"], it["pack_unid"]
+        ))
 
-        # (2) PATCH: inserir grupos aceitando grupo_codigo/grupo_titulo ou legados
-        for g in grupos or []:
-            grupo_codigo = g.get("grupo_codigo") or g.get("codigo") or g.get("nome") or ""
-            grupo_titulo = g.get("grupo_titulo") or g.get("titulo") or g.get("descricao") or g.get("nome") or ""
+    conn.commit()
+    cur.close(); conn.close()
 
-            if not (grupo_codigo or grupo_titulo):
-                continue
-
-            cur.execute("""
-                INSERT INTO carga_grupos (numero_carga, grupo_codigo, grupo_titulo)
-                VALUES (%s, %s, %s)
-                ON CONFLICT DO NOTHING
-            """, (numero_carga, grupo_codigo, grupo_titulo))
-
-        # inserir itens (ajuste nomes de colunas conforme seu schema)
-        for it in itens or []:
-            cur.execute("""
-                INSERT INTO carga_itens (
-                    numero_carga,
-                    grupo_codigo,
-                    fabricante,
-                    codigo,
-                    cod_barras,
-                    descricao,
-                    qtd_unidades,
-                    unidade,
-                    pack_qtd,
-                    pack_unid
-                ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
-            """, (
-                numero_carga,
-                it.get("grupo_codigo") or it.get("grupo") or "",
-                it.get("fabricante", ""),
-                it.get("codigo", ""),
-                it.get("cod_barras", ""),
-                it.get("descricao", ""),
-                it.get("qtd_unidades", 0),
-                it.get("unidade", "UN"),
-                it.get("pack_qtd", 1),
-                it.get("pack_unid", "UN"),
-            ))
-
-        conn.commit()
-
-        # (3) Log de depuração
-        print(f"[MAPA] numero_carga={numero_carga} grupos={len(grupos or [])} itens={len(itens or [])}")
-        if itens:
-            print("[MAPA] primeiro_item=", itens[0])
-            print("[MAPA] ultimo_item=", itens[-1])
-
-        flash(f"Mapa {numero_carga} importado com sucesso.")
-        return redirect(url_for("mapa_detalhe", numero_carga=numero_carga))
-
-    except Exception as e:
-        conn.rollback()
-        print("[MAPA][ERRO]", e)
-        flash("Falha ao importar o mapa. Veja os logs.")
-        return redirect(url_for("mapa_extrator"))
-
-    finally:
-        cur.close()
-        conn.close()
-        try:
-            os.remove(path_tmp)
-        except Exception:
-            pass
-
+    return jsonify({
+        "ok": True,
+        "numero_carga": header["numero_carga"],
+        "pedidos": pedidos_map,
+        "grupos": len(grupos),
+        "itens": len(itens)
+    })
 
 
 @app.route('/api/mapas')
@@ -880,7 +763,47 @@ def api_mapas():
          "criado_em": r[3].isoformat() if r[3] else None}
     for r in rows])
 
+@app.route('/mapa')
+def mapa_lista():
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT numero_carga, motorista, data_emissao
+        FROM cargas
+        ORDER BY criado_em DESC
+    """)
+    mapas = cur.fetchall()
+    cur.close(); conn.close()
 
+    html = ['''<!DOCTYPE html><html lang="pt-br"><head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mapas</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    </head><body class="bg-dark text-light"><div class="container mt-4">
+    <nav class="mb-3">
+      <a class="btn btn-outline-light me-2" href="/conferencia">Conferência</a>
+      <a class="btn btn-outline-light me-2" href="/gestao">Gestão</a>
+      <a class="btn btn-warning" href="/mapa/upload">Importar novo mapa</a>
+    </nav>
+    <h2 class="mb-3">🗺️ Mapas de Separação</h2>
+    <p class="text-secondary">Escolha um mapa para iniciar a separação.</p>
+    <div class="list-group">''']
+    if mapas:
+        for num, mot, data in mapas:
+            html.append(f'''
+              <a class="list-group-item list-group-item-action d-flex justify-content-between align-items-center bg-dark text-light"
+                 href="/mapa/{num}">
+                <div>
+                  <div class="fw-bold">{num}</div>
+                  <small class="text-secondary">Motorista: {mot or '-'} | Emissão: {data or '-'}</small>
+                </div>
+                <span class="bi bi-chevron-right"></span>
+              </a>''')
+    else:
+        html.append('''<div class="alert alert-secondary">Nenhum mapa importado ainda.
+        Use a aba <b>Gestão</b> para subir um PDF.</div>''')
+    html.append('</div></div></body></html>')
+    return ''.join(html)
 
 # ========== MAPA: APIs de listagem e atualização (NOVO) ==========
 
@@ -1250,80 +1173,6 @@ def mapa_extrator():
                          f"</tr>")
     tail = "</tbody></table></div></body></html>"
     return head + "\n".join(rows_html) + tail
-
-# ------------------------------
-# ROTA: LISTAGEM DE MAPAS
-# ------------------------------
-@app.route('/mapa')
-def mapa():
-    conn = get_db_connection()
-    cur = conn.cursor()
-    cur.execute("""
-        SELECT numero_carga, motorista, descricao_romaneio, data_emissao
-        FROM cargas
-        ORDER BY criado_em DESC
-    """)
-    mapas = cur.fetchall()
-    cur.close(); conn.close()
-    return render_template('mapa.html', mapas=mapas)
-
-
-@app.route('/mapa/deletar/<numero_carga>', methods=['POST'])
-def mapa_deletar(numero_carga):
-    conn = get_db_connection()
-    cur = conn.cursor()
-    try:
-        cur.execute("DELETE FROM cargas WHERE numero_carga = %s", (numero_carga,))
-        conn.commit()
-        flash(f"Mapa {numero_carga} excluído com sucesso.", "success")
-    except Exception as e:
-        conn.rollback()
-        app.logger.exception(e)
-        flash(f"Erro ao excluir o mapa {numero_carga}.", "danger")
-    finally:
-        cur.close(); conn.close()
-    return redirect(url_for('mapa'))
-
-
-@app.route('/api/mapa/<numero_carga>/debug')
-def api_mapa_debug(numero_carga):
-    conn = get_db_connection()
-    cur = conn.cursor()
-
-    cur.execute("SELECT count(*) FROM carga_itens WHERE numero_carga = %s", (numero_carga,))
-    total_itens = cur.fetchone()[0]
-
-    cur.execute("""
-        SELECT grupo_codigo, count(*) 
-        FROM carga_itens 
-        WHERE numero_carga = %s 
-        GROUP BY grupo_codigo
-        ORDER BY grupo_codigo
-    """, (numero_carga,))
-    por_grupo = cur.fetchall()
-
-    cur.execute("""
-        SELECT numero_carga, motorista, descricao_romaneio, data_emissao 
-        FROM cargas WHERE numero_carga = %s
-    """, (numero_carga,))
-    header = cur.fetchone()
-
-    cur.close()
-    conn.close()
-
-    return jsonify({
-        "header": {
-            "numero_carga": header[0] if header else numero_carga,
-            "motorista": header[1] if header else None,
-            "romaneio": header[2] if header else None,
-            "emissao": header[3] if header else None,
-        },
-        "total_itens": total_itens,
-        "por_grupo": [{"grupo_codigo": g, "qtd": q} for (g, q) in por_grupo]
-    })
-
-
-
 
 
 @app.route('/ping')
