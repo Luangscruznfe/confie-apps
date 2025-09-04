@@ -51,7 +51,33 @@ def parse_mapa(pdf_path: str) -> Tuple[Dict[str, str], Any, List[Dict[str, str]]
     """
     doc = fitz.open(pdf_path)
 
+    # Lê todas as linhas uma vez (ordem visual)
+    lines = list(_iter_lines(doc))
+    header_text = "\n".join(lines[:200])  # primeiras linhas bastam p/ cabeçalho
+
+    # Inicializa header ANTES de popular
     header: Dict[str, str] = {}
+
+    # Extrai campos do cabeçalho (formas flexíveis)
+    m = re.search(r"(?:N[uú]mero\s+da\s+Carga|Numero\s+da\s+Carga)\s*[:\-]?\s*(\d{1,10})",
+                  header_text, re.IGNORECASE)
+    if m:
+        header["numero_carga"] = m.group(1).strip()
+
+    m = re.search(r"(?:Data\s+Emiss[aã]o|Data)\s*[:\-]?\s*([0-3]?\d\/[01]?\d\/\d{2,4})",
+                  header_text, re.IGNORECASE)
+    if m:
+        header["data"] = m.group(1).strip()
+
+    m = re.search(r"Motorista\s*[:\-]?\s*([A-ZÀ-ÖØ-ö0-9 \-\.]{1,40})?", header_text, re.IGNORECASE)
+    if m:
+        header["motorista"] = (m.group(1) or "").strip()
+
+    m = re.search(r"(?:Desc\.?\s*Romaneio|Romaneio)\s*[:\-]?\s*([A-Z0-9 \-\/]{1,40})",
+                  header_text, re.IGNORECASE)
+    if m:
+        header["romaneio"] = m.group(1).strip()
+
     grupos: List[Dict[str, str]] = []
     itens:  List[Dict[str, Any]] = []
 
@@ -78,7 +104,8 @@ def parse_mapa(pdf_path: str) -> Tuple[Dict[str, str], Any, List[Dict[str, str]]
         cur = {}
         esperando = "fabricante"
 
-    for line in _iter_lines(doc):
+    # loop principal sobre as linhas
+    for line in lines:
         # 1) Grupo?
         mg = GRUPO_RE.match(line)
         if mg:
@@ -162,7 +189,7 @@ def parse_mapa(pdf_path: str) -> Tuple[Dict[str, str], Any, List[Dict[str, str]]
             # não reconheceu qtd? pode ser início de novo item; fecha o atual
             if GRUPO_RE.match(line) or FAB_RE.match(line) or COD_RE.match(line) or EAN_RE.match(line):
                 flush_item()
-                # reprocessa indiretamente (o loop já vai tratar essa linha)
+                # recomeça estado a partir do que reconheceu
                 if FAB_RE.match(line):
                     cur = {"fabricante": line}; esperando = "codigo"
                 elif COD_RE.match(line):
@@ -176,9 +203,6 @@ def parse_mapa(pdf_path: str) -> Tuple[Dict[str, str], Any, List[Dict[str, str]]
     # flush do último item
     if cur:
         flush_item()
-
-    # (Opcional) tentar header["numero_carga"] aqui, se o PDF trouxer isso
-    # Por enquanto deixamos vazio e usamos o que já vem de fora (rota).
 
     return header, None, grupos, itens
 
