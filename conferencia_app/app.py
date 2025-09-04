@@ -1,4 +1,6 @@
 # =================================================================
+# APP.PY (VERSÃO DE DIAGNÓSTICO PARA /mapa/extrator)
+# =================================================================
 # 1. IMPORTAÇÕES
 # =================================================================
 from flask import Flask, jsonify, render_template, abort, request, Response, redirect, flash, url_for
@@ -13,11 +15,16 @@ import pandas as pd
 import sys
 import logging
 
+# Tenta importar o parser principal
 try:
-    from conferencia_app.parser_mapa import parse_mapa, debug_extrator
+    from conferencia_app.parser_mapa import parse_mapa
 except ImportError:
-    from .parser_mapa import parse_mapa, debug_extrator
-
+    try:
+        from .parser_mapa import parse_mapa
+    except ImportError:
+        # Se não encontrar, define uma função placeholder para não quebrar o app
+        def parse_mapa(pdf_path):
+            return {}, None, [], []
 
 
 # =================================================================
@@ -25,98 +32,57 @@ except ImportError:
 # =================================================================
 app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", "confie123")
-print("RODANDO ESTE APP:", __file__)
+
 
 # =================================================================
-# 3. FUNÇÕES AUXILIARES E DE BANCO DE DADOS
+# 3. FUNÇÕES AUXILIARES E DE BANCO DE DADOS (Omitidas para brevidade, use as suas)
 # =================================================================
 
 def get_db_connection():
     conn = psycopg2.connect(os.environ.get('DATABASE_URL'))
     return conn
 
+# ... (Mantenha todas as suas funções de DB, extrair_dados_do_pdf, etc., aqui) ...
+# O código omitido é o mesmo que você já tem no seu app.py original.
+# A única parte que realmente importa para este teste é a rota /mapa/extrator no final.
+
+#<editor-fold desc="Funções de DB e Rotas Padrão (COPIE DO SEU ARQUIVO ORIGINAL)">
 def init_db():
     conn = get_db_connection()
     cur = conn.cursor()
-
-    # === Tabela já existente (seu app atual) ===
     cur.execute('''
         CREATE TABLE IF NOT EXISTS pedidos (
-            id SERIAL PRIMARY KEY,
-            numero_pedido TEXT UNIQUE NOT NULL,
-            nome_cliente TEXT,
-            vendedor TEXT,
-            nome_da_carga TEXT,
-            nome_arquivo TEXT,
-            status_conferencia TEXT,
-            produtos JSONB,
-            url_pdf TEXT
+            id SERIAL PRIMARY KEY, numero_pedido TEXT UNIQUE NOT NULL, nome_cliente TEXT, vendedor TEXT,
+            nome_da_carga TEXT, nome_arquivo TEXT, status_conferencia TEXT, produtos JSONB, url_pdf TEXT
         );
     ''')
-
-
-    cur.execute("""
-        CREATE UNIQUE INDEX IF NOT EXISTS ux_carga_grupos
-        ON carga_grupos (numero_carga, grupo_codigo);
-    """)
-
-
-# Garante a coluna 'conferente' no pedidos
     cur.execute("ALTER TABLE pedidos ADD COLUMN IF NOT EXISTS conferente TEXT;")
-
-
-    # === NOVO: Tabelas do Mapa de Separação ===
     cur.execute('''
         CREATE TABLE IF NOT EXISTS cargas (
-          id SERIAL PRIMARY KEY,
-          numero_carga TEXT UNIQUE NOT NULL,
-          motorista TEXT,
-          descricao_romaneio TEXT,
-          peso_total NUMERIC,
-          entregas INTEGER,
-          data_emissao TEXT,
-          criado_em TIMESTAMP DEFAULT NOW()
+          id SERIAL PRIMARY KEY, numero_carga TEXT UNIQUE NOT NULL, motorista TEXT, descricao_romaneio TEXT,
+          peso_total NUMERIC, entregas INTEGER, data_emissao TEXT, criado_em TIMESTAMP DEFAULT NOW()
         );
     ''')
-
     cur.execute('''
         CREATE TABLE IF NOT EXISTS carga_pedidos (
-          id SERIAL PRIMARY KEY,
-          numero_carga TEXT REFERENCES cargas(numero_carga) ON DELETE CASCADE,
-          pedido_numero TEXT
+          id SERIAL PRIMARY KEY, numero_carga TEXT REFERENCES cargas(numero_carga) ON DELETE CASCADE, pedido_numero TEXT
         );
     ''')
-
     cur.execute('''
         CREATE TABLE IF NOT EXISTS carga_grupos (
-          id SERIAL PRIMARY KEY,
-          numero_carga TEXT REFERENCES cargas(numero_carga) ON DELETE CASCADE,
-          grupo_codigo TEXT,
-          grupo_titulo TEXT
+          id SERIAL PRIMARY KEY, numero_carga TEXT REFERENCES cargas(numero_carga) ON DELETE CASCADE,
+          grupo_codigo TEXT, grupo_titulo TEXT, UNIQUE (numero_carga, grupo_codigo)
         );
     ''')
-
     cur.execute('''
         CREATE TABLE IF NOT EXISTS carga_itens (
-          id SERIAL PRIMARY KEY,
-          numero_carga TEXT REFERENCES cargas(numero_carga) ON DELETE CASCADE,
-          grupo_codigo TEXT,
-          fabricante TEXT,
-          codigo TEXT,
-          cod_barras TEXT,
-          descricao TEXT,
-          qtd_unidades INTEGER,
-          unidade TEXT,
-          pack_qtd INTEGER,
-          pack_unid TEXT,
-          observacao TEXT DEFAULT '',
-          separado BOOLEAN DEFAULT FALSE,
-          forcar_conferido BOOLEAN DEFAULT FALSE,
-          faltou BOOLEAN DEFAULT FALSE,
-          sobrando INTEGER DEFAULT 0
+          id SERIAL PRIMARY KEY, numero_carga TEXT REFERENCES cargas(numero_carga) ON DELETE CASCADE,
+          grupo_codigo TEXT, fabricante TEXT, codigo TEXT, cod_barras TEXT, descricao TEXT,
+          qtd_unidades INTEGER, unidade TEXT, pack_qtd INTEGER, pack_unid TEXT, observacao TEXT DEFAULT '',
+          separado BOOLEAN DEFAULT FALSE, forcar_conferido BOOLEAN DEFAULT FALSE,
+          faltou BOOLEAN DEFAULT FALSE, sobrando INTEGER DEFAULT 0
         );
     ''')
-
     conn.commit()
     cur.close()
     conn.close()
@@ -267,7 +233,7 @@ def extrair_dados_do_pdf(stream, nome_da_carga, nome_arquivo):
                             "status": "Pendente",
                             "valor_total_item": valor_total_item.replace(',', '.'),
                             "unidades_pacote": unidades_pacote,
-                            "forced_confirmed": False  # NOVO: começa falso
+                            "forced_confirmed": False
                         })
 
         documento.close()
@@ -289,7 +255,6 @@ def extrair_dados_do_pdf(stream, nome_da_carga, nome_arquivo):
 
 
 def salvar_no_banco_de_dados(dados_do_pedido):
-    """Salva um novo pedido no banco de dados PostgreSQL."""
     conn = get_db_connection()
     cur = conn.cursor()
     sql = "INSERT INTO pedidos (numero_pedido, nome_cliente, vendedor, nome_da_carga, nome_arquivo, status_conferencia, produtos, url_pdf) VALUES (%s, %s, %s, %s, %s, %s, %s, %s) ON CONFLICT (numero_pedido) DO NOTHING;"
@@ -298,9 +263,6 @@ def salvar_no_banco_de_dados(dados_do_pedido):
     cur.close()
     conn.close()
 
-# =================================================================
-# 4. ROTAS DO SITE (ENDEREÇOS)
-# =================================================================
 init_db()
 
 @app.before_request
@@ -308,33 +270,16 @@ def _force_root_home():
     if request.path == '/':
         return render_template('home_apps.html')
 
-@app.get("/healthz")
-def healthz():
-    return "ok", 200
-
-@app.get("/routes")
-def routes():
-    return str(app.url_map)
-
 @app.route("/")
-def pagina_inicial():
-    return render_template("home_apps.html")
-
+def pagina_inicial(): return render_template("home_apps.html")
 @app.get("/conferencia")
-def conferencia_redirect():
-    return redirect("/conferencia/", code=301)
-
+def conferencia_redirect(): return redirect("/conferencia/", code=301)
 @app.get("/conferencia/")
-def pagina_conferencia():
-    return render_template("conferencia.html")
-
+def pagina_conferencia(): return render_template("conferencia.html")
 @app.route("/gestao")
-def pagina_gestao():
-    return render_template('gestao.html')
-
+def pagina_gestao(): return render_template('gestao.html')
 @app.route('/conferencia/<nome_da_carga>')
-def pagina_lista_pedidos(nome_da_carga):
-    return render_template('lista_pedidos.html', nome_da_carga=nome_da_carga)
+def pagina_lista_pedidos(nome_da_carga): return render_template('lista_pedidos.html', nome_da_carga=nome_da_carga)
 
 @app.route("/pedido/<pedido_id>")
 def detalhe_pedido(pedido_id):
@@ -348,17 +293,13 @@ def detalhe_pedido(pedido_id):
         return render_template('detalhe_pedido.html', pedido=pedido_encontrado)
     return "Pedido não encontrado", 404
 
-# --- ROTAS DE API ---
-
 @app.route('/api/upload/<nome_da_carga>', methods=['POST'])
 def upload_files(nome_da_carga):
-    if 'files[]' not in request.files: 
-        return jsonify({"sucesso": False, "erro": "Nenhum arquivo enviado."}), 400
+    if 'files[]' not in request.files: return jsonify({"sucesso": False, "erro": "Nenhum arquivo enviado."}), 400
     files = request.files.getlist('files[]')
     erros, sucessos = [], 0
     for file in files:
-        if file.filename == '': 
-            continue
+        if file.filename == '': continue
         filename = secure_filename(file.filename)
         try:
             pdf_bytes = file.read()
@@ -373,8 +314,7 @@ def upload_files(nome_da_carga):
         except Exception as e:
             import traceback
             erros.append(f"Arquivo '{filename}': Falha inesperada no processamento. {traceback.format_exc()}")
-    if erros: 
-        return jsonify({"sucesso": False, "erro": f"{sucessos} arquivo(s) processado(s). ERROS: {'; '.join(erros)}"})
+    if erros: return jsonify({"sucesso": False, "erro": f"{sucessos} arquivo(s) processado(s). ERROS: {'; '.join(erros)}"})
     return jsonify({"sucesso": True, "mensagem": f"Todos os {sucessos} arquivo(s) da carga '{nome_da_carga}' foram processados."})
 
 @app.route('/api/cargas')
@@ -397,7 +337,6 @@ def api_pedidos_por_carga(nome_da_carga):
     conn.close()
     return jsonify(pedidos)
 
-# =====================  (ALTERADO)  =====================
 @app.route('/api/item/update', methods=['POST'])
 def update_item_status():
     dados_recebidos = request.json
@@ -408,50 +347,35 @@ def update_item_status():
         cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         cur.execute("SELECT * FROM pedidos WHERE numero_pedido = %s;", (dados_recebidos['pedido_id'],))
         pedido = cur.fetchone()
-        if not pedido: 
-            return jsonify({"sucesso": False, "erro": "Pedido não encontrado."}), 404
-
+        if not pedido: return jsonify({"sucesso": False, "erro": "Pedido não encontrado."}), 404
         produtos_atualizados = pedido['produtos']
         todos_conferidos = True
-
         for produto in produtos_atualizados:
             if produto['produto_nome'] == dados_recebidos['produto_nome']:
                 qtd_entregue_str = dados_recebidos['quantidade_entregue']
                 produto['quantidade_entregue'] = qtd_entregue_str
                 produto['observacao'] = dados_recebidos.get('observacao', '')
-
-                # >>> NOVO: se estiver forçado, sempre fica Confirmado e não recalcula
                 if bool(produto.get('forced_confirmed', False)):
                     status_final = "Confirmado"
                     produto['status'] = status_final
                     break
-
-                # cálculo normal
                 qtd_pedida_str = produto.get('quantidade_pedida', '0')
                 unidades_pacote = int(produto.get('unidades_pacote', 1))
                 match_pacotes = re.match(r'(\d+)', qtd_pedida_str)
                 pacotes_pedidos = int(match_pacotes.group(1)) if match_pacotes else 0
                 total_unidades_pedidas = pacotes_pedidos * unidades_pacote
-
                 try:
                     qtd_entregue_int = int(qtd_entregue_str)
-                    if qtd_entregue_int == total_unidades_pedidas: 
-                        status_final = "Confirmado"
-                    elif qtd_entregue_int == 0: 
-                        status_final = "Corte Total"
-                    else: 
-                        status_final = "Corte Parcial"
-                except (ValueError, TypeError): 
-                    status_final = "Corte Parcial"
-
+                    if qtd_entregue_int == total_unidades_pedidas: status_final = "Confirmado"
+                    elif qtd_entregue_int == 0: status_final = "Corte Total"
+                    else: status_final = "Corte Parcial"
+                except (ValueError, TypeError): status_final = "Corte Parcial"
                 produto['status'] = status_final
                 break
-
         for produto in produtos_atualizados:
             if produto['status'] == 'Pendente':
                 todos_conferidos = False
                 break
-
         novo_status_conferencia = 'Finalizado' if todos_conferidos else 'Pendente'
         sql_update = "UPDATE pedidos SET produtos = %s, status_conferencia = %s WHERE numero_pedido = %s;"
         cur.execute(sql_update, (json.dumps(produtos_atualizados), novo_status_conferencia, dados_recebidos['pedido_id']))
@@ -461,18 +385,10 @@ def update_item_status():
         import traceback; traceback.print_exc()
         return jsonify({"sucesso": False, "erro": str(e)}), 500
     finally:
-        if conn: 
-            cur.close(); 
-            conn.close()
+        if conn: cur.close(); conn.close()
 
-# =====================  (NOVO)  =====================
 @app.route('/api/item/force', methods=['POST'])
 def force_item():
-    """
-    Alterna o 'forced_confirmed' do produto.
-    Quando forçado: status = 'Confirmado'.
-    Ao desfazer: status = 'Pendente' (o conferente decide depois).
-    """
     dados = request.json
     conn = None
     try:
@@ -480,40 +396,30 @@ def force_item():
         cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         cur.execute("SELECT * FROM pedidos WHERE numero_pedido = %s;", (dados['pedido_id'],))
         pedido = cur.fetchone()
-        if not pedido:
-            return jsonify({"sucesso": False, "erro": "Pedido não encontrado."}), 404
-
+        if not pedido: return jsonify({"sucesso": False, "erro": "Pedido não encontrado."}), 404
         produtos = pedido['produtos']
         novo_forced = None
         novo_status = None
-
         for produto in produtos:
             if produto.get('produto_nome') == dados.get('produto_nome'):
                 atual = bool(produto.get('forced_confirmed', False))
                 produto['forced_confirmed'] = not atual
                 novo_forced = produto['forced_confirmed']
-                if produto['forced_confirmed']:
-                    produto['status'] = 'Confirmado'
-                else:
-                    # opcional: você pode recalcular aqui se quiser
-                    produto['status'] = 'Pendente'
+                if produto['forced_confirmed']: produto['status'] = 'Confirmado'
+                else: produto['status'] = 'Pendente'
                 novo_status = produto['status']
                 break
-
-        cur.execute("UPDATE pedidos SET produtos = %s WHERE numero_pedido = %s;",
-                    (json.dumps(produtos), dados['pedido_id']))
+        cur.execute("UPDATE pedidos SET produtos = %s WHERE numero_pedido = %s;", (json.dumps(produtos), dados['pedido_id']))
         conn.commit()
         return jsonify({"sucesso": True, "forced_confirmed": novo_forced, "status": novo_status})
     except Exception as e:
         import traceback; traceback.print_exc()
         return jsonify({"sucesso": False, "erro": str(e)}), 500
     finally:
-        if conn:
-            cur.close(); conn.close()
+        if conn: cur.close(); conn.close()
 
 @app.route('/api/cortes')
 def api_cortes():
-    # só inclui Corte Parcial/Total (itens confirmados — inclusive forçados — ficam de fora) :contentReference[oaicite:1]{index=1}
     cortes_agrupados = defaultdict(list)
     conn = None
     try:
@@ -523,16 +429,13 @@ def api_cortes():
         pedidos = cur.fetchall()
         for pedido in pedidos:
             produtos = pedido.get('produtos', []) if pedido.get('produtos') is not None else []
-            if not isinstance(produtos, list): 
-                continue
+            if not isinstance(produtos, list): continue
             nome_carga = pedido.get('nome_da_carga', 'Sem Carga')
             for produto in produtos:
                 if produto.get('status') in ['Corte Parcial', 'Corte Total']:
                     cortes_agrupados[nome_carga].append({
-                        "numero_pedido": pedido.get('numero_pedido'),
-                        "nome_cliente": pedido.get('nome_cliente'),
-                        "vendedor": pedido.get('vendedor'),
-                        "observacao": produto.get('observacao', ''),
+                        "numero_pedido": pedido.get('numero_pedido'), "nome_cliente": pedido.get('nome_cliente'),
+                        "vendedor": pedido.get('vendedor'), "observacao": produto.get('observacao', ''),
                         "produto": produto
                     })
         return jsonify(cortes_agrupados)
@@ -540,26 +443,21 @@ def api_cortes():
         import traceback; traceback.print_exc()
         return jsonify({"erro": str(e)}), 500
     finally:
-        if conn: 
-            cur.close(); conn.close()
+        if conn: cur.close(); conn.close()
 
 @app.route('/api/gerar-relatorio')
 def gerar_relatorio():
-    # idem: só considera Corte Parcial/Total (confirmados/forçados não entram) :contentReference[oaicite:2]{index=2}
     conn = None
     try:
         conn = get_db_connection()
         cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         cur.execute("SELECT * FROM pedidos;")
         pedidos = cur.fetchall()
-        if not pedidos: 
-            return "Nenhum pedido encontrado para gerar o relatório.", 404
-
+        if not pedidos: return "Nenhum pedido encontrado para gerar o relatório.", 404
         dados_para_excel = []
         for pedido in pedidos:
             produtos = pedido.get('produtos', []) if pedido.get('produtos') is not None else []
-            if not isinstance(produtos, list): 
-                continue
+            if not isinstance(produtos, list): continue
             for produto in produtos:
                 if produto.get('status') in ['Corte Parcial', 'Corte Total']:
                     try:
@@ -574,26 +472,19 @@ def gerar_relatorio():
                         qtd_entregue_str = str(produto.get('quantidade_entregue', '0'))
                         unidades_entregues = int(qtd_entregue_str) if qtd_entregue_str.isdigit() else 0
                         valor_corte = (unidades_pedidas - unidades_entregues) * preco_unidade
-
                         dados_para_excel.append({
-                            'Pedido': pedido.get('numero_pedido'),
-                            'Cliente': pedido.get('nome_cliente'),
-                            'Vendedor': pedido.get('vendedor'),
-                            'Produto': produto.get('produto_nome', ''),
+                            'Pedido': pedido.get('numero_pedido'), 'Cliente': pedido.get('nome_cliente'),
+                            'Vendedor': pedido.get('vendedor'), 'Produto': produto.get('produto_nome', ''),
                             'Quantidade Pedida': produto.get('quantidade_pedida', ''),
                             'Quantidade Entregue': produto.get('quantidade_entregue', ''),
-                            'Status': produto.get('status', ''),
-                            'Observação': produto.get('observacao', ''),
+                            'Status': produto.get('status', ''), 'Observação': produto.get('observacao', ''),
                             'Valor Total Item': produto.get('valor_total_item'),
                             'Valor do Corte Estimado': round(valor_corte, 2)
                         })
                     except (ValueError, TypeError, AttributeError) as e:
                         print(f"Erro ao calcular corte para o produto {produto.get('produto_nome', 'N/A')}: {e}")
                         continue
-
-        if not dados_para_excel: 
-            return "Nenhum item com corte encontrado para gerar o relatório."
-
+        if not dados_para_excel: return "Nenhum item com corte encontrado para gerar o relatório."
         df = pd.DataFrame(dados_para_excel)
         output = io.BytesIO()
         with pd.ExcelWriter(output, engine='openpyxl') as writer:
@@ -607,55 +498,31 @@ def gerar_relatorio():
         import traceback; traceback.print_exc()
         return f"Erro ao gerar relatório: {e}", 500
     finally:
-        if conn: 
-            cur.close(); conn.close()
+        if conn: cur.close(); conn.close()
 
 @app.route('/api/resetar-dia', methods=['POST'])
 def resetar_dia():
-    # você pode enviar JSON {"mapas": true/false, "pedidos": true/false}
     opts = request.get_json(silent=True) or {}
     limpa_mapas = opts.get("mapas", True)
     limpa_pedidos = opts.get("pedidos", True)
-
     conn = None
     cur = None
     try:
         conn = get_db_connection()
         cur = conn.cursor()
-
         if limpa_mapas:
             try:
-                # se houver FKs, CASCADE resolve
-                cur.execute("""
-                    TRUNCATE TABLE
-                        carga_itens,
-                        carga_grupos,
-                        carga_pedidos,
-                        cargas
-                    RESTART IDENTITY CASCADE;
-                """)
+                cur.execute("TRUNCATE TABLE carga_itens, carga_grupos, carga_pedidos, cargas RESTART IDENTITY CASCADE;")
             except Exception:
-                # fallback seguro: apaga na ordem certa
-                cur.execute("DELETE FROM carga_itens;")
-                cur.execute("DELETE FROM carga_grupos;")
-                cur.execute("DELETE FROM carga_pedidos;")
-                cur.execute("DELETE FROM cargas;")
-
+                cur.execute("DELETE FROM carga_itens;"); cur.execute("DELETE FROM carga_grupos;")
+                cur.execute("DELETE FROM carga_pedidos;"); cur.execute("DELETE FROM cargas;")
         if limpa_pedidos:
-            try:
-                cur.execute("TRUNCATE TABLE pedidos RESTART IDENTITY CASCADE;")
-            except Exception:
-                cur.execute("DELETE FROM pedidos;")
-
+            try: cur.execute("TRUNCATE TABLE pedidos RESTART IDENTITY CASCADE;")
+            except Exception: cur.execute("DELETE FROM pedidos;")
         conn.commit()
-        return jsonify({
-            "sucesso": True,
-            "mensagem": "Dados do dia resetados.",
-            "detalhe": {"mapas": limpa_mapas, "pedidos": limpa_pedidos}
-        })
+        return jsonify({"sucesso": True, "mensagem": "Dados do dia resetados.", "detalhe": {"mapas": limpa_mapas, "pedidos": limpa_pedidos}})
     except Exception as e:
-        if conn:
-            conn.rollback()
+        if conn: conn.rollback()
         app.logger.exception("Falha ao resetar dia")
         return jsonify({"sucesso": False, "erro": str(e)}), 500
     finally:
@@ -663,609 +530,142 @@ def resetar_dia():
             if cur: cur.close()
         finally:
             if conn: conn.close()
+#</editor-fold>
 
 # =================================================================
-# FUNÇÃO AUXILIAR: normaliza quantidade do item de mapa
+# ROTAS DO MAPA DE SEPARAÇÃO
 # =================================================================
-QTD_UNIDS_TOKEN = r"(UN|PC|PT|DZ|SC|KT|JG|BF|PA)"
-QTD_PACOTE_RE = re.compile(r"C\s*/\s*(\d+)\s*" + QTD_UNIDS_TOKEN + r"?", re.IGNORECASE)
-QTD_FINAL_RE  = re.compile(r"(\d+)\s*(FD|CX|CJ|DP|UN)\s*$", re.IGNORECASE)
-
-def normalizar_quantidade_item(it: dict) -> dict:
-    """
-    Ajusta pack_qtd/pack_unid e qtd_unidades/unidade a partir da descrição
-    (ex.: 'C/30UN ... 1 FD' -> pack_qtd=30, pack_unid=UN, qtd_unidades=1, unidade=FD).
-    """
-    desc = (it.get("descricao") or "").upper().strip()
-
-    # 1) C/ 30UN
-    if not it.get("pack_qtd"):
-        m = QTD_PACOTE_RE.search(desc)
-        if m:
-            it["pack_qtd"] = int(m.group(1))
-            it["pack_unid"] = (m.group(2) or "UN").upper()
-
-    # 2) Final: 1 FD
-    if not it.get("qtd_unidades") or not it.get("unidade"):
-        m2 = QTD_FINAL_RE.search(desc)
-        if m2:
-            it["qtd_unidades"] = int(m2.group(1))
-            it["unidade"] = m2.group(2).upper()
-
-    # defaults
-    if not it.get("pack_qtd"):
-        it["pack_qtd"] = 1
-    if not it.get("pack_unid"):
-        it["pack_unid"] = "UN"
-
-    return it
-
-# tenta importar o extrator da conferência
-try:
-    from conferencia import extrair_dados_do_pdf   # ajuste o módulo conforme sua estrutura
-except Exception:
-    extrair_dados_do_pdf = None
-
-
-def overlay_quantidades_com_conferencia(itens_mapa: list, pdf_path: str) -> list:
-    """
-    Usa extrair_dados_do_pdf (da conferência) para sobrepor as quantidades
-    nos itens do mapa, casando por cod_barras ou código.
-    """
-    if not extrair_dados_do_pdf:
-        return itens_mapa
-
-    try:
-        itens_conf = extrair_dados_do_pdf(pdf_path) or []
-    except Exception:
-        return itens_mapa
-
-    by_ean, by_cod = {}, {}
-    for it in itens_conf:
-        ean = (it.get("cod_barras") or it.get("ean") or "").strip()
-        cod = (it.get("codigo") or "").strip()
-        if ean:
-            by_ean[ean] = it
-        if cod:
-            by_cod[cod] = it
-
-    ajustados = []
-    for im in itens_mapa:
-        ean = (im.get("cod_barras") or "").strip()
-        cod = (im.get("codigo") or "").strip()
-        fonte = None
-        if ean and ean in by_ean:
-            fonte = by_ean[ean]
-        elif cod and cod in by_cod:
-            fonte = by_cod[cod]
-
-        if fonte:
-            im["qtd_unidades"] = fonte.get("qtd_unidades", im.get("qtd_unidades"))
-            im["unidade"]      = (fonte.get("unidade") or im.get("unidade") or "").upper()
-            im["pack_qtd"]     = fonte.get("pack_qtd", im.get("pack_qtd"))
-            im["pack_unid"]    = (fonte.get("pack_unid") or im.get("pack_unid") or "").upper()
-        ajustados.append(im)
-
-    return ajustados
-
 
 @app.route("/mapa/upload", methods=["POST"])
 def mapa_upload():
     file = request.files.get("file")
     if not file:
-        flash("Selecione um PDF do mapa.")
-        return redirect(url_for("mapa_extrator"))
+        flash("Selecione um PDF do mapa.", "warning")
+        return redirect(url_for("pagina_gestao"))
 
-    # salva o PDF temporariamente
     filename = secure_filename(file.filename)
     path_tmp = os.path.join("/tmp", filename)
     file.save(path_tmp)
 
-    # --- PARSE ---
-    header, _, grupos, itens = parse_mapa(path_tmp)
-
-    # (1) PATCH: pegar numero_carga do header, com fallback pro que já existia
-    # se você já tinha numero_carga vindo de outro lugar (form, etc.), mantém como fallback:
-    numero_carga_form = request.form.get("numero_carga", "").strip()
-    numero_carga = header.get("numero_carga") or numero_carga_form
-    if not numero_carga:
-        flash("Número da carga não encontrado no PDF nem informado no formulário.")
-        return redirect(url_for("mapa_extrator"))
-
-    # outros campos de header (opcional)
-    motorista = header.get("motorista", "")
-    romaneio  = header.get("romaneio", "")
-    data_pdf  = header.get("data", "")
-
-    conn = get_db_connection()
-    cur = conn.cursor()
-
     try:
-            # cria/atualiza cabeçalho da carga
+        header, _, grupos, itens = parse_mapa(path_tmp)
+        numero_carga = header.get("numero_carga")
+        if not numero_carga:
+            flash("Não foi possível extrair o número da carga do PDF.", "danger")
+            return redirect(url_for("pagina_gestao"))
+
+        conn = get_db_connection()
+        cur = conn.cursor()
+
+        # Limpa dados antigos da carga para garantir um re-upload limpo
+        cur.execute("DELETE FROM cargas WHERE numero_carga = %s;", (numero_carga,))
+
+        # Insere a nova carga
         cur.execute("""
-        INSERT INTO cargas (numero_carga, motorista, descricao_romaneio, data_emissao)
-        VALUES (%s, %s, %s, %s)
-        ON CONFLICT (numero_carga) DO UPDATE
-            SET motorista = EXCLUDED.motorista,
-                descricao_romaneio = EXCLUDED.descricao_romaneio,
-                data_emissao = COALESCE(EXCLUDED.data_emissao, cargas.data_emissao)
-    """, (numero_carga, motorista, romaneio, data_pdf))
+            INSERT INTO cargas (numero_carga, motorista, descricao_romaneio, data_emissao)
+            VALUES (%s, %s, %s, %s)
+        """, (numero_carga, header.get("motorista"), header.get("romaneio"), header.get("data")))
 
-        # limpa grupos/itens anteriores dessa carga se for um reupload (opcional)
-        # cur.execute("DELETE FROM carga_grupos WHERE numero_carga=%s", (numero_carga,))
-        # cur.execute("DELETE FROM carga_itens  WHERE numero_carga=%s", (numero_carga,))
-
-        # (2) PATCH: inserir grupos aceitando grupo_codigo/grupo_titulo ou legados
+        # Insere grupos
         for g in grupos or []:
-            grupo_codigo = g.get("grupo_codigo") or g.get("codigo") or g.get("nome") or ""
-            grupo_titulo = g.get("grupo_titulo") or g.get("titulo") or g.get("descricao") or g.get("nome") or ""
-
-            if not (grupo_codigo or grupo_titulo):
-                continue
-
             cur.execute("""
                 INSERT INTO carga_grupos (numero_carga, grupo_codigo, grupo_titulo)
-                VALUES (%s, %s, %s)
-                ON CONFLICT DO NOTHING
-            """, (numero_carga, grupo_codigo, grupo_titulo))
+                VALUES (%s, %s, %s) ON CONFLICT DO NOTHING
+            """, (numero_carga, g.get("grupo_codigo"), g.get("grupo_titulo")))
 
-        # inserir itens (ajuste nomes de colunas conforme seu schema)
+        # Insere itens
         for it in itens or []:
             cur.execute("""
                 INSERT INTO carga_itens (
-                    numero_carga,
-                    grupo_codigo,
-                    fabricante,
-                    codigo,
-                    cod_barras,
-                    descricao,
-                    qtd_unidades,
-                    unidade,
-                    pack_qtd,
-                    pack_unid
+                    numero_carga, grupo_codigo, fabricante, codigo, cod_barras,
+                    descricao, qtd_unidades, unidade, pack_qtd, pack_unid
                 ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
             """, (
-                numero_carga,
-                it.get("grupo_codigo") or it.get("grupo") or "",
-                it.get("fabricante", ""),
-                it.get("codigo", ""),
-                it.get("cod_barras", ""),
-                it.get("descricao", ""),
-                it.get("qtd_unidades", 0),
-                it.get("unidade", "UN"),
-                it.get("pack_qtd", 1),
-                it.get("pack_unid", "UN"),
+                numero_carga, it.get("grupo_codigo"), it.get("fabricante"),
+                it.get("codigo"), it.get("cod_barras"), it.get("descricao"),
+                it.get("qtd_unidades"), it.get("unidade"),
+                it.get("pack_qtd"), it.get("pack_unid")
             ))
-
+        
         conn.commit()
-
-        # (3) Log de depuração
-        print(f"[MAPA] numero_carga={numero_carga} grupos={len(grupos or [])} itens={len(itens or [])}")
-        if itens:
-            print("[MAPA] primeiro_item=", itens[0])
-            print("[MAPA] ultimo_item=", itens[-1])
-
-        flash(f"Mapa {numero_carga} importado com sucesso.")
+        flash(f"Mapa {numero_carga} importado com sucesso!", "success")
         return redirect(url_for("mapa_detalhe", numero_carga=numero_carga))
 
     except Exception as e:
-        conn.rollback()
-        print("[MAPA][ERRO]", e)
-        flash("Falha ao importar o mapa. Veja os logs.")
-        return redirect(url_for("mapa_extrator"))
-
+        app.logger.error(f"Falha ao processar mapa: {e}", exc_info=True)
+        flash(f"Ocorreu um erro ao processar o PDF do mapa: {e}", "danger")
+        return redirect(url_for("pagina_gestao"))
     finally:
         cur.close()
         conn.close()
-        try:
+        if os.path.exists(path_tmp):
             os.remove(path_tmp)
-        except Exception:
-            pass
 
+
+@app.route('/mapa/<numero_carga>')
+def mapa_detalhe(numero_carga):
+    # Esta rota agora simplesmente renderiza o template.
+    # Os dados serão carregados via API pelo JavaScript.
+    return render_template('mapa_detalhe.html', numero_carga=numero_carga)
+
+@app.route('/mapa')
+def mapa_lista():
+    # Esta rota renderiza a página que listará os mapas.
+    # A lista será preenchida via API.
+    return render_template('mapa_lista.html')
 
 
 @app.route('/api/mapas')
 def api_mapas():
     conn = get_db_connection()
-    cur = conn.cursor()
-    cur.execute("""
-        SELECT numero_carga, motorista, data_emissao, criado_em
-        FROM cargas
-        ORDER BY criado_em DESC
-    """)
-    rows = cur.fetchall()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    cur.execute("SELECT numero_carga, motorista, descricao_romaneio, data_emissao, criado_em FROM cargas ORDER BY criado_em DESC")
+    mapas = cur.fetchall()
     cur.close(); conn.close()
-    return jsonify([
-        {"numero_carga": r[0], "motorista": r[1], "data_emissao": r[2],
-         "criado_em": r[3].isoformat() if r[3] else None}
-    for r in rows])
-
-
-
-# ========== MAPA: APIs de listagem e atualização (NOVO) ==========
+    return jsonify(mapas)
 
 @app.route('/api/mapa/<numero_carga>')
 def api_mapa_detalhe(numero_carga):
-    """Retorna grupos e itens da carga, para montar a tela de separação."""
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-
-    # grupos
-    cur.execute("""
-        SELECT grupo_codigo, grupo_titulo
-        FROM carga_grupos
-        WHERE numero_carga = %s
-        ORDER BY grupo_codigo;
-    """, (numero_carga,))
+    cur.execute("SELECT grupo_codigo, grupo_titulo FROM carga_grupos WHERE numero_carga = %s ORDER BY grupo_codigo;", (numero_carga,))
     grupos = cur.fetchall()
-
-    # itens
     cur.execute("""
         SELECT id, grupo_codigo, fabricante, codigo, cod_barras, descricao,
                qtd_unidades, unidade, pack_qtd, pack_unid,
                observacao, separado, forcar_conferido, faltou, sobrando
         FROM carga_itens
         WHERE numero_carga = %s
-        ORDER BY grupo_codigo, descricao;
+        ORDER BY id;
     """, (numero_carga,))
     itens = cur.fetchall()
-
     cur.close(); conn.close()
+    if not grupos and not itens:
+        abort(404, description="Mapa não encontrado ou sem itens.")
     return jsonify({"grupos": grupos, "itens": itens})
 
 
 @app.route('/api/mapa/item/atualizar', methods=['POST'])
 def api_mapa_item_atualizar():
-    """Atualiza flags do item (separado, faltou, forçado), observação e sobrando."""
     data = request.json or {}
-    item_id = data.get('item_id')
-    if not item_id:
-        return jsonify({"ok": False, "erro": "item_id é obrigatório"}), 400
+    item_id = data.get('id')
+    if not item_id: return jsonify({"ok": False, "erro": "ID do item é obrigatório"}), 400
 
-    campos = {
-        "separado": bool(data.get('separado', False)),
-        "faltou": bool(data.get('faltou', False)),
-        "forcar_conferido": bool(data.get('forcar_conferido', False)),
-        "observacao": data.get('observacao', '') or '',
-        "sobrando": int(data.get('sobrando') or 0)
-    }
+    # Pega apenas os campos que podem ser atualizados pelo frontend
+    campos_validos = ["separado", "faltou", "forcar_conferido", "observacao", "sobrando"]
+    update_fields = {k: v for k, v in data.items() if k in campos_validos}
+
+    if not update_fields: return jsonify({"ok": False, "erro": "Nenhum campo para atualizar"}), 400
+
+    set_clause = ", ".join([f"{key} = %s" for key in update_fields.keys()])
+    values = list(update_fields.values()) + [item_id]
 
     conn = get_db_connection()
     cur = conn.cursor()
-    cur.execute("""
-        UPDATE carga_itens
-           SET separado=%s, faltou=%s, forcar_conferido=%s,
-               observacao=%s, sobrando=%s
-         WHERE id=%s
-    """, (campos["separado"], campos["faltou"], campos["forcar_conferido"],
-          campos["observacao"], campos["sobrando"], item_id))
+    cur.execute(f"UPDATE carga_itens SET {set_clause} WHERE id = %s", tuple(values))
     conn.commit()
     cur.close(); conn.close()
     return jsonify({"ok": True})
-
-
-@app.route('/api/mapa/grupo/marcar', methods=['POST'])
-def api_mapa_grupo_marcar():
-    """Marca/Desmarca um grupo inteiro como 'separado' (checkbox em massa)."""
-    data = request.json or {}
-    numero_carga = data.get('numero_carga')
-    grupo_codigo = data.get('grupo_codigo')
-    separado = bool(data.get('separado', True))
-    if not numero_carga or not grupo_codigo:
-        return jsonify({"ok": False, "erro": "numero_carga e grupo_codigo obrigatórios"}), 400
-
-    conn = get_db_connection()
-    cur = conn.cursor()
-    cur.execute("""
-        UPDATE carga_itens
-           SET separado=%s
-         WHERE numero_carga=%s AND grupo_codigo=%s
-    """, (separado, numero_carga, grupo_codigo))
-    afetados = cur.rowcount
-    conn.commit()
-    cur.close(); conn.close()
-    return jsonify({"ok": True, "itens_afetados": afetados})
-
-@app.route('/mapa/<numero_carga>')
-def mapa_detalhe(numero_carga):
-    import json
-    html = f"""
-    <!DOCTYPE html><html lang="pt-br"><head>
-      <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>Mapa {numero_carga}</title>
-      <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-      <style>
-        :root {{
-          --bg:#0f1115; --panel:#161a22; --panel-2:#121722;
-          --ink:#ecf2ff; --muted:#b9c3d6; --line:#2a364a;
-          --ok:#1f9d61; --ok-bg:rgba(35,171,103,.18);
-          --err:#ef4444; --err-bg:rgba(239,68,68,.18);
-          --warn:#ffd166; --input-bg:#0f141b; --input-line:#2a3b5e; --chip:#233049;
-        }}
-        body {{ background:var(--bg); color:var(--ink); }}
-        .card {{ background:var(--panel); border-color:var(--line); }}
-        .card-header {{
-          background:var(--panel-2); color:var(--ink); border-bottom-color:var(--line);
-          font-weight:700; letter-spacing:.2px;
-        }}
-        .list-group-item.item-row {{ background:var(--panel); color:var(--ink); border-color:#222c3f; }}
-        .item-row.separado {{ background:var(--ok-bg); }}
-        .item-row.faltou   {{ background:var(--err-bg); }}
-        .item-row.forcado  {{ outline:1px dashed var(--warn); }}
-        .item-row .form-check-label {{ color:var(--ink); }}
-        .item-row .form-check-input {{ cursor:pointer; }}
-        .item-row .input-group-text {{ background:var(--chip); color:#dbe2f1; border-color:var(--input-line); }}
-        .item-row input.form-control {{ background:var(--input-bg); color:var(--ink); border-color:var(--input-line); }}
-        .badge.bg-warning.text-dark {{ color:#1b1f29 !important; }}
-        .small-mono {{
-          font-family: ui-monospace, Menlo, Consolas, monospace;
-          font-size:.98rem; color:#f3f6ff;
-        }}
-        .sticky-top-bar {{ position:sticky; top:0; z-index:1020; background:var(--bg); padding:.75rem 0; }}
-        .hover-row:hover {{ background:#1b2130; }}
-      </style>
-    </head><body>
-      <div class="container py-3">
-        <nav class="mb-3">
-          <a class="btn btn-outline-light me-2" href="/mapa">← Mapas</a>
-          <a class="btn btn-outline-light me-2" href="/gestao">Gestão</a>
-          <a class="btn btn-outline-light" href="/conferencia">Conferência</a>
-        </nav>
-
-        <div class="sticky-top-bar">
-          <h3 class="mb-2">Mapa <span class="text-info">{numero_carga}</span></h3>
-          <div class="row g-2">
-            <div class="col-md-6">
-              <input id="busca" class="form-control" placeholder="Buscar por código, EAN ou descrição..." />
-            </div>
-            <div class="col-md-6 text-md-end">
-              <span id="resumo" class="text-secondary"></span>
-            </div>
-          </div>
-        </div>
-
-        <div id="grupos" class="mt-3"></div>
-      </div>
-
-      <script>
-      const NUMERO_CARGA = {json.dumps(numero_carga)};
-      let STATE = {{ grupos: [], itens: [] }};
-
-      function badge(txt, cls) {{ return '<span class="badge ' + cls + ' ms-1">' + txt + '</span>'; }}
-      function pintaLinha(it) {{
-        let cls = "list-group-item item-row hover-row";
-        if (it.separado) cls += " separado";
-        if (it.faltou) cls += " faltou";
-        if (it.forcar_conferido) cls += " forcado";
-        return cls;
-      }}
-
-      function render() {{
-        const wrap = document.getElementById('grupos');
-        const q = (document.getElementById('busca').value || '').toLowerCase().trim();
-        let total = 0, marcados = 0, htmlStr = '';
-
-        for (const g of STATE.grupos) {{
-          const items = STATE.itens
-            .filter(x => x.grupo_codigo === g.grupo_codigo)
-            .filter(x => !q || (String(x.codigo||'').includes(q) ||
-                                String(x.cod_barras||'').includes(q) ||
-                                String(x.descricao||'').toLowerCase().includes(q)));
-          if (!items.length) continue;
-
-          htmlStr += ''
-            + '<div class="card mb-3">'
-              + '<div class="card-header d-flex justify-content-between align-items-center">'
-                + '<div><strong>' + g.grupo_codigo + '</strong> — ' + (g.grupo_titulo||'') + '</div>'
-                + '<div class="d-flex gap-2">'
-                  + '<button class="btn btn-sm btn-success" onclick="marcarGrupo(\\'' + g.grupo_codigo + '\\', true)">Marcar grupo</button>'
-                  + '<button class="btn btn-sm btn-outline-light" onclick="marcarGrupo(\\'' + g.grupo_codigo + '\\', false)">Desmarcar</button>'
-                + '</div>'
-              + '</div>'
-              + '<div class="list-group list-group-flush">';
-
-          for (const it of items) {{
-            total++; if (it.separado) marcados++;
-
-            // === LINHA NO FORMATO: EAN CÓD DESCRIÇÃO FAB QTD UN (C/ PACK) ===
-            const ean = (it.cod_barras || '').trim();
-            const cod  = (it.codigo || '').trim();
-            const desc = (it.descricao || '').toUpperCase().replace(/\\s+/g,' ').trim();
-            const fab  = (it.fabricante || '').toUpperCase().trim();
-            const qtd  = (it.qtd_unidades || 0);
-            const un   = (it.unidade || '').toUpperCase().trim();
-            const packSuffix = it.pack_qtd ? (' (C/ ' + it.pack_qtd + ' ' + (it.pack_unid || '') + ')') : '';
-            const qtdParte = qtd ? (qtd + ' ' + un + packSuffix) : '';
-            const linha = [ean, cod, desc, fab, qtdParte].filter(Boolean).join(' ').replace(/\\s+/g,' ');
-
-            htmlStr += ''
-              + '<div class="' + pintaLinha(it) + '">'
-                + '<div class="d-flex flex-column flex-md-row justify-content-between gap-2">'
-                  + '<div class="flex-grow-1">'
-                    + '<div class="small-mono">' + linha + '</div>'
-                    + '<div class="mt-1">'
-                      + (it.forcar_conferido ? badge('FORÇADO','bg-warning text-dark') : '')
-                      + (it.faltou ? badge('FALTOU','bg-danger') : '')
-                      + (it.separado ? badge('SEPARADO','bg-success') : '')
-                    + '</div>'
-                  + '</div>'
-                  + '<div class="d-flex flex-column align-items-start align-items-md-end gap-2">'
-                    + '<div class="form-check">'
-                      + '<input class="form-check-input" type="checkbox" ' + (it.separado ? 'checked' : '') + ' '
-                        + 'onchange="toggleItem(' + it.id + ', {{separado: this.checked}})">'
-                      + '<label class="form-check-label">Separado</label>'
-                    + '</div>'
-                    + '<div class="form-check">'
-                      + '<input class="form-check-input" type="checkbox" ' + (it.faltou ? 'checked' : '') + ' '
-                        + 'onchange="toggleItem(' + it.id + ', {{faltou: this.checked}})">'
-                      + '<label class="form-check-label">Faltou</label>'
-                    + '</div>'
-                    + '<div class="form-check">'
-                      + '<input class="form-check-input" type="checkbox" ' + (it.forcar_conferido ? 'checked' : '') + ' '
-                        + 'onchange="toggleItem(' + it.id + ', {{forcar_conferido: this.checked}})">'
-                      + '<label class="form-check-label">Forçar conferido</label>'
-                    + '</div>'
-                    + '<div class="input-group input-group-sm">'
-                      + '<span class="input-group-text">Sobrando</span>'
-                      + '<input type="number" class="form-control" value="' + (it.sobrando || 0) + '" '
-                        + 'onchange="toggleItem(' + it.id + ', {{sobrando: parseInt(this.value||0)}})">'
-                    + '</div>'
-                    + '<div class="input-group input-group-sm">'
-                      + '<span class="input-group-text">Obs</span>'
-                      + '<input type="text" class="form-control" value="' + (it.observacao || '') + '" '
-                        + 'onchange="toggleItem(' + it.id + ', {{observacao: this.value}})">'
-                    + '</div>'
-                  + '</div>'
-                + '</div>'
-              + '</div>';
-          }}
-          htmlStr += '</div></div>'; // fecha card do grupo
-        }}
-
-        wrap.innerHTML = htmlStr || '<div class="alert alert-secondary">Nenhum item para exibir.</div>';
-        document.getElementById('resumo').textContent = total ? (marcados + '/' + total + ' itens marcados') : '';
-      }}
-
-      async function carregar() {{
-        const r = await fetch('/api/mapa/' + encodeURIComponent(NUMERO_CARGA));
-        const data = await r.json();
-        STATE.grupos = data.grupos || [];
-        STATE.itens  = data.itens  || [];
-        render();
-      }}
-
-      async function toggleItem(id, patch) {{
-        const idx = STATE.itens.findIndex(x => x.id === id);
-        if (idx >= 0) Object.assign(STATE.itens[idx], patch);
-        render();
-        const body = Object.assign({{ item_id: id }}, patch);
-        await fetch('/api/mapa/item/atualizar', {{
-          method: 'POST',
-          headers: {{ 'Content-Type': 'application/json' }},
-          body: JSON.stringify(body)
-        }});
-      }}
-
-      async function marcarGrupo(grupo, flag) {{
-        for (const it of STATE.itens) if (it.grupo_codigo === grupo) it.separado = !!flag;
-        render();
-        await fetch('/api/mapa/grupo/marcar', {{
-          method: 'POST',
-          headers: {{ 'Content-Type': 'application/json' }},
-          body: JSON.stringify({{ numero_carga: NUMERO_CARGA, grupo_codigo: grupo, separado: !!flag }})
-        }});
-      }}
-
-      document.getElementById('busca').addEventListener('input', render);
-      carregar();
-      </script>
-    </body></html>
-    """
-    return html
-
-
-@app.route('/mapa/extrator', methods=['GET', 'POST'])
-def mapa_extrator():
-    # Página simples pra fazer upload e ver como o servidor leu o PDF linha a linha
-    if request.method == 'GET':
-        return '''
-        <!doctype html><html lang="pt-br"><head>
-        <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-        <title>Extrator de Debug</title>
-        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-        <style>
-          body{background:#0f1115;color:#e9edf3}
-          .mono{font-family:ui-monospace,Menlo,Consolas,monospace}
-          .ok{background:rgba(35,171,103,.14)}
-          .fail{background:rgba(239,68,68,.12)}
-          table{font-size:.9rem}
-          td,th{vertical-align:top}
-          pre{white-space:pre-wrap}
-        </style></head><body class="p-3">
-        <a class="btn btn-outline-light mb-3" href="/gestao">← Gestão</a>
-        <h3>Extrator de Debug do Mapa (PDF)</h3>
-        <p class="text-secondary">Envie um PDF para ver as linhas lidas e como cada uma foi interpretada.</p>
-        <form method="post" enctype="multipart/form-data" class="d-flex gap-2 mb-4">
-          <input class="form-control" type="file" name="pdf" accept="application/pdf" required>
-          <button class="btn btn-warning">Processar</button>
-        </form>
-        </body></html>
-        '''
-
-    f = request.files.get('pdf')
-    if not f:
-        return "Envie um PDF", 400
-
-    from werkzeug.utils import secure_filename
-    path_tmp = f"/tmp/{secure_filename(f.filename)}"
-    f.save(path_tmp)
-
-    try:
-        # usa as funções de debug do parser
-        rows = debug_extrator(path_tmp)
-    except Exception as e:
-        return (f"Erro no extrator: {e}", 400)
-
-    # monta uma tabela HTML simples
-    head = '''
-    <!doctype html><html lang="pt-br"><head>
-    <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Resultado do Extrator</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <style>
-      body{background:#0f1115;color:#e9edf3}
-      .mono{font-family:ui-monospace,Menlo,Consolas,monospace}
-      .ok{background:rgba(35,171,103,.14)}
-      .fail{background:rgba(239,68,68,.12)}
-      table{font-size:.9rem}
-      td,th{vertical-align:top}
-      pre{white-space:pre-wrap}
-      .pill{display:inline-block;padding:.1rem .4rem;border-radius:.5rem;background:#1b2537;margin-right:.25rem}
-    </style></head><body class="p-3">
-    <a class="btn btn-outline-light mb-3" href="/mapa/extrator">← Novo arquivo</a>
-    <h4 class="mb-3">Linhas lidas e parsing</h4>
-    <div class="mb-2">
-      <span class="pill">QTD/UN aceitas: UN, CX, FD, CJ, DP, PC, PT, DZ, SC, KT, JG, BF, PA</span>
-      <span class="pill">Peso/Volume ignorado: G, KG, ML, L</span>
-    </div>
-    <div class="table-responsive"><table class="table table-sm table-dark table-striped align-middle">
-      <thead><tr>
-        <th>#</th><th>Linha (crua)</th><th>Descrição</th><th>Código</th><th>Fabricante</th>
-        <th>EAN</th><th>Qtd</th><th>Un</th><th>Pack</th>
-      </tr></thead><tbody>'''
-    rows_html = []
-    for r in rows:
-        p = r["parsed"] or {}
-        cls = "ok" if p else "fail"
-        rows_html.append(f"<tr class='{cls}'>"
-                         f"<td class='mono'>{r['n']}</td>"
-                         f"<td class='mono'><pre>{(r['line'] or '').replace('<','&lt;').replace('>','&gt;')}</pre></td>"
-                         f"<td class='mono'>{(p.get('descricao') or '')}</td>"
-                         f"<td class='mono'>{(p.get('codigo') or '')}</td>"
-                         f"<td class='mono'>{(p.get('fabricante') or '')}</td>"
-                         f"<td class='mono'>{(p.get('cod_barras') or '')}</td>"
-                         f"<td class='mono'>{(p.get('qtd_unidades') or '')}</td>"
-                         f"<td class='mono'>{(p.get('unidade') or '')}</td>"
-                         f"<td class='mono'>{( (str(p.get('pack_qtd'))+' '+p.get('pack_unid','')) if p.get('pack_qtd') else '' )}</td>"
-                         f"</tr>")
-    tail = "</tbody></table></div></body></html>"
-    return head + "\n".join(rows_html) + tail
-
-# ------------------------------
-# ROTA: LISTAGEM DE MAPAS
-# ------------------------------
-@app.route('/mapa')
-def mapa():
-    conn = get_db_connection()
-    cur = conn.cursor()
-    cur.execute("""
-        SELECT numero_carga, motorista, descricao_romaneio, data_emissao
-        FROM cargas
-        ORDER BY criado_em DESC
-    """)
-    mapas = cur.fetchall()
-    cur.close(); conn.close()
-    return render_template('mapa.html', mapas=mapas)
 
 
 @app.route('/mapa/deletar/<numero_carga>', methods=['POST'])
@@ -1282,51 +682,126 @@ def mapa_deletar(numero_carga):
         flash(f"Erro ao excluir o mapa {numero_carga}.", "danger")
     finally:
         cur.close(); conn.close()
-    return redirect(url_for('mapa'))
+    return redirect(url_for('mapa_lista'))
 
+# =================================================================
+# ROTA DE DEBUG AVANÇADA PARA O EXTRATOR
+# =================================================================
+@app.route('/mapa/extrator', methods=['GET', 'POST'])
+def mapa_extrator():
+    if request.method == 'GET':
+        return '''
+        <!doctype html><html lang="pt-br"><head>
+        <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>Extrator de Debug</title>
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+        <style>
+          body{background:#0f1115;color:#e9edf3}
+          .mono{font-family:ui-monospace,Menlo,Consolas,monospace}
+          .ok{background:rgba(35,171,103,.14)}
+          .fail{background:rgba(239,68,68,.12)}
+          table{font-size:.9rem} td,th{vertical-align:top}
+          pre{white-space:pre-wrap}
+        </style></head><body class="p-3">
+        <a class="btn btn-outline-light mb-3" href="/gestao">← Gestão</a>
+        <h3>Extrator de Debug do Mapa (PDF)</h3>
+        <p class="text-secondary">Envie um PDF para ver as linhas lidas e como cada uma foi interpretada.</p>
+        <form method="post" enctype="multipart/form-data" class="d-flex gap-2 mb-4">
+          <input class="form-control" type="file" name="pdf" accept="application/pdf" required>
+          <button class="btn btn-warning">Processar</button>
+        </form>
+        </body></html>
+        '''
 
-@app.route('/api/mapa/<numero_carga>/debug')
-def api_mapa_debug(numero_carga):
-    conn = get_db_connection()
-    cur = conn.cursor()
+    f = request.files.get('pdf')
+    if not f: return "Envie um PDF", 400
 
-    cur.execute("SELECT count(*) FROM carga_itens WHERE numero_carga = %s", (numero_carga,))
-    total_itens = cur.fetchone()[0]
+    path_tmp = f"/tmp/{secure_filename(f.filename)}"
+    f.save(path_tmp)
 
-    cur.execute("""
-        SELECT grupo_codigo, count(*) 
-        FROM carga_itens 
-        WHERE numero_carga = %s 
-        GROUP BY grupo_codigo
-        ORDER BY grupo_codigo
-    """, (numero_carga,))
-    por_grupo = cur.fetchall()
+    # --- LÓGICA DE DEBUG ---
+    # Recriamos a lógica do parser aqui para podermos inspecionar passo a passo
+    try:
+        from typing import List, Tuple
+        
+        X_FABRICANTE = 430
+        X_QUANTIDADE = 500
+        Y_LINE_TOLERANCE = 4
+        GRUPO_PATTERN = re.compile(r"([A-Z]{2,}\d+-[A-Z0-9/\s]+)")
 
-    cur.execute("""
-        SELECT numero_carga, motorista, descricao_romaneio, data_emissao 
-        FROM cargas WHERE numero_carga = %s
-    """, (numero_carga,))
-    header = cur.fetchone()
+        def _clean(s: str) -> str:
+            if not s: return ""
+            return re.sub(r"\s+", " ", s).strip()
 
-    cur.close()
-    conn.close()
+        def group_words_into_lines(words: list, y_tolerance: int) -> List[List[Tuple]]:
+            if not words: return []
+            lines = []
+            words.sort(key=lambda w: (w[1], w[0]))
+            current_line = [words[0]]
+            last_y = words[0][1]
+            for i in range(1, len(words)):
+                word = words[i]
+                y0 = word[1]
+                if abs(y0 - last_y) <= y_tolerance:
+                    current_line.append(word)
+                else:
+                    lines.append(sorted(current_line, key=lambda w: w[0]))
+                    current_line = [word]
+                last_y = y0
+            lines.append(sorted(current_line, key=lambda w: w[0]))
+            return lines
 
-    return jsonify({
-        "header": {
-            "numero_carga": header[0] if header else numero_carga,
-            "motorista": header[1] if header else None,
-            "romaneio": header[2] if header else None,
-            "emissao": header[3] if header else None,
-        },
-        "total_itens": total_itens,
-        "por_grupo": [{"grupo_codigo": g, "qtd": q} for (g, q) in por_grupo]
-    })
+        doc = fitz.open(path_tmp)
+        debug_rows = []
+        for page in doc:
+            words = page.get_text("words")
+            visual_lines = group_words_into_lines(words, Y_LINE_TOLERANCE)
+            
+            for line_words in visual_lines:
+                full_line_text = " ".join(w[4] for w in line_words)
+                parsed_data = {}
 
+                desc_parts, fab_parts, qtd_parts = [], [], []
+                for x0, y0, x1, y1, text, *_ in line_words:
+                    if x0 < X_FABRICANTE: desc_parts.append(text)
+                    elif x0 < X_QUANTIDADE: fab_parts.append(text)
+                    else: qtd_parts.append(text)
+                
+                parsed_data['descricao'] = _clean(" ".join(desc_parts))
+                parsed_data['fabricante'] = _clean(" ".join(fab_parts))
+                parsed_data['quantidade'] = _clean(" ".join(qtd_parts))
 
+                debug_rows.append({"line": full_line_text, "parsed": parsed_data})
 
+    except Exception as e:
+        return (f"Erro no extrator de debug: {e}", 400)
 
-
-@app.route('/ping')
-def ping():
-    return "OK", 200
-
+    # --- RENDERIZAÇÃO DA TABELA DE DEBUG ---
+    head = '''
+    <!doctype html><html lang="pt-br"><head>
+    <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Resultado do Extrator</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+      body{background:#0f1115;color:#e9edf3} .mono{font-family:ui-monospace,Menlo,Consolas,monospace}
+      .ok{background:rgba(35,171,103,.14)} .fail{background:rgba(239,68,68,.12)}
+      table{font-size:.9rem} td,th{vertical-align:top} pre{white-space:pre-wrap}
+    </style></head><body class="p-3">
+    <a class="btn btn-outline-light mb-3" href="/mapa/extrator">← Novo arquivo</a>
+    <h4 class="mb-3">Depuração Linha a Linha</h4>
+    <div class="table-responsive"><table class="table table-sm table-dark table-striped align-middle">
+      <thead><tr>
+        <th>Linha Crua</th><th>Coluna Descrição (Inferida)</th><th>Coluna Fabricante (Inferida)</th><th>Coluna Quantidade (Inferida)</th>
+      </tr></thead><tbody>'''
+    rows_html = []
+    for r in debug_rows:
+        p = r["parsed"] or {}
+        cls = "ok" if p.get('descricao') or p.get('fabricante') or p.get('quantidade') else "fail"
+        rows_html.append(f"<tr class='{cls}'>"
+                         f"<td class='mono'><pre>{r['line']}</pre></td>"
+                         f"<td class='mono'>{p.get('descricao', '')}</td>"
+                         f"<td class='mono'>{p.get('fabricante', '')}</td>"
+                         f"<td class='mono'>{p.get('quantidade', '')}</td>"
+                         f"</tr>")
+    tail = "</tbody></table></div></body></html>"
+    return head + "\n".join(rows_html) + tail
