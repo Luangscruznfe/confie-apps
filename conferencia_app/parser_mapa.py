@@ -273,7 +273,7 @@ def parse_mapa(pdf_path: str) -> Tuple[Dict[str, str], List[Dict[str, str]], Lis
         if _clean(i.get("descricao", "")) or _clean(i.get("codigo", ""))
     ]
 
-        return header, None, grupos, itens
+    return header, None, grupos, itens
 
 # ----------------------------
 # Função de debug (opcional)
