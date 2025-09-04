@@ -744,7 +744,7 @@ def overlay_quantidades_com_conferencia(itens_mapa: list, pdf_path: str) -> list
 @app.route('/mapa/upload', methods=['POST'])
 def mapa_upload():
     try:
-        f = request.files.get('file')
+        f = request.files.get('pdf')
         if not f or not f.filename.lower().endswith('.pdf'):
             flash("Envie um arquivo PDF válido.", "danger")
             return redirect(url_for('mapa'))

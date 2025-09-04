@@ -127,10 +127,9 @@
   <div class="card-header">Importar Mapa de Separação (PDF)</div>
   <div class="card-body">
     <form id="form-mapa" class="d-flex gap-2" enctype="multipart/form-data">
-      <input class="form-control" type="file" name="file" accept="application/pdf" required />
-      <!-- IMPORTANTE: botão do tipo button -->
-      <button type="button" id="btn-enviar-mapa" class="btn btn-warning">Enviar Mapa</button>
-      <a href="/mapa" class="btn btn-outline-light">Abrir Mapas</a>
+  <input class="form-control" type="file" name="pdf" accept="application/pdf" required />
+  <button type="button" id="btn-enviar-mapa" class="btn btn-warning">Enviar Mapa</button>
+  <a href="/mapa" class="btn btn-outline-light">Abrir Mapas</a>
     </form>
     <div id="resultado-mapa" class="mt-3 small text-muted"></div>
   </div>
