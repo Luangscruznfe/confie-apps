@@ -754,7 +754,7 @@ def mapa_upload():
     file = request.files.get("file")
     if not file:
         flash("Selecione um PDF do mapa.")
-        return redirect(url_for("mapa_form"))
+        return redirect(url_for("mapa_extrator"))
 
     # salva o PDF temporariamente
     filename = secure_filename(file.filename)
@@ -770,7 +770,7 @@ def mapa_upload():
     numero_carga = header.get("numero_carga") or numero_carga_form
     if not numero_carga:
         flash("Número da carga não encontrado no PDF nem informado no formulário.")
-        return redirect(url_for("mapa_form"))
+        return redirect(url_for("mapa_extrator"))
 
     # outros campos de header (opcional)
     motorista = header.get("motorista", "")
@@ -852,7 +852,7 @@ def mapa_upload():
         conn.rollback()
         print("[MAPA][ERRO]", e)
         flash("Falha ao importar o mapa. Veja os logs.")
-        return redirect(url_for("mapa_form"))
+        return redirect(url_for("mapa_extrator"))
 
     finally:
         cur.close()
