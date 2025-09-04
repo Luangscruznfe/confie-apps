@@ -24,6 +24,7 @@ except ImportError:
 # 2. CONFIGURAÇÃO DA APP FLASK
 # =================================================================
 app = Flask(__name__)
+app.secret_key = os.environ.get("FLASK_SECRET_KEY", "confie123")
 print("RODANDO ESTE APP:", __file__)
 
 # =================================================================
@@ -754,7 +755,7 @@ def mapa_upload():
         f.save(path_tmp)
 
         # extrai do PDF com parse_mapa
-        header, grupos, itens = parse_mapa(path_tmp)
+        header, _, grupos, itens = parse_mapa(path_tmp)
 
         numero_carga = header.get("numero_carga")
         if not numero_carga:
