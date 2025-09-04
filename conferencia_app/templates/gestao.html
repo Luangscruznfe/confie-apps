@@ -127,27 +127,54 @@
   <div class="card-header">Importar Mapa de Separação (PDF)</div>
   <div class="card-body">
     <form id="mapaForm" enctype="multipart/form-data">
-  <input type="file" name="file" accept="application/pdf">
-  <button type="submit">Enviar Mapa</button>
+    <div class="input-group">
+        <input class="form-control" type="file" name="file" accept="application/pdf" required>
+        <button class="btn btn-warning" type="submit">Enviar Mapa</button>
+    </div>
 </form>
 
 <script>
 document.getElementById("mapaForm").addEventListener("submit", function(e) {
   e.preventDefault();
   const formData = new FormData(this);
+  const resultadoDiv = document.getElementById('resultado-mapa');
+  const submitButton = this.querySelector('button[type="submit"]');
+
+  // Mostra feedback de carregamento
+  submitButton.disabled = true;
+  submitButton.innerHTML = 'Enviando...';
+  resultadoDiv.innerHTML = '<span class="text-primary">Processando o mapa...</span>';
+  resultadoDiv.className = 'mt-3 small'; // Reseta as classes
 
   fetch("/mapa/upload", {
     method: "POST",
     body: formData
   })
-  .then(res => res.text())
-  .then(data => {
-    alert("Mapa enviado com sucesso!");
-    console.log(data);
+  .then(response => {
+    // Se a resposta for bem-sucedida, redireciona para a página do mapa
+    if (response.redirected) {
+        window.location.href = response.url;
+        return; // Interrompe a execução para não mostrar mensagem
+    }
+    // Se não houver redirecionamento, trata como texto (possível erro)
+    return response.text();
+  })
+  .then(text => {
+    // Se chegamos aqui, provavelmente houve um erro ou não houve redirecionamento
+    if (text) {
+        resultadoDiv.innerHTML = `<span class="text-danger"><b>Erro:</b> ${text}</span>`;
+        resultadoDiv.className = 'mt-3 small alert alert-danger';
+    }
   })
   .catch(err => {
-    alert("Erro ao enviar mapa");
+    resultadoDiv.innerHTML = `<span class="text-danger"><b>Falha na comunicação:</b> ${err.message}</span>`;
+    resultadoDiv.className = 'mt-3 small alert alert-danger';
     console.error(err);
+  })
+  .finally(() => {
+    // Reativa o botão em caso de erro
+    submitButton.disabled = false;
+    submitButton.innerHTML = 'Enviar Mapa';
   });
 });
 </script>
