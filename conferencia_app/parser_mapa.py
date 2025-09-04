@@ -1,336 +1,321 @@
-# parser_mapa.py (versão robusta e corrigida para packs)
-import re, fitz
+# -*- coding: utf-8 -*-
+"""
+Parser robusto para 'Mapa de Separação' (PyMuPDF / fitz).
+- Lê TODAS as páginas (sem cortar).
+- Mantém a ordem visual (y, depois x).
+- Faz flush do último item (não perde o item final).
+- Retorna: header(dict), grupos(list[dict]), itens(list[dict])
+"""
 
-HEAD_IGNORES = (
-    "SEPARAÇÃO DE CARGA",
-    "FABRIC.CÓDIGO", "FABRIC.CODIGO",
-    "CÓD. BARRAS", "COD. BARRAS",
-    "PAG.:",
-    "DATA EMISSÃO", "MOTORISTA",
-    "PESO TOTAL", "ENTREGAS",
-    "PEDIDOS:", "NÚMERO DA CARGA", "NUMERO DA CARGA"
-)
+import re
+from typing import Dict, List, Tuple, Any
 
-# Unidades de picking aceitas (quantidade separada)
-PICK_UNIDADES = {"UN","CX","FD","CJ","DP","PC","PT","DZ","SC","KT","JG","BF","PA"}
-# Unidades de peso/volume que NÃO são picking (vão ficar na descrição)
-WEIGHT_UNIDADES = {"G","KG","ML","L"}
+try:
+    import fitz  # PyMuPDF
+except ImportError:
+    raise RuntimeError("PyMuPDF (fitz) não encontrado. Instale com: pip install pymupdf")
 
-# Estes regex auxiliares não serão mais usados diretamente por try_parse_line,
-# mas podem ser úteis para outras validações ou debug.
-PACK_ONLY_RE = re.compile(r"^C/\s*(\d+)\s*([A-Z]{1,4})$", re.IGNORECASE)
-QTY_ONLY_RE  = re.compile(r"^(\d+)\s*([A-Z]{1,4})$", re.IGNORECASE)
+# ----------------------------
+# Utilidades de normalização
+# ----------------------------
 
-def _is_only_pack(s: str):
-    m = PACK_ONLY_RE.match(" ".join((s or "").strip().split()))
+def _clean(s: str) -> str:
+    if not s:
+        return ""
+    # remove separadores estranhos e espaços repetidos
+    s = s.replace("\x0c", " ").replace("\u00ad", "")  # form feed e soft-hyphen
+    s = re.sub(r"[ \t]+", " ", s)
+    return s.strip()
+
+def _to_int_safe(s: str) -> int:
+    if s is None:
+        return 0
+    s = s.replace(".", "").replace(",", ".")
+    m = re.search(r"-?\d+(\.\d+)?", s)
     if not m:
-        return None
-    return int(m.group(1)), (m.group(2) or "").upper()
+        return 0
+    try:
+        v = float(m.group(0))
+        return int(round(v))
+    except Exception:
+        return 0
 
-def _is_only_qty(s: str):
-    m = QTY_ONLY_RE.match(" ".join((s or "").strip().split()))
-    if not m:
-        return None
-    un = (m.group(2) or "").upper()
-    if un not in PICK_UNIDADES:   # ignora peso/volume como “quantidade”
-        return None
-    return int(m.group(1)), un
+# ----------------------------
+# Heurísticas de detecção
+# ----------------------------
 
-# =========================
-# 1) Cabeçalho (tolerante)
-# =========================
-HEADER_PATTERNS = {
-    "numero_carga": re.compile(
-        r"(?:N[uú]mero\s+da\s+Carga|Numero\s+da\s+Carga|N[º°]\s*da?\s*Carg[ae])\s*:\s*([A-Za-z0-9\-\/\.]+)",
-        re.IGNORECASE
-    ),
-    "motorista": re.compile(r"Motorista\s*:\s*(.+)", re.IGNORECASE),
-    "descricao_romaneio": re.compile(r"Desc\.?\s*Romaneio\s*:\s*(.+)", re.IGNORECASE),
-    "peso_total": re.compile(r"Peso\s+Total\s*:\s*([\d\.,]+)", re.IGNORECASE),
-    "entregas": re.compile(r"Entregas\s*:\s*(\d+)", re.IGNORECASE),
-    "data_emissao": re.compile(r"Data(?:\s+de)?\s*Emiss[aã]o\s*:\s*([\d/]{8,10})", re.IGNORECASE),
+# 1) Cabeçalho: número da carga, data, cliente, etc. Ajuste conforme seu PDF.
+_HEADER_HINTS = {
+    "numero_carga": [r"(?:n[úu]mero|num\.?|nº)\s*da?\s*carga\s*[:\-]?\s*(\S+)", r"\bCARGA\s*[:\-]?\s*(\S+)"],
+    "data": [r"\bdata\s*[:\-]?\s*([0-3]?\d\/[01]?\d\/\d{2,4})", r"\bEmiss[aã]o\s*[:\-]?\s*([0-3]?\d\/[01]?\d\/\d{2,4})"],
+    "cliente": [r"\bcliente\s*[:\-]\s*(.+)$"],
 }
 
-RE_PEDIDOS_INICIO = re.compile(r"^Pedidos:\s*(.*)", re.IGNORECASE)
-RE_GRUPO = re.compile(r"^([A-Z]{3}\d+)\s*-\s*(.+)$", re.IGNORECASE)
+# 2) Grupo: linha que indica início de seção (ex.: “GRUPO: HIGIENE” ou “Setor: …”)
+_GRUPO_PATTERNS = [
+    r"^\s*(?:GRUPO|SETOR|SEÇÃO|SECAO)\s*[:\-]\s*(.+?)\s*$",
+]
 
-# =========================
-# 2) Padrões de itens
-# =========================
-# Padrão “completo” (com EAN), aceita "C/ 12UN" opcional
-RE_ITEM = re.compile(
-    r"""^(?:C/\s*(?P<pack_qtd>\d+)\s*(?P<pack_unid>[A-Z]+))?\s*     # prefixo opcional "C/ 12UN"
-        (?P<fabricante>[A-Z0-9À-Ú\-&\. ]+?)\s+                      # fabricante (com acento)
-        (?P<codigo>\d{3,})\s+                                      # código interno (3+ dígitos)
-        (?P<cod_barras>\d{8,14})\s+                                # EAN/GTIN (8–14 dígitos)
-        (?P<descricao>.+?)\s+                                      # descrição
-        (?P<qtd_unidades>\d+)\s*(?P<unidade>[A-Z]{1,4})\s*$        # quantidade e unidade
-    """,
-    re.VERBOSE | re.IGNORECASE
+# 3) Item: heurística flexível.
+#    Aceita linhas iniciando com índice/código e que contenham uma descrição,
+#    e normalmente terminam com QTD/UND ou pelo menos um número “quantidade”.
+_ITEM_START_PATTERNS = [
+    # 001 7891234567890 TOALHA ABSORV 2X55 BEST ... 12
+    r"^\s*(\d{1,4})\s+(\d{6,})\s+(.+?)\s+(\d{1,6})\s*$",
+    # 001 TOALHA ABSORV ... 12   (sem código de barras visível)
+    r"^\s*(\d{1,4})\s+(.+?)\s+(\d{1,6})\s*$",
+    # Código de barras primeiro
+    r"^\s*(\d{6,})\s+(.+?)\s+(\d{1,6})\s*$",
+]
+
+# Caso o item quebre em várias linhas, juntamos até detectar a próxima âncora de item/grupo.
+_NEXT_ANCHOR = re.compile(
+    r"|".join(
+        [
+            _GRUPO_PATTERNS[0],
+            # próxima linha com cara de item
+            r"^\s*(\d{1,4})\s+(\d{6,})\s+.+\d\s*$",
+            r"^\s*(\d{1,4})\s+.+\d\s*$",
+            r"^\s*(\d{6,})\s+.+\d\s*$",
+        ]
+    ),
+    re.IGNORECASE,
 )
 
-# Padrão “flex” (quando falta EAN ou fabricante, ou a ordem muda um pouco)
-# Exemplos que esse padrão cobre:
-#   "C/ 12UN 24916  BARRA SUCRILHOS CHOCOLATE  1 DP"
-#   "KELLANOVA 24916 BARRA... 1 DP" (sem EAN)
-#   "24916 7896004004495 BARRA... 1 DP" (sem fabricante)
-RE_ITEM_FLEX = re.compile(
-    r"""^(?:C/\s*(?P<pack_qtd>\d+)\s*(?P<pack_unid>[A-Z]+))?\s*
-        (?:(?P<fabricante>[A-Z0-9À-Ú\-&\. ]+?)\s+)?                 # fabricante opcional
-        (?P<codigo>\d{3,})\s+                                      # código
-        (?:(?P<cod_barras>\d{8,14})\s+)?                           # EAN opcional
-        (?P<descricao>.+?)\s+                                      # descrição
-        (?P<qtd_unidades>\d+)\s*(?P<unidade>[A-Z]{1,4})\s*$        # qtd/unidade
-    """,
-    re.VERBOSE | re.IGNORECASE
-)
-
-# =========================
-# 3) Extração robusta
-# =========================
-def extract_text_from_pdf(path_pdf: str) -> str:
-    """
-    1) Tenta 'text' normal.
-    2) Se vier pouco texto, reconstrói por 'words' (ordena por y/x e agrupa por linha).
-    3) Se ainda curto, tenta 'blocks'.
-    """
-    doc = fitz.open(path_pdf)
-    pages_text = []
-
-    def rebuild_from_words(page):
-        words = page.get_text("words")  # [x0,y0,x1,y1,"texto",block,line,word]
-        if not words:
-            return ""
-        words.sort(key=lambda w: (round(w[1], 1), w[0]))  # y, depois x
-        lines, current_y, buf = [], None, []
-        for w in words:
-            y = round(w[1], 1)
-            if current_y is None:
-                current_y = y
-            if abs(y - current_y) > 1.5:  # nova linha
-                if buf:
-                    lines.append(" ".join(buf))
-                buf = []
-                current_y = y
-            buf.append(w[4])
-        if buf:
-            lines.append(" ".join(buf))
-        return "\n".join(lines)
-
-    for page in doc:
-        t = (page.get_text("text") or "").replace("\xa0", " ").strip()
-        if len(t) < 50:
-            t = rebuild_from_words(page)
-        if len(t) < 50:
-            try:
-                blocks = page.get_text("blocks") or []
-                t = "\n".join((b[4] or "").strip() for b in blocks if len(b) >= 5)
-            except:
-                pass
-        pages_text.append(t)
-    doc.close()
-    return "\n".join(pages_text)
-
-# =========================
-# 4) Parse do cabeçalho/pedidos
-# =========================
-def parse_header_and_pedidos(all_text: str):
-    header = {}
-    for k, rgx in HEADER_PATTERNS.items():
-        m = rgx.search(all_text)
+def _match_grupo(line: str) -> str:
+    line = _clean(line)
+    for pat in _GRUPO_PATTERNS:
+        m = re.match(pat, line, flags=re.IGNORECASE)
         if m:
-            header[k] = (m.group(1) or "").strip()
+            return _clean(m.group(1))
+    return ""
 
-    pedidos, cap, cap_on = [], [], False
-    for line in all_text.splitlines():
-        ls = line.strip()
-        if not cap_on:
-            m = RE_PEDIDOS_INICIO.match(ls)
+def _match_item(line: str) -> Dict[str, Any]:
+    """
+    Tenta casar linha de item com as heurísticas.
+    Retorna dict com colunas básicas, ou {} se não casar.
+    """
+    s = _clean(line)
+
+    # Tente padrões na ordem
+    for pat in _ITEM_START_PATTERNS:
+        m = re.match(pat, s, flags=re.IGNORECASE)
+        if not m:
+            continue
+
+        groups = [g for g in m.groups()]
+
+        # Normalização por quantidade de grupos identificados
+        # Padrões acima cobrem 3 ou 4 grupos.
+        if len(groups) == 4:
+            idx, cod, desc, qtd = groups
+            return {
+                "indice": _to_int_safe(idx),
+                "codigo": _clean(cod),
+                "descricao": _clean(desc),
+                "quantidade": _to_int_safe(qtd),
+            }
+        if len(groups) == 3:
+            # Pode ser: (indice, desc, qtd)  OU  (cod, desc, qtd)
+            g1, g2, g3 = groups
+            if re.fullmatch(r"\d{1,4}", g1):  # índice pequeno
+                return {
+                    "indice": _to_int_safe(g1),
+                    "codigo": "",
+                    "descricao": _clean(g2),
+                    "quantidade": _to_int_safe(g3),
+                }
+            else:
+                # Supomos que g1 seja código de barras
+                return {
+                    "indice": 0,
+                    "codigo": _clean(g1),
+                    "descricao": _clean(g2),
+                    "quantidade": _to_int_safe(g3),
+                }
+
+    return {}
+
+# ----------------------------
+# Extração por blocos (ordem visual)
+# ----------------------------
+
+def _iter_lines_in_reading_order(doc: "fitz.Document"):
+    """
+    Varre todas as páginas, pega blocos (page.get_text('blocks')),
+    ordena por (y, x) e rende uma sequência de linhas limpas.
+    """
+    for page_index in range(doc.page_count):
+        page = doc.load_page(page_index)
+        blocks = page.get_text("blocks") or []
+
+        # block: (x0, y0, x1, y1, text, block_no, block_type, ...)
+        # Ordena por topo (y0) e depois por x0 para manter ordem de leitura
+        blocks.sort(key=lambda b: (round(b[1], 2), round(b[0], 2)))
+
+        for b in blocks:
+            text = b[4] if len(b) > 4 else ""
+            # Split por linhas; evita perder conteúdo por \x0c
+            for raw_line in text.splitlines():
+                line = _clean(raw_line)
+                if line:
+                    yield line
+
+# ----------------------------
+# Parser principal
+# ----------------------------
+
+def parse_mapa(pdf_path: str) -> Tuple[Dict[str, str], List[Dict[str, str]], List[Dict[str, Any]]]:
+    """
+    Retorna:
+      header: { 'numero_carga': str, 'data': 'dd/mm/aaaa', 'cliente': '...' }
+      grupos: [ { 'nome': 'HIGIENE' }, ... ]
+      itens:  [ { 'grupo': 'HIGIENE', 'indice': 1, 'codigo': '789...', 'descricao': '...', 'quantidade': 12 }, ... ]
+    """
+    doc = fitz.open(pdf_path)
+
+    header: Dict[str, str] = {}
+    grupos: List[Dict[str, str]] = []
+    itens: List[Dict[str, Any]] = []
+
+    # Estado corrente
+    grupo_atual = ""
+    buffer_item_lines: List[str] = []  # para itens quebrados em várias linhas
+
+    # 1) Varre linhas em ordem de leitura
+    lines = list(_iter_lines_in_reading_order(doc))
+
+    # 2) Primeiro, tenta capturar cabeçalho nas 60 primeiras linhas (ajuste se precisar)
+    header_region = "\n".join(lines[:60])
+    for key, patterns in _HEADER_HINTS.items():
+        for pat in patterns:
+            m = re.search(pat, header_region, flags=re.IGNORECASE | re.MULTILINE)
             if m:
-                cap_on = True
-                cap.append(m.group(1))
-        else:
-            if ls.lower().startswith("fabric.") or RE_GRUPO.match(ls):
+                header[key] = _clean(m.group(1))
                 break
-            cap.append(ls)
+        header.setdefault(key, "")
 
-    if cap:
-        blob = " ".join(cap).replace("Pedidos:", " ")
-        pedidos = re.findall(r"\d{3,}", blob)
-    return header, pedidos
+    # 3) Passa item a item, detectando grupos e itens
+    def _flush_buffer_item():
+        """Tenta consolidar o que estiver no buffer como um item."""
+        nonlocal buffer_item_lines, grupo_atual, itens
+        if not buffer_item_lines:
+            return
 
-# =========================
-# 5) Parse de grupos/itens
-# =========================
+        joined = _clean(" ".join(buffer_item_lines))
+        data = _match_item(joined)
+        if data:
+            data["grupo"] = grupo_atual
+            itens.append(data)
+        buffer_item_lines = []
 
-def try_parse_line(line: str):
-    """
-    Tenta parsear UMA linha de item usando os padrões RE_ITEM e RE_ITEM_FLEX.
-    Prioriza RE_ITEM (mais completo) e depois RE_ITEM_FLEX.
-    """
-    s = " ".join((line or "").strip().split())
-    if not s:
-        return None
+    for line in lines:
+        # Detecta grupo
+        grupo = _match_grupo(line)
+        if grupo:
+            # Antes de trocar de grupo, garante flush de item pendente
+            _flush_buffer_item()
 
-    # Tenta casar com o padrão mais completo primeiro
-    match = RE_ITEM.match(s)
-    if not match:
-        # Se não casar, tenta com o padrão flexível
-        match = RE_ITEM_FLEX.match(s)
+            grupo_atual = grupo
+            grupos.append({"nome": grupo_atual})
+            continue
 
-    if match:
-        # Extrai os grupos nomeados do match
-        data = match.groupdict()
+        # Tentativa de match direto de item
+        item = _match_item(line)
+        if item:
+            # se já havia lixo no buffer (linhas do item anterior), fecha antes
+            _flush_buffer_item()
+            item["grupo"] = grupo_atual
+            itens.append(item)
+            continue
 
-        # Converte quantidades para int, se existirem
-        # Usa .get() para lidar com grupos que podem não existir em RE_ITEM_FLEX
-        data['qtd_unidades'] = int(data['qtd_unidades']) if data.get('qtd_unidades') else 0
-        data['pack_qtd'] = int(data['pack_qtd']) if data.get('pack_qtd') else 0
+        # Se não é grupo nem item direto, pode ser continuação do item atual
+        if buffer_item_lines:
+            # Se a próxima linha parece um novo anchor (novo item ou novo grupo), fecha o buffer
+            if _NEXT_ANCHOR.match(line):
+                _flush_buffer_item()
+                # reprocessa essa linha como possível novo início
+                # (chamando lógicas acima)
+                grupo = _match_grupo(line)
+                if grupo:
+                    grupo_atual = grupo
+                    grupos.append({"nome": grupo_atual})
+                    continue
+                item = _match_item(line)
+                if item:
+                    item["grupo"] = grupo_atual
+                    itens.append(item)
+                    continue
+                # se não casou nada, começa um novo buffer com essa linha
+                buffer_item_lines = [line]
+            else:
+                buffer_item_lines.append(line)
+        else:
+            # buffer vazio: talvez seja o começo de um item quebrado
+            # regra simples: se contém número + texto, guardamos
+            if re.search(r"\d", line) and re.search(r"[A-Za-zÀ-ÖØ-öø-ÿ]", line):
+                buffer_item_lines.append(line)
+            # senão, ignoramos (linhas soltas de layout)
 
-        # Garante que unidades e pack_unid sejam maiúsculas
-        data['unidade'] = (data.get('unidade') or '').upper()
-        data['pack_unid'] = (data.get('pack_unid') or '').upper()
+    # 4) MUITO IMPORTANTE: flush final para não perder o último item
+    _flush_buffer_item()
 
-        # Filtra unidades que não são de picking para não serem consideradas como 'unidade' principal
-        # Se a unidade não é de picking, a qtd_unidades também não faz sentido aqui
-        if data['unidade'] not in PICK_UNIDADES:
-            data['unidade'] = ''
-            data['qtd_unidades'] = 0
-
-        # Retorna apenas os campos relevantes e limpos
-        return {
-            "fabricante": (data.get('fabricante') or '').strip().upper(),
-            "codigo": (data.get('codigo') or '').strip(),
-            "cod_barras": (data.get('cod_barras') or '').strip(),
-            "descricao": (data.get('descricao') or '').strip(),
-            "qtd_unidades": data['qtd_unidades'],
-            "unidade": data['unidade'],
-            "pack_qtd": data['pack_qtd'],
-            "pack_unid": data['pack_unid'],
+    # 5) Pós-processamento simples: remove itens vazios e normaliza
+    itens = [
+        {
+            "grupo": i.get("grupo", ""),
+            "indice": int(i.get("indice", 0) or 0),
+            "codigo": _clean(i.get("codigo", "")),
+            "descricao": _clean(i.get("descricao", "")),
+            "quantidade": int(i.get("quantidade", 0) or 0),
         }
-    return None # Não houve match
+        for i in itens
+        if _clean(i.get("descricao", "")) or _clean(i.get("codigo", ""))
+    ]
 
-def parse_groups_and_items(all_text: str):
-    grupos, itens, current_group = [], [], None
-    lines = [" ".join(l.strip().split()) for l in all_text.splitlines() if l.strip()]
-    i = 0
-    while i < len(lines):
-        line = lines[i]
+        return header, None, grupos, itens
 
-        # >>> IGNORA cabeçalhos/rodapés do PDF
-        upper = line.upper()
-        if any(token in upper for token in HEAD_IGNORES):
-            i += 1
-            continue
+# ----------------------------
+# Função de debug (opcional)
+# ----------------------------
 
-        # Grupo
-        mg = RE_GRUPO.match(line)
-        if mg:
-            current_group = {"codigo": mg.group(1).upper(), "titulo": mg.group(2).strip()}
-            grupos.append(current_group)
-            # ao trocar de grupo, limpa pendentes
-            pending_qty = None
-            pending_pack = None
-            i += 1
-            continue
+def debug_mapa(pdf_path: str) -> None:
+    """
+    Use esta função para inspecionar rapidamente o que o parser está vendo.
+    """
+    h, g, it = parse_mapa(pdf_path)
+    print("[HEADER]")
+    for k, v in h.items():
+        print(f"  {k}: {v}")
 
-        if not current_group:
-            i += 1
-            continue
+    print("\n[GRUPOS]")
+    for idx, gg in enumerate(g, 1):
+        print(f"  {idx:02d}. {gg['nome']}")
 
-        # Se a linha é só QTD/UN ou só PACK, guarda no buffer e segue
-        only_q = _is_only_qty(line)
-        if only_q:
-            pending_qty = only_q
-            i += 1
-            continue
-        only_p = _is_only_pack(line)
-        if only_p:
-            pending_pack = only_p
-            i += 1
-            continue
+    print(f"\n[ITENS] total={len(it)}")
+    for i in it[-5:]:  # mostra os últimos 5 pra checar o 'último item'
+        print(f"  ({i.get('grupo')}) #{i.get('indice')} {i.get('codigo')}  {i.get('descricao')}  QTD={i.get('quantidade')}")
 
-        # 1) tenta parsear a linha atual
-        parsed = try_parse_line(line)
 
-        # 2) quebra de descrição? tenta juntar com a próxima
-        if not parsed and i + 1 < len(lines):
-            join_next = f"{line} {lines[i+1]}"
-            parsed = try_parse_line(join_next)
-            if parsed:
-                i += 1  # consumiu a próxima linha
+def debug_extrator(pdf_path: str):
+    """
+    Retorna uma lista de linhas lidas com um parse básico por linha,
+    no formato: [{ "n": int, "line": str, "parsed": dict|{} }, ...]
+    """
+    doc = fitz.open(pdf_path)
+    rows = []
+    n = 0
+    for line in _iter_lines_in_reading_order(doc):
+        n += 1
+        parsed = {}
+        g = _match_grupo(line)
+        if g:
+            parsed = {"grupo": g}
+        else:
+            it = _match_item(line)
+            if it:
+                parsed = it
+        rows.append({"n": n, "line": line, "parsed": parsed})
+    doc.close()
+    return rows
 
-        if parsed:
-            # 3) aplica buffers pendentes (caso pack/qtd tenham aparecido ANTES do item)
-            if not parsed.get("qtd_unidades") and pending_qty:
-                parsed["qtd_unidades"], parsed["unidade"] = pending_qty
-                pending_qty = None
-            if not parsed.get("pack_qtd") and pending_pack:
-                parsed["pack_qtd"], parsed["pack_unid"] = pending_pack
-                pending_pack = None
-
-            # 4) olha LINHAS SEGUINTES imediatas para completar qtd e pack
-            # Esta lógica pode ser simplificada ou removida se try_parse_line for robusto o suficiente
-            # para pegar tudo em uma única linha.
-            if i + 1 < len(lines):
-                nxt = lines[i+1]
-                got = False
-                qn = _is_only_qty(nxt)
-                if qn and not parsed.get("qtd_unidades"):
-                    parsed["qtd_unidades"], parsed["unidade"] = qn
-                    i += 1
-                    got = True
-                if got and i + 1 < len(lines):
-                    nx2 = lines[i+1]
-                    pk2 = _is_only_pack(nx2)
-                    if pk2 and not parsed.get("pack_qtd"):
-                        parsed["pack_qtd"], parsed["pack_unid"] = pk2
-                        i += 1
-                if not got:
-                    pk = _is_only_pack(nxt)
-                    if pk and not parsed.get("pack_qtd"):
-                        parsed["pack_qtd"], parsed["pack_unid"] = pk
-                        i += 1
-
-            parsed["grupo_codigo"] = current_group["codigo"]
-            if parsed["descricao"] and (parsed["codigo"] or parsed["fabricante"] or parsed["cod_barras"]):
-                itens.append(parsed)
-
-        i += 1
-
-    return grupos, itens
-
-# =========================
-# 6) Orquestração
-# =========================
-def parse_mapa(path_pdf: str):
-    text = extract_text_from_pdf(path_pdf)
-    header, pedidos = parse_header_and_pedidos(text)
-    grupos, itens = parse_groups_and_items(text)
-
-    # Fallback: tenta extrair número da carga do nome do arquivo
-    if not header.get("numero_carga"):
-        fname = (path_pdf or "").split("/")[-1]
-        m = re.search(r"(\d{4,})", fname)
-        if m:
-            header["numero_carga"] = m.group(1)
-
-    if not header.get("numero_carga"):
-        raise ValueError("Não encontrei 'Número da Carga' no PDF (tentei variações).")
-    if not itens:
-        raise ValueError("Não encontrei itens no PDF.")
-
-    return header, pedidos, grupos, itens
-
-def debug_extrator(path_pdf: str):
-    """Devolve as linhas cruas e como cada uma foi parseada (ou não)."""
-    # Importação local para evitar circularidade se este arquivo for importado por outro
-    # que também importa debug_extrator.
-    from .parser_mapa import extract_text_from_pdf # Ajustado para importação relativa
-    raw = extract_text_from_pdf(path_pdf)
-    lines = [l for l in raw.splitlines()]
-    out = []
-    for i, ln in enumerate(lines, 1):
-        parsed = try_parse_line(ln)
-        out.append({"n": i, "line": ln, "parsed": parsed})
-    return out
