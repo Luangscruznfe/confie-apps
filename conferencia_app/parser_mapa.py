@@ -204,7 +204,7 @@ def parse_mapa(pdf_path: str) -> Tuple[Dict[str, str], Any, List[Dict[str, str]]
     if cur:
         flush_item()
 
-    return header, None, grupos, itens
+    return header, grupos, itens, []
 
 # ---------- depuração ----------
 def debug_extrator(pdf_path: str):
