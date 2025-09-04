@@ -692,77 +692,137 @@ def normalizar_quantidade_item(it: dict) -> dict:
 
     return it
 
+# tenta importar o extrator da conferência
+try:
+    from conferencia import extrair_dados_do_pdf   # ajuste o módulo conforme sua estrutura
+except Exception:
+    extrair_dados_do_pdf = None
+
+
+def overlay_quantidades_com_conferencia(itens_mapa: list, pdf_path: str) -> list:
+    """
+    Usa extrair_dados_do_pdf (da conferência) para sobrepor as quantidades
+    nos itens do mapa, casando por cod_barras ou código.
+    """
+    if not extrair_dados_do_pdf:
+        return itens_mapa
+
+    try:
+        itens_conf = extrair_dados_do_pdf(pdf_path) or []
+    except Exception:
+        return itens_mapa
+
+    by_ean, by_cod = {}, {}
+    for it in itens_conf:
+        ean = (it.get("cod_barras") or it.get("ean") or "").strip()
+        cod = (it.get("codigo") or "").strip()
+        if ean:
+            by_ean[ean] = it
+        if cod:
+            by_cod[cod] = it
+
+    ajustados = []
+    for im in itens_mapa:
+        ean = (im.get("cod_barras") or "").strip()
+        cod = (im.get("codigo") or "").strip()
+        fonte = None
+        if ean and ean in by_ean:
+            fonte = by_ean[ean]
+        elif cod and cod in by_cod:
+            fonte = by_cod[cod]
+
+        if fonte:
+            im["qtd_unidades"] = fonte.get("qtd_unidades", im.get("qtd_unidades"))
+            im["unidade"]      = (fonte.get("unidade") or im.get("unidade") or "").upper()
+            im["pack_qtd"]     = fonte.get("pack_qtd", im.get("pack_qtd"))
+            im["pack_unid"]    = (fonte.get("pack_unid") or im.get("pack_unid") or "").upper()
+        ajustados.append(im)
+
+    return ajustados
 
 
 @app.route('/mapa/upload', methods=['POST'])
 def mapa_upload():
-    file = request.files['file']
-    if not file or not file.filename.endswith('.pdf'):
-        flash("Envie um arquivo PDF válido.", "danger")
-        return redirect(url_for('mapa'))  # << antes era mapa_listar
-
-    # Salva temporário
-    filepath = os.path.join("/tmp", file.filename)
-    file.save(filepath)
-
     try:
-        header, grupos, itens = parse_mapa(filepath)
-    except Exception as e:
-        flash(f"Erro ao processar PDF: {e}", "danger")
-        return redirect(url_for('mapa'))  # << antes era mapa_listar
+        f = request.files.get('file')
+        if not f or not f.filename.lower().endswith('.pdf'):
+            flash("Envie um arquivo PDF válido.", "danger")
+            return redirect(url_for('mapa'))
 
-    conn = get_db_connection()
-    cur = conn.cursor()
+        # salva temporário
+        path_tmp = os.path.join("/tmp", f.filename)
+        f.save(path_tmp)
 
-    # Limpa dados anteriores dessa carga
-    # (se suas FKs já estão ON DELETE CASCADE, bastaria deletar só em 'cargas')
-    cur.execute("DELETE FROM carga_itens   WHERE numero_carga = %s", (header["numero_carga"],))
-    cur.execute("DELETE FROM carga_grupos  WHERE numero_carga = %s", (header["numero_carga"],))
-    cur.execute("DELETE FROM carga_pedidos WHERE numero_carga = %s", (header["numero_carga"],))
-    cur.execute("DELETE FROM cargas        WHERE numero_carga = %s", (header["numero_carga"],))
+        # extrai do PDF com parse_mapa
+        header, grupos, itens = parse_mapa(path_tmp)
 
-    # Insere o cabeçalho na TABELA CERTA: 'cargas'
-    cur.execute("""
-        INSERT INTO cargas (numero_carga, motorista, descricao_romaneio, data_emissao)
-        VALUES (%s, %s, %s, %s)
-        ON CONFLICT (numero_carga) DO UPDATE
-        SET motorista = EXCLUDED.motorista,
-            descricao_romaneio = EXCLUDED.descricao_romaneio,
-            data_emissao = EXCLUDED.data_emissao
-    """, (
-        header.get("numero_carga"),
-        header.get("motorista"),
-        header.get("romaneio"),      # mapeado para descricao_romaneio
-        header.get("emissao")
-    ))
+        numero_carga = header.get("numero_carga")
+        if not numero_carga:
+            flash("Número da carga não encontrado no PDF.", "danger")
+            return redirect(url_for('mapa'))
 
-    # Insere grupos
-    for g in grupos:
+        # sobrepõe quantidades usando a conferência (se disponível)
+        itens = overlay_quantidades_com_conferencia(itens, path_tmp)
+
+        conn = get_db_connection()
+        cur = conn.cursor()
+
+        # limpa dados prévios dessa carga
+        cur.execute("DELETE FROM carga_itens   WHERE numero_carga = %s", (numero_carga,))
+        cur.execute("DELETE FROM carga_grupos  WHERE numero_carga = %s", (numero_carga,))
+        cur.execute("DELETE FROM carga_pedidos WHERE numero_carga = %s", (numero_carga,))
+        cur.execute("DELETE FROM cargas        WHERE numero_carga = %s", (numero_carga,))
+
+        # insere header em 'cargas'
         cur.execute("""
-            INSERT INTO carga_grupos (numero_carga, grupo_codigo, grupo_titulo)
-            VALUES (%s, %s, %s)
-        """, (header["numero_carga"], g["grupo_codigo"], g.get("descricao") or g.get("grupo_titulo") or ""))
-
-    # Insere itens (com normalização)
-    for it in itens:
-        it = normalizar_quantidade_item(it)
-        cur.execute("""
-            INSERT INTO carga_itens
-                (numero_carga, grupo_codigo, fabricante, codigo, cod_barras, descricao,
-                 qtd_unidades, unidade, pack_qtd, pack_unid)
-            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+            INSERT INTO cargas (numero_carga, motorista, descricao_romaneio, data_emissao)
+            VALUES (%s,%s,%s,%s)
+            ON CONFLICT (numero_carga) DO UPDATE
+            SET motorista = EXCLUDED.motorista,
+                descricao_romaneio = EXCLUDED.descricao_romaneio,
+                data_emissao = EXCLUDED.data_emissao
         """, (
-            header["numero_carga"], it["grupo_codigo"], it["fabricante"], it["codigo"],
-            it["cod_barras"], it["descricao"], it["qtd_unidades"], it["unidade"],
-            it["pack_qtd"], it["pack_unid"]
+            numero_carga,
+            header.get("motorista"),
+            header.get("romaneio"),
+            header.get("emissao")
         ))
 
-    conn.commit()
-    cur.close(); conn.close()
+        # insere grupos
+        for g in grupos:
+            cur.execute("""
+                INSERT INTO carga_grupos (numero_carga, grupo_codigo, grupo_titulo)
+                VALUES (%s,%s,%s)
+            """, (
+                numero_carga,
+                g.get("grupo_codigo"),
+                g.get("descricao") or g.get("grupo_titulo") or ""
+            ))
 
-    flash(f"Mapa {header['numero_carga']} importado com sucesso!", "success")
-    return redirect(url_for('mapa'))  # << antes era mapa_listar
+        # insere itens (normalização final)
+        for it in itens:
+            it = normalizar_quantidade_item(it)
+            cur.execute("""
+                INSERT INTO carga_itens
+                    (numero_carga, grupo_codigo, fabricante, codigo, cod_barras, descricao,
+                     qtd_unidades, unidade, pack_qtd, pack_unid)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+            """, (
+                numero_carga, it.get("grupo_codigo"), it.get("fabricante"), it.get("codigo"),
+                it.get("cod_barras"), it.get("descricao"), it.get("qtd_unidades"), it.get("unidade"),
+                it.get("pack_qtd"), it.get("pack_unid")
+            ))
 
+        conn.commit()
+        cur.close(); conn.close()
+
+        flash(f"Mapa {numero_carga} importado com sucesso!", "success")
+        return redirect(url_for('mapa'))
+
+    except Exception as e:
+        import traceback; traceback.print_exc()
+        flash(f"Erro ao importar mapa: {e}", "danger")
+        return redirect(url_for('mapa'))
 
 
 @app.route('/api/mapas')
