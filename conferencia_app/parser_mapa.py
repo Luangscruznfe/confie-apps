@@ -1,4 +1,4 @@
-# Arquivo: parser_mapa.py (Versão final e completa)
+# Arquivo: parser_mapa.py (Versão com filtro de lixo)
 
 import re
 from typing import Dict, List, Tuple, Any
@@ -8,7 +8,7 @@ try:
 except ImportError:
     raise RuntimeError("PyMuPDF (fitz) não encontrado. Instale com: pip install pymupdf")
 
-# ===== Constantes de Layout e Padrões (Versão Final) =====
+# ===== Constantes de Layout e Padrões =====
 X_FABRICANTE = 430
 X_QUANTIDADE = 500
 Y_LINE_TOLERANCE = 4
@@ -24,6 +24,8 @@ def group_words_into_lines(words: list, y_tolerance: int) -> List[List[Tuple]]:
     lines = []
     words.sort(key=lambda w: (w[1], w[0]))
     
+    if not words: return []
+
     current_line = [words[0]]
     last_y = words[0][1]
 
@@ -40,7 +42,7 @@ def group_words_into_lines(words: list, y_tolerance: int) -> List[List[Tuple]]:
     lines.append(sorted(current_line, key=lambda w: w[0]))
     return lines
 
-# ===== PARSER PRINCIPAL (VERSÃO FINAL E CORRIGIDA) =====
+# ===== PARSER PRINCIPAL =====
 def parse_mapa(pdf_path: str) -> Tuple[Dict[str, str], Any, List[Dict[str, str]], List[Dict[str, Any]]]:
     doc = fitz.open(pdf_path)
     header, grupos, itens = {}, [], []
@@ -71,6 +73,12 @@ def parse_mapa(pdf_path: str) -> Tuple[Dict[str, str], Any, List[Dict[str, str]]
             full_desc = _clean(" ".join(desc_parts))
             fabricante = _clean(" ".join(fab_parts))
             quantidade = _clean(" ".join(qtd_parts))
+
+            # ===== NOVO FILTRO AQUI =====
+            # Se a linha não tiver uma quantidade, não é um produto. Pula para a próxima.
+            if not quantidade:
+                continue
+            # ============================
 
             match_grupo_code = GRUPO_CODE_PATTERN.match(full_desc)
             is_group_line = (match_grupo_code and not fabricante and not quantidade)
@@ -121,12 +129,9 @@ def parse_mapa(pdf_path: str) -> Tuple[Dict[str, str], Any, List[Dict[str, str]]
     doc.close()
     return header, None, grupos, itens
 
-# A FUNÇÃO ABAIXO ESTAVA FALTANDO NO SEU ARQUIVO
 def debug_extrator(pdf_path: str):
-    """Função de depuração que o app.py precisa para a rota /mapa/extrator."""
     doc = fitz.open(pdf_path)
     rows = []
-    # Esta é uma versão simplificada, apenas para garantir que a função exista
     for page in doc:
         rows.extend(page.get_text("text").splitlines())
     doc.close()
