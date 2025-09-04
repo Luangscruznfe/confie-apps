@@ -782,7 +782,7 @@ def mapa_upload():
 
     try:
             # cria/atualiza cabeçalho da carga
-    cur.execute("""
+        cur.execute("""
         INSERT INTO cargas (numero_carga, motorista, descricao_romaneio, data_emissao)
         VALUES (%s, %s, %s, %s)
         ON CONFLICT (numero_carga) DO UPDATE
