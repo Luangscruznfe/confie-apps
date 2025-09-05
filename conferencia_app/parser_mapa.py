@@ -1,4 +1,4 @@
-# Arquivo: parser_mapa.py (Versão com filtro de cabeçalho)
+# Arquivo: parser_mapa.py (Versão com suporte a itens sem grupo)
 
 import re
 from typing import Dict, List, Tuple, Any
@@ -13,8 +13,6 @@ X_FABRICANTE = 430
 X_QUANTIDADE = 500
 Y_LINE_TOLERANCE = 4
 GRUPO_CODE_PATTERN = re.compile(r"([A-Z]{2,}\d{1,2})")
-
-# Palavras-chave para ignorar linhas de cabeçalho/rodapé
 HEADER_KEYWORDS = ["Data Emissão", "PAG.:", "SEPARAÇÃO DE CARGA", "Peso Total", "Pedidos:", "AtivLogRomSepa"]
 
 # ---------- Funções Auxiliares ----------
@@ -48,8 +46,13 @@ def group_words_into_lines(words: list, y_tolerance: int) -> List[List[Tuple]]:
 # ===== PARSER PRINCIPAL =====
 def parse_mapa(pdf_path: str) -> Tuple[Dict[str, str], Any, List[Dict[str, str]], List[Dict[str, Any]]]:
     doc = fitz.open(pdf_path)
-    header, grupos, itens = {}, [], []
-    grupo_codigo_atual = ""
+    header, itens = {}, []
+    
+    # ===== NOVA LÓGICA AQUI =====
+    # Define um grupo padrão para itens "avulsos" que vêm antes do primeiro grupo
+    grupo_codigo_atual = "GERAL"
+    grupos = [{"grupo_codigo": "GERAL", "grupo_titulo": "ITENS SEM GRUPO"}]
+    # ============================
 
     for page_num, page in enumerate(doc):
         if page_num == 0:
@@ -65,10 +68,8 @@ def parse_mapa(pdf_path: str) -> Tuple[Dict[str, str], Any, List[Dict[str, str]]
         for line_words in visual_lines:
             full_line_text = " ".join(w[4] for w in line_words)
             
-            # ===== NOVO FILTRO DE PALAVRAS-CHAVE AQUI =====
             if any(keyword in full_line_text for keyword in HEADER_KEYWORDS):
                 continue
-            # ===============================================
 
             if not full_line_text or "Cód. Barras" in full_line_text:
                 continue
