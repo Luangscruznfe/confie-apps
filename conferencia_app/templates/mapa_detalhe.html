@@ -21,7 +21,7 @@
         .list-group-item { background-color: var(--panel); border-color: #222c3f; }
         .list-group-item.separado { background-color: var(--ok-bg); }
         .list-group-item.faltou { background-color: var(--err-bg); }
-        .list-group-item.pendente { background-color: var(--warn-bg); } /* Novo estilo para pendente */
+        .list-group-item.pendente { background-color: var(--warn-bg); }
         .form-control, .input-group-text, .modal-content {
             background-color: var(--input-bg); color: var(--ink); border-color: var(--input-line);
         }
@@ -40,6 +40,24 @@
  	 font-weight: 700;
   	letter-spacing: .3px;
 	}
+
+    /* NOVO: Estilos para os botões de filtro */
+    .filter-pill {
+        display: inline-block;
+        padding: 0.25rem 0.75rem;
+        background-color: var(--chip);
+        border-radius: 1rem;
+        cursor: pointer;
+        font-size: 0.85rem;
+        transition: background-color 0.2s;
+        border: 1px solid transparent;
+    }
+    .filter-pill.active {
+        background-color: var(--warn);
+        color: var(--bg);
+        font-weight: 600;
+        border-color: var(--warn);
+    }
     </style>
 </head>
 <body>
@@ -52,6 +70,13 @@
     <div class="sticky-top-bar">
         <h3 class="mb-2">{{ nome_mapa or 'Mapa' }} <span class="text-info">{{ numero_carga }}</span></h3>
         <input id="busca" class="form-control" placeholder="Buscar por código, EAN ou descrição...">
+        
+        <div class="d-flex gap-2 mt-3">
+            <span class="filter-pill" id="filter-todos" onclick="setFilter('todos')">Todos</span>
+            <span class="filter-pill" id="filter-falta" onclick="setFilter('falta')">Com Falta</span>
+            <span class="filter-pill" id="filter-obs" onclick="setFilter('obs')">Com OBS</span>
+        </div>
+
         <div id="resumo" class="text-secondary small mt-2"></div>
     </div>
     <div id="grupos-container" class="mt-3">
@@ -88,6 +113,20 @@
     const NUMERO_CARGA = {{ numero_carga | tojson }};
     let STATE = { grupos: [], itens: [] };
     let modalFaltou;
+    // NOVO: Variável de estado do filtro
+    let activeFilter = 'todos';
+
+    // NOVO: Função para definir o filtro ativo
+    function setFilter(filterType) {
+        activeFilter = filterType;
+        // Atualiza a classe 'active' nos botões
+        document.querySelectorAll('.filter-pill').forEach(pill => {
+            pill.classList.remove('active');
+        });
+        document.getElementById(`filter-${filterType}`).classList.add('active');
+        // Re-renderiza a lista de itens com o novo filtro
+        renderItens();
+    }
 
     function badge(text, className) { return `<span class="badge ${className} me-1">${text}</span>`; }
 
@@ -98,11 +137,35 @@
         let total = 0, marcados = 0;
 
         STATE.grupos.forEach(grupo => {
+            // LÓGICA DE FILTRO ATUALIZADA
             const itensFiltrados = STATE.itens.filter(it => {
+                // 1. O item deve pertencer ao grupo atual
                 if (it.grupo_codigo !== grupo.grupo_codigo) return false;
-                if (!query) return true;
-                const searchable = `${it.codigo || ''} ${it.cod_barras || ''} ${it.descricao || ''}`.toLowerCase();
-                return searchable.includes(query);
+
+                // 2. O item deve corresponder ao filtro de status (Todos, Falta, OBS)
+                let matchesStatusFilter = false;
+                switch (activeFilter) {
+                    case 'falta':
+                        matchesStatusFilter = it.faltou === true;
+                        break;
+                    case 'obs':
+                        matchesStatusFilter = it.pendente === true;
+                        break;
+                    case 'todos':
+                    default:
+                        matchesStatusFilter = true;
+                        break;
+                }
+                if (!matchesStatusFilter) return false;
+
+                // 3. O item deve corresponder à busca por texto (se houver)
+                if (query) {
+                    const searchable = `${it.codigo || ''} ${it.cod_barras || ''} ${it.descricao || ''}`.toLowerCase();
+                    return searchable.includes(query);
+                }
+
+                // Se passou por todas as verificações, o item é exibido
+                return true;
             });
 
             if (itensFiltrados.length === 0) return;
@@ -141,7 +204,7 @@
                 let itemClasses = "list-group-item d-flex flex-column flex-md-row justify-content-between gap-3 p-3";
                 if (it.separado) itemClasses += " separado";
                 if (it.faltou) itemClasses += " faltou";
-                if (it.pendente) itemClasses += " pendente"; // Adiciona classe para pendente
+                if (it.pendente) itemClasses += " pendente"; 
 
                 const descCompleta = [it.cod_barras, it.codigo, it.descricao, it.fabricante].filter(Boolean).join(' ');
                 const qtdPedida = `${it.qtd_unidades || ''} ${it.unidade || ''} ${it.pack_qtd > 1 ? `(C/${it.pack_qtd})` : ''}`.trim();
@@ -171,7 +234,7 @@
             html += `</div></div>`;
         });
 
-        container.innerHTML = html || '<div class="alert alert-secondary">Nenhum item encontrado para a busca.</div>';
+        container.innerHTML = html || '<div class="alert alert-secondary">Nenhum item encontrado. Verifique a busca e o filtro selecionado.</div>';
         document.getElementById('resumo').textContent = total > 0 ? `${marcados} de ${total} itens marcados.` : '';
     }
 
@@ -209,23 +272,22 @@
             qtd_separada: qtdSeparada,
             faltou: qtdSeparada < qtdPedida,
             separado: true,
-            pendente: false // Se marcou falta, não está mais pendente
+            pendente: false
         };
 
         await atualizarItem(itemId, patch);
         modalFaltou.hide();
     }
     
-    // Nova função para marcar/desmarcar item como pendente
     async function marcarPendente(itemId, pendente) {
         const item = STATE.itens.find(it => it.id === itemId);
         if (!item) return;
 
         const patch = {
             pendente: pendente,
-            separado: false, // Se está pendente, não está separado
-            faltou: false,   // Se está pendente, não está com falta (é outro tipo de problema)
-            qtd_separada: null // Reseta quantidade separada se estiver pendente
+            separado: false, 
+            faltou: false,   
+            qtd_separada: null 
         };
         
         await atualizarItem(itemId, patch);
@@ -254,7 +316,7 @@
     async function atualizarItem(itemId, patch) {
         const item = STATE.itens.find(it => it.id === itemId);
         if (item) Object.assign(item, patch);
-        renderItens(); // Renderiza imediatamente com o estado local atualizado
+        renderItens(); 
 
         const response = await fetch('/api/mapa/item/atualizar', {
             method: 'POST',
@@ -264,8 +326,6 @@
         const data = await response.json();
         
         if (data.ok && data.updated_fields) {
-            // Se o servidor retornar campos atualizados (ex: recalculou status),
-            // atualiza o estado novamente e renderiza.
             if (item) Object.assign(item, data.updated_fields);
             renderItens();
         }
@@ -275,9 +335,9 @@
         STATE.itens.forEach(it => { 
             if (it.grupo_codigo === grupoCodigo) {
                 it.separado = separado; 
-                it.pendente = false; // Ao marcar/desmarcar grupo, remove pendência
-                it.faltou = false;   // Ao marcar/desmarcar grupo, remove falta
-                it.qtd_separada = null; // Reseta qtd separada
+                it.pendente = false; 
+                it.faltou = false;   
+                it.qtd_separada = null; 
             }
         });
         renderItens();
@@ -306,6 +366,7 @@
     document.addEventListener('DOMContentLoaded', () => {
         modalFaltou = new bootstrap.Modal(document.getElementById('modalFaltou'));
         carregarDados();
+        setFilter('todos'); // Define o filtro inicial como 'Todos'
     });
 </script>
 </body>
