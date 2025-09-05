@@ -39,7 +39,7 @@
         <a class="btn btn-outline-light" href="/conferencia">Conferência</a>
     </nav>
     <div class="sticky-top-bar">
-        <h3 class="mb-2">Mapa <span class="text-info">{{ numero_carga }}</span></h3>
+        <h3 class="mb-2">{{ nome_mapa or 'Mapa' }} <span class="text-info">{{ numero_carga }}</span></h3>
         <input id="busca" class="form-control" placeholder="Buscar por código, EAN ou descrição...">
         <div id="resumo" class="text-secondary small mt-2"></div>
     </div>
@@ -134,7 +134,7 @@
                 html += `
                     <div class="${itemClasses}" id="item-${it.id}">
                         <div class="flex-grow-1">
-                            <div class="small-mono">${descCompleta}</div>
+                            <div class="small-mono text-light">${descCompleta}</div>
                             <div class="fw-bold">${qtdInfo}</div>
                             <div class="mt-1">
                                 ${it.separado ? badge('Separado', 'bg-success') : ''}
