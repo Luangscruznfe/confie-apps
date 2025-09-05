@@ -18,13 +18,16 @@
         .list-group-item { background-color: var(--panel); border-color: #222c3f; }
         .list-group-item.separado { background-color: var(--ok-bg); }
         .list-group-item.faltou { background-color: var(--err-bg); }
-        .list-group-item.pendente { background-color: var(--warn-bg); } /* Novo estilo para pendente */
+        .list-group-item.pendente { background-color: var(--warn-bg); }
         .form-control, .input-group-text, .modal-content {
             background-color: var(--input-bg); color: var(--ink); border-color: var(--input-line);
         }
         .form-control:focus {
             background-color: var(--input-bg); color: var(--ink); border-color: var(--warn);
             box-shadow: 0 0 0 0.25rem rgba(255, 209, 102, 0.25);
+        }
+        .form-control::placeholder {
+            color: var(--muted);
         }
         .btn-close { filter: invert(1); }
         .sticky-top-bar { position: sticky; top: 0; z-index: 1020; background: var(--bg); padding: .75rem 0; }
@@ -103,9 +106,9 @@
                 <div class="card mb-3">
                     <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-3">
     
-                        <div class="fw-bold fs-5">
-                            <span>${grupo.grupo_codigo}</span>
-                            <span class="text-white-50">${grupo.grupo_titulo || ''}</span>
+                        <div class="fs-5">
+                            <strong class="fw-bold">${grupo.grupo_codigo}</strong>
+                            <span class="text-secondary fw-normal">${grupo.grupo_titulo || ''}</span>
                         </div>
 
                         <div class="d-flex align-items-center gap-2 flex-wrap">
@@ -130,7 +133,7 @@
                 let itemClasses = "list-group-item d-flex flex-column flex-md-row justify-content-between gap-3 p-3";
                 if (it.separado) itemClasses += " separado";
                 if (it.faltou) itemClasses += " faltou";
-                if (it.pendente) itemClasses += " pendente"; // Adiciona classe para pendente
+                if (it.pendente) itemClasses += " pendente";
 
                 const descCompleta = [it.cod_barras, it.codigo, it.descricao, it.fabricante].filter(Boolean).join(' ');
                 const qtdPedida = `${it.qtd_unidades || ''} ${it.unidade || ''} ${it.pack_qtd > 1 ? `(C/${it.pack_qtd})` : ''}`.trim();
@@ -146,7 +149,8 @@
                             <div class="mt-1">
                                 ${it.separado ? badge('Separado', 'bg-success') : ''}
                                 ${it.faltou ? badge('Faltou', 'bg-danger') : ''}
-                                ${it.pendente ? badge('Pendente', 'bg-warning text-dark') : ''} </div>
+                                ${it.pendente ? badge('Pendente', 'bg-warning text-dark') : ''}
+                            </div>
                         </div>
                         <div class="d-flex flex-wrap gap-3 align-items-center">
                             <div class="form-check form-switch">
@@ -154,7 +158,8 @@
                                 <label class="form-check-label ${it.separado ? 'text-success fw-bold' : 'text-secondary'}">OK</label>
                             </div>
                             <button class="btn btn-sm btn-warning" onclick="abrirModalFaltou(${it.id})">Faltou</button>
-                            <button class="btn btn-sm btn-info text-dark" onclick="marcarPendente(${it.id}, ${!it.pendente})">OBS</button> </div>
+                            <button class="btn btn-sm btn-info text-dark" onclick="marcarPendente(${it.id}, ${!it.pendente})">OBS</button>
+                        </div>
                     </div>`;
             });
             html += `</div></div>`;
@@ -198,23 +203,22 @@
             qtd_separada: qtdSeparada,
             faltou: qtdSeparada < qtdPedida,
             separado: true,
-            pendente: false // Se marcou falta, não está mais pendente
+            pendente: false
         };
 
         await atualizarItem(itemId, patch);
         modalFaltou.hide();
     }
     
-    // Nova função para marcar/desmarcar item como pendente
     async function marcarPendente(itemId, pendente) {
         const item = STATE.itens.find(it => it.id === itemId);
         if (!item) return;
 
         const patch = {
             pendente: pendente,
-            separado: false, // Se está pendente, não está separado
-            faltou: false,   // Se está pendente, não está com falta (é outro tipo de problema)
-            qtd_separada: null // Reseta quantidade separada se estiver pendente
+            separado: false,
+            faltou: false,
+            qtd_separada: null
         };
         
         await atualizarItem(itemId, patch);
@@ -243,7 +247,7 @@
     async function atualizarItem(itemId, patch) {
         const item = STATE.itens.find(it => it.id === itemId);
         if (item) Object.assign(item, patch);
-        renderItens(); // Renderiza imediatamente com o estado local atualizado
+        renderItens();
 
         const response = await fetch('/api/mapa/item/atualizar', {
             method: 'POST',
@@ -253,8 +257,6 @@
         const data = await response.json();
         
         if (data.ok && data.updated_fields) {
-            // Se o servidor retornar campos atualizados (ex: recalculou status),
-            // atualiza o estado novamente e renderiza.
             if (item) Object.assign(item, data.updated_fields);
             renderItens();
         }
@@ -264,9 +266,9 @@
         STATE.itens.forEach(it => { 
             if (it.grupo_codigo === grupoCodigo) {
                 it.separado = separado; 
-                it.pendente = false; // Ao marcar/desmarcar grupo, remove pendência
-                it.faltou = false;   // Ao marcar/desmarcar grupo, remove falta
-                it.qtd_separada = null; // Reseta qtd separada
+                it.pendente = false;
+                it.faltou = false;
+                it.qtd_separada = null;
             }
         });
         renderItens();
