@@ -57,7 +57,7 @@
     <div class="mapa-info">
       Motorista: {{ m[1] or '-' }}
       {% if m|length > 2 %} · Emissão: {{ m[2] or '-' }}{% endif %}
-      {% if m|length > 3 %} · Romaneio: {{ m[2] or '-' }}{% endif %}
+      {% if m|length > 3 %} · Romaneio: {{ m[3] or '-' }}{% endif %}
     </div>
   </a>
 

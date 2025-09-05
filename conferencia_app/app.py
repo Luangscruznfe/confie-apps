@@ -763,11 +763,12 @@ def mapa_lista():
     conn = get_db_connection()
     cur = conn.cursor()
     cur.execute("""
-        SELECT numero_carga, motorista, data_emissao
+        SELECT numero_carga, motorista, data_emissao, descricao_romaneio
         FROM cargas
         ORDER BY criado_em DESC
     """)
     mapas = cur.fetchall()
+    # ...
     cur.close(); conn.close()
 
     # A função agora apenas busca os dados e renderiza o template.
