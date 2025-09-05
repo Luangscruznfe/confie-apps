@@ -1,64 +1,82 @@
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
   <title>Mapas de Separação</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+
   <style>
-    :root {
-      --bg-color: #0f1115;
-      --card-bg: #161a22;
-      --border-color: #2a364a;
-      --text-color: #ecf2ff;
-      --text-muted: #b0b3b8;
-      --accent-color: #3d8bfd;
-      --danger-color: #ef4444;
+    :root{
+      --bg:#0f1115; --card:#161a22; --card2:#10151d; --line:#2a364a;
+      --txt:#ecf2ff; --muted:#b0b3b8; --accent:#7dd3fc; --accent2:#60a5fa;
+      --danger:#ef4444;
     }
-    body {
-      background-color: var(--bg-color);
-      color: var(--text-color);
+
+    body{ background:var(--bg); color:var(--txt); }
+
+    .main-title{ font-weight:800; color:#fff; }
+
+    /* ====== Cards da lista ====== */
+    .mapa-card{
+      background:linear-gradient(180deg,var(--card),var(--card2));
+      border:1px solid var(--line);
+      border-radius:.75rem;
+      padding:16px 18px;
+      transition:transform .12s ease, box-shadow .12s ease, border-color .12s ease;
     }
-    .main-title {
-      font-weight: bold;
-      color: white;
+    .mapa-card:hover{
+      transform:translateY(-3px);
+      border-color:var(--accent2);
+      box-shadow:0 12px 28px rgba(0,0,0,.45);
     }
-    .mapa-item {
-      background-color: var(--card-bg);
-      border: 1px solid var(--border-color);
-      border-radius: 0.5rem; /* Cantos arredondados */
-      transition: all 0.2s ease-in-out;
+
+    .mapa-title{
+      font-weight:800;
+      letter-spacing:.2px;
+      margin:0;
+      font-size:1.1rem;
     }
-    .mapa-item:hover {
-      border-color: var(--accent-color);
-      transform: translateY(-4px);
-      box-shadow: 0 8px 25px rgba(0,0,0,0.5);
+    .mapa-title .name{ color:var(--accent); }
+    .mapa-title .icon{ margin-right:.5rem; opacity:.95; }
+
+    .mapa-meta{
+      display:flex;
+      flex-wrap:wrap;
+      gap:.5rem;
+      margin-top:.5rem;
     }
-    .mapa-title {
-      font-size: 1.25rem; /* Título maior */
-      font-weight: 600;
-      color: var(--text-color);
+    .meta-badge{
+      background:#0e1420;
+      border:1px solid var(--line);
+      color:var(--muted);
+      font-size:.85rem;
+      padding:4px 10px;
+      border-radius:.5rem;
     }
-    .mapa-info {
-      font-size: 0.9rem;
-      color: var(--text-muted);
+    .meta-badge b{ color:#d8e6ff; font-weight:700; }
+
+    .btn-destroy{
+      border-color:rgba(239,68,68,.45);
+      color:#ffb4b4;
+      border-radius:.5rem;
     }
-    .mapa-info strong {
-      color: #cdd2da; /* Rótulos com um pouco mais de destaque */
+    .btn-destroy:hover{
+      background:#2a1113;
+      border-color:var(--danger);
+      color:#ffdede;
     }
-    .btn-outline-danger {
-        border-color: var(--danger-color);
-        color: var(--danger-color);
-    }
-    .btn-outline-danger:hover {
-        background-color: var(--danger-color);
-        color: white;
+
+    /* Link do card ocupa toda a área clicável sem sublinhar */
+    .stretched{
+      text-decoration:none;
+      color:inherit;
     }
   </style>
 </head>
 <body>
 
 <div class="container mt-4 mb-5">
-  <h1 class="main-title mb-4">📦 Mapas de Separação</h1>
+  <h1 class="main-title mb-3">📦 Mapas de Separação</h1>
   <a href="/gestao" class="btn btn-outline-light mb-4">&larr; Voltar para Gestão</a>
 
   {% with messages = get_flashed_messages(with_categories=true) %}
@@ -70,31 +88,32 @@
   {% endwith %}
 
   {% if mapas %}
-    <div class="list-group">
+    <ul class="list-unstyled m-0 p-0">
       {% for m in mapas %}
-        <div class="list-group-item mapa-item d-flex justify-content-between align-items-center p-4 mb-3">
-          <a class="text-decoration-none flex-grow-1"
-             href="{{ url_for('mapa_detalhe', numero_carga=m[0]) }}">
-            
-            <h5 class="mapa-title mb-3">
-              📄 {{ (m[4] if m|length > 4 and m[4] else m[0]) }}
-            </h5>
+      <li class="mapa-card d-flex justify-content-between align-items-center mb-3">
+        <!-- link cobre o conteúdo do card -->
+        <a class="stretched flex-grow-1" href="{{ url_for('mapa_detalhe', numero_carga=m[0]) }}">
+          <h5 class="mapa-title">
+            <span class="icon">📄</span>
+            <span class="name">{{ (m[4] if m|length > 4 and m[4] else m[0]) }}</span>
+          </h5>
 
-            <div class="mapa-info d-flex flex-wrap" style="gap: 0.5rem 1.5rem;">
-              <span><strong>ID:</strong> {{ m[0] }}</span>
-              <span><strong>Motorista:</strong> {{ m[1] or 'N/A' }}</span>
-              {% if m|length > 2 and m[2] %}<span><strong>Emissão:</strong> {{ m[2] }}</span>{% endif %}
-              {% if m|length > 3 and m[3] %}<span><strong>Romaneio:</strong> {{ m[3] }}</span>{% endif %}
-            </div>
-          </a>
+          <div class="mapa-meta">
+            <span class="meta-badge"><b>ID:</b> {{ m[0] }}</span>
+            <span class="meta-badge"><b>Motorista:</b> {{ m[1] or '-' }}</span>
+            {% if m|length > 2 %}<span class="meta-badge"><b>Emissão:</b> {{ m[2] or '-' }}</span>{% endif %}
+            {% if m|length > 3 %}<span class="meta-badge"><b>Romaneio:</b> {{ m[3] or '-' }}</span>{% endif %}
+          </div>
+        </a>
 
-          <form action="{{ url_for('mapa_deletar', numero_carga=m[0]) }}" method="post"
-              onsubmit="return confirm('Excluir mapa {{ (m[4] if m|length > 4 and m[4] else m[0]) }} e todos os itens vinculados?');" class="ms-4">
-            <button type="submit" class="btn btn-sm btn-outline-danger">🗑️ Excluir</button>
-          </form>
-        </div>
+        <form action="{{ url_for('mapa_deletar', numero_carga=m[0]) }}" method="post"
+              onsubmit="return confirm('Excluir mapa {{ (m[4] if m|length > 4 and m[4] else m[0]) }} e todos os itens vinculados?');"
+              class="ms-3">
+          <button type="submit" class="btn btn-sm btn-outline-danger btn-destroy">🗑️ Excluir</button>
+        </form>
+      </li>
       {% endfor %}
-    </div>
+    </ul>
   {% else %}
     <div class="alert alert-secondary mt-4">Nenhum mapa encontrado.</div>
   {% endif %}
