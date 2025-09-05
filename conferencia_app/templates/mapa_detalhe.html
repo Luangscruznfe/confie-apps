@@ -96,7 +96,6 @@
 
             if (itensFiltrados.length === 0) return;
 
-            // CORRIGIDO: Usa 'separador_nome', que é o nome que vem da API
             const nomeSeparador = grupo.separador_nome || '';
 
             html += `
@@ -170,17 +169,32 @@
     }
 
     async function salvarFalta() {
-        const itemId = document.getElementById('modal-item-id').value;
-        const qtdSeparada = document.getElementById('modal-qtd-separada').value;
+        const itemId = parseInt(document.getElementById('modal-item-id').value, 10);
+        const qtdSeparadaInput = document.getElementById('modal-qtd-separada').value;
 
-        if (!qtdSeparada || isNaN(parseInt(qtdSeparada, 10))) {
-            alert('Por favor, insira uma quantidade válida.');
+        if (qtdSeparadaInput === '' || isNaN(parseInt(qtdSeparadaInput, 10))) {
+            alert('Por favor, insira uma quantidade numérica válida.');
+            return;
+        }
+        const qtdSeparada = parseInt(qtdSeparadaInput, 10);
+
+        // Encontra o item completo para pegar a quantidade pedida
+        const item = STATE.itens.find(it => it.id === itemId);
+        if (!item) {
+            alert('Erro: Item não encontrado.');
             return;
         }
 
-        await atualizarItem(itemId, {
-            qtd_separada: parseInt(qtdSeparada, 10)
-        });
+        const qtdPedida = item.qtd_unidades || 0;
+
+        // Monta o objeto de atualização completo, espelhando a lógica do servidor
+        const patch = {
+            qtd_separada: qtdSeparada,
+            faltou: qtdSeparada < qtdPedida, // Calcula o status 'faltou'
+            separado: true                   // Um item com quantidade definida é considerado 'separado'
+        };
+
+        await atualizarItem(itemId, patch);
         modalFaltou.hide();
     }
     
@@ -197,7 +211,6 @@
             body: JSON.stringify({
                 numero_carga: NUMERO_CARGA,
                 grupo_codigo: grupoCodigo,
-                // CORRIGIDO: Envia 'separador_nome' para a API
                 separador_nome: nome 
             })
         });
@@ -210,14 +223,13 @@
         if (item) Object.assign(item, patch);
         renderItens();
 
-        // Envia para a API. Note que a API agora retorna os campos atualizados.
         const response = await fetch('/api/mapa/item/atualizar', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ item_id: itemId, ...patch })
         });
         const data = await response.json();
-        // Sincroniza o estado local com a resposta da API (ex: 'faltou' calculado no backend)
+        
         if (data.ok && data.updated_fields) {
             if (item) Object.assign(item, data.updated_fields);
             renderItens();
