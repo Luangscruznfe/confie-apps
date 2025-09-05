@@ -1,7 +1,7 @@
 # =================================================================
 # 1. IMPORTAÇÕES
 # =================================================================
-from flask import Flask, jsonify, render_template, abort, request, Response
+from flask import Flask, jsonify, render_template, abort, request, Response, url_for
 import cloudinary, cloudinary.uploader, cloudinary.api
 import psycopg2, psycopg2.extras
 import json, os, re, io, fitz, shutil, requests
@@ -770,35 +770,8 @@ def mapa_lista():
     mapas = cur.fetchall()
     cur.close(); conn.close()
 
-    html = ['''<!DOCTYPE html><html lang="pt-br"><head>
-    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mapas</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    </head><body class="bg-dark text-light"><div class="container mt-4">
-    <nav class="mb-3">
-      <a class="btn btn-outline-light me-2" href="/conferencia">Conferência</a>
-      <a class="btn btn-outline-light me-2" href="/gestao">Gestão</a>
-      <a class="btn btn-warning" href="/mapa/upload">Importar novo mapa</a>
-    </nav>
-    <h2 class="mb-3">🗺️ Mapas de Separação</h2>
-    <p class="text-secondary">Escolha um mapa para iniciar a separação.</p>
-    <div class="list-group">''']
-    if mapas:
-        for num, mot, data in mapas:
-            html.append(f'''
-              <a class="list-group-item list-group-item-action d-flex justify-content-between align-items-center bg-dark text-light"
-                 href="/mapa/{num}">
-                <div>
-                  <div class="fw-bold">{num}</div>
-                  <small class="text-secondary">Motorista: {mot or '-'} | Emissão: {data or '-'}</small>
-                </div>
-                <span class="bi bi-chevron-right"></span>
-              </a>''')
-    else:
-        html.append('''<div class="alert alert-secondary">Nenhum mapa importado ainda.
-        Use a aba <b>Gestão</b> para subir um PDF.</div>''')
-    html.append('</div></div></body></html>')
-    return ''.join(html)
+    # A função agora apenas busca os dados e renderiza o template.
+    return render_template('mapa_lista.html', mapas=mapas)
 
 # ========== MAPA: APIs de listagem e atualização (NOVO) ==========
 
