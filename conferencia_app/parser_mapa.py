@@ -1,4 +1,4 @@
-# Arquivo: parser_mapa.py (Versão final e definitiva)
+# Arquivo: parser_mapa.py (Versão com filtro de cabeçalho)
 
 import re
 from typing import Dict, List, Tuple, Any
@@ -14,16 +14,15 @@ X_QUANTIDADE = 500
 Y_LINE_TOLERANCE = 4
 GRUPO_CODE_PATTERN = re.compile(r"([A-Z]{2,}\d{1,2})")
 
+# Palavras-chave para ignorar linhas de cabeçalho/rodapé
+HEADER_KEYWORDS = ["Data Emissão", "PAG.:", "SEPARAÇÃO DE CARGA", "Peso Total", "Pedidos:", "AtivLogRomSepa"]
+
 # ---------- Funções Auxiliares ----------
 def _clean(s: str) -> str:
     if not s: return ""
     return re.sub(r"\s+", " ", s).strip()
 
 def group_words_into_lines(words: list, y_tolerance: int) -> List[List[Tuple]]:
-    """
-    Agrupa palavras em 'linhas visuais' com uma tolerância vertical.
-    Contém a correção crítica da lógica de agrupamento.
-    """
     if not words: return []
     lines = []
     words.sort(key=lambda w: (w[1], w[0]))
@@ -41,7 +40,6 @@ def group_words_into_lines(words: list, y_tolerance: int) -> List[List[Tuple]]:
             lines.append(sorted(current_line, key=lambda w: w[0]))
             current_line = [word]
         
-        # CORREÇÃO CRÍTICA: Atualiza o 'last_y' com o Y da palavra ATUAL
         last_y = y0
         
     lines.append(sorted(current_line, key=lambda w: w[0]))
@@ -66,6 +64,12 @@ def parse_mapa(pdf_path: str) -> Tuple[Dict[str, str], Any, List[Dict[str, str]]
 
         for line_words in visual_lines:
             full_line_text = " ".join(w[4] for w in line_words)
+            
+            # ===== NOVO FILTRO DE PALAVRAS-CHAVE AQUI =====
+            if any(keyword in full_line_text for keyword in HEADER_KEYWORDS):
+                continue
+            # ===============================================
+
             if not full_line_text or "Cód. Barras" in full_line_text:
                 continue
             
@@ -82,7 +86,6 @@ def parse_mapa(pdf_path: str) -> Tuple[Dict[str, str], Any, List[Dict[str, str]]
             match_grupo_code = GRUPO_CODE_PATTERN.match(full_desc)
             is_group_line = (match_grupo_code and not fabricante and not quantidade)
 
-            # Filtro final: A linha só é válida se tiver uma quantidade OU se for uma linha de grupo.
             if not quantidade and not is_group_line:
                 continue
 
@@ -133,10 +136,8 @@ def parse_mapa(pdf_path: str) -> Tuple[Dict[str, str], Any, List[Dict[str, str]]
 
 
 def debug_extrator(pdf_path: str):
-    """Função de depuração que o app.py precisa para a rota /mapa/extrator."""
     doc = fitz.open(pdf_path)
     rows = []
-    # Esta é uma versão simplificada, apenas para garantir que a função exista
     for page in doc:
         rows.extend(page.get_text("text").splitlines())
     doc.close()
