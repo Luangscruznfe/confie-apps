@@ -1,7 +1,7 @@
 # =================================================================
 # 1. IMPORTAÇÕES
 # =================================================================
-from flask import Flask, jsonify, render_template, abort, request, Response, url_for
+from flask import Flask, jsonify, render_template, abort, request, Response, url_for, flash
 import cloudinary, cloudinary.uploader, cloudinary.api
 import psycopg2, psycopg2.extras
 import json, os, re, io, fitz, shutil, requests
@@ -946,6 +946,28 @@ def mapa_extrator():
                          f"</tr>")
     tail = "</tbody></table></div></body></html>"
     return head + "\n".join(rows_html) + tail
+
+@app.route('/mapa/deletar/<numero_carga>', methods=['POST'])
+def mapa_deletar(numero_carga):
+    conn = None
+    cur = None
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute("DELETE FROM cargas WHERE numero_carga = %s", (numero_carga,))
+        conn.commit()
+        flash(f"Mapa {numero_carga} excluído com sucesso.", "success")
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        flash(f"Erro ao excluir o mapa {numero_carga}.", "danger")
+        app.logger.error(f"Erro ao deletar mapa: {e}")
+    finally:
+        if cur:
+            cur.close()
+        if conn:
+            conn.close()
+    return redirect(url_for('mapa_lista'))
 
 
 @app.route('/ping')
