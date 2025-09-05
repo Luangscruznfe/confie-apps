@@ -24,6 +24,54 @@
         }
         .sticky-top-bar { position: sticky; top: 0; z-index: 1020; background: var(--bg); padding: .75rem 0; }
         .small-mono { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 0.9rem; color: #f3f6ff; }
+/* ===== Visibilidade melhorada: busca, cabeçalhos e controles ===== */
+.form-control::placeholder{ color:#8a95a6; opacity:1; }
+.form-control:focus{
+  background:#161c24;
+  border-color:#3b82f6;
+  box-shadow:0 0 0 .25rem rgba(59,130,246,.25);
+  color:var(--ink);
+}
+
+/* Cabeçalho de cada grupo */
+.card-header{
+  background:linear-gradient(180deg,#1b2230,#161b24);
+  color:#dbe4ef;
+  border:1px solid var(--line);
+  border-radius:.5rem;
+}
+
+/* Cartões de item */
+.list-group-item{
+  background:#0f141c;
+  border-color:#2b3240;
+  border-radius:.5rem;
+  margin-bottom:.25rem;
+}
+.list-group-item .fw-bold.text-info{
+  color:#7dd3fc !important;
+  font-weight:700;
+}
+
+/* Switch “Separado” */
+.form-check.form-switch .form-check-input{
+  width:3rem; height:1.5rem;
+  background:#232b3a; border:1px solid #3a4354; cursor:pointer;
+}
+.form-check.form-switch .form-check-input:focus{
+  box-shadow:0 0 0 .2rem rgba(59,130,246,.25);
+}
+.form-check.form-switch .form-check-input:checked{
+  background:#1f9d61; border-color:#1f9d61;
+}
+
+/* Labels */
+.form-check-label{ color:#aeb6c2; font-weight:600; margin-left:.35rem; }
+.form-check-input:checked + .form-check-label{ color:#e6edf5; }
+
+/* Checkbox “Faltou” em vermelho quando marcado (precisa da classe abaixo no HTML/JS) */
+.form-check-input.check-faltou{ accent-color:#ef4444; }
+
     </style>
 </head>
 <body>
@@ -34,7 +82,7 @@
         <a class="btn btn-outline-light" href="/conferencia">Conferência</a>
     </nav>
     <div class="sticky-top-bar">
-        <h3 class="mb-2">Mapa <span class="text-info">{{ numero_carga }}</span></h3>
+        <h3 class="mb-3">Mapa <span class="text-info">{{ nome_mapa or numero_carga }}</span></h3>
         <input id="busca" class="form-control" placeholder="Buscar por código, EAN ou descrição...">
         <div id="resumo" class="text-secondary small mt-2"></div>
     </div>
@@ -107,7 +155,7 @@
                                 <label class="form-check-label">Separado</label>
                             </div>
                             <div class="form-check">
-                                <input class="form-check-input" type="checkbox" ${it.faltou ? 'checked' : ''} onchange="atualizarItem(${it.id}, { faltou: this.checked })">
+                                <input class="form-check-input check-faltou" type="checkbox" ${it.faltou ? 'checked' : ''} onchange="atualizarItem(${it.id}, { faltou: this.checked })">
                                 <label class="form-check-label">Faltou</label>
                             </div>
                             </div>

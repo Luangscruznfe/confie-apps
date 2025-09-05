@@ -56,13 +56,14 @@ def init_db():
         );
     ''')
 
-# Garante a coluna 'conferente' no pedidos
+
+    # Garante a coluna 'conferente' no pedidos
     cur.execute("ALTER TABLE pedidos ADD COLUMN IF NOT EXISTS conferente TEXT;")
 
 
     # === NOVO: Tabelas do Mapa de Separação ===
     cur.execute('''
-        CREATE TABLE IF NOT EXISTS cargas (
+    CREATE TABLE IF NOT EXISTS cargas (
           id SERIAL PRIMARY KEY,
           numero_carga TEXT UNIQUE NOT NULL,
           motorista TEXT,
@@ -70,9 +71,13 @@ def init_db():
           peso_total NUMERIC,
           entregas INTEGER,
           data_emissao TEXT,
-          criado_em TIMESTAMP DEFAULT NOW()
+          criado_em TIMESTAMP DEFAULT NOW(),
+          nome_exibicao TEXT
         );
     ''')
+    # Para bancos antigos onde a coluna não existia ainda
+    cur.execute("ALTER TABLE IF EXISTS cargas ADD COLUMN IF NOT EXISTS nome_exibicao TEXT;")
+
 
     cur.execute('''
         CREATE TABLE IF NOT EXISTS carga_pedidos (
@@ -292,6 +297,20 @@ def salvar_no_banco_de_dados(dados_do_pedido):
     conn.commit()
     cur.close()
     conn.close()
+
+def salvar_nome_carga(numero_carga: str, nome_exibicao: str):
+    conn = get_db_connection()
+    c = conn.cursor()
+    c.execute("""
+        INSERT INTO cargas (numero_carga, nome_exibicao)
+        VALUES (%s, %s)
+        ON CONFLICT (numero_carga)
+        DO UPDATE SET nome_exibicao = EXCLUDED.nome_exibicao
+    """, (str(numero_carga), nome_exibicao))
+    conn.commit()
+    conn.close()
+
+
 
 # =================================================================
 # 4. ROTAS DO SITE (ENDEREÇOS)
@@ -672,6 +691,7 @@ def mapa_upload():
         return "Nenhum arquivo selecionado. Por favor, escolha um PDF.", 400
 
     filename = secure_filename(f.filename)
+    nome_exibicao = os.path.splitext(filename)[0]  # "Araçariguama.pdf" -> "Araçariguama"
     # Usar /tmp é uma boa prática para ambientes de deploy temporários
     path_tmp = os.path.join("/tmp", filename)
     f.save(path_tmp)
@@ -691,9 +711,9 @@ def mapa_upload():
 
         # Insere a nova carga
         cur.execute("""
-            INSERT INTO cargas (numero_carga, motorista, descricao_romaneio, data_emissao)
-            VALUES (%s, %s, %s, %s)
-        """, (numero_carga, header.get("motorista"), header.get("romaneio"), header.get("data")))
+    INSERT INTO cargas (numero_carga, motorista, descricao_romaneio, data_emissao, nome_exibicao)
+    VALUES (%s, %s, %s, %s, %s)
+""", (numero_carga, header.get("motorista"), header.get("romaneio"), header.get("data"), nome_exibicao))
 
         # Insere grupos
         for g in grupos or []:
@@ -737,9 +757,13 @@ def mapa_upload():
 
 @app.route('/mapa/<numero_carga>')
 def mapa_detalhe(numero_carga):
-    # Esta rota apenas serve o "esqueleto" da página HTML.
-    # O JavaScript dentro do template cuidará de carregar e mostrar os dados da API.
-    return render_template('mapa_detalhe.html', numero_carga=numero_carga)
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute("SELECT nome_exibicao FROM cargas WHERE numero_carga = %s", (numero_carga,))
+    row = cur.fetchone()
+    cur.close(); conn.close()
+    nome_mapa = row[0] if row and row[0] else None
+    return render_template('mapa_detalhe.html', numero_carga=numero_carga, nome_mapa=nome_mapa)
 
 
 @app.route('/api/mapas')
@@ -747,7 +771,7 @@ def api_mapas():
     conn = get_db_connection()
     cur = conn.cursor()
     cur.execute("""
-        SELECT numero_carga, motorista, data_emissao, criado_em
+        SELECT numero_carga, motorista, data_emissao, criado_em, nome_exibicao
         FROM cargas
         ORDER BY criado_em DESC
     """)
@@ -755,24 +779,24 @@ def api_mapas():
     cur.close(); conn.close()
     return jsonify([
         {"numero_carga": r[0], "motorista": r[1], "data_emissao": r[2],
-         "criado_em": r[3].isoformat() if r[3] else None}
+         "criado_em": r[3].isoformat() if r[3] else None,
+         "nome_exibicao": r[4]}
     for r in rows])
+
 
 @app.route('/mapa')
 def mapa_lista():
     conn = get_db_connection()
     cur = conn.cursor()
     cur.execute("""
-        SELECT numero_carga, motorista, data_emissao, descricao_romaneio
+        SELECT numero_carga, motorista, data_emissao, descricao_romaneio, nome_exibicao
         FROM cargas
         ORDER BY criado_em DESC
     """)
     mapas = cur.fetchall()
-    # ...
     cur.close(); conn.close()
-
-    # A função agora apenas busca os dados e renderiza o template.
     return render_template('mapa_lista.html', mapas=mapas)
+
 
 # ========== MAPA: APIs de listagem e atualização (NOVO) ==========
 
