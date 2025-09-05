@@ -1,4 +1,4 @@
-# Arquivo: parser_mapa.py (Versão com suporte a itens sem grupo)
+# Arquivo: parser_mapa.py (Versão com filtro para linhas numéricas)
 
 import re
 from typing import Dict, List, Tuple, Any
@@ -47,12 +47,8 @@ def group_words_into_lines(words: list, y_tolerance: int) -> List[List[Tuple]]:
 def parse_mapa(pdf_path: str) -> Tuple[Dict[str, str], Any, List[Dict[str, str]], List[Dict[str, Any]]]:
     doc = fitz.open(pdf_path)
     header, itens = {}, []
-    
-    # ===== NOVA LÓGICA AQUI =====
-    # Define um grupo padrão para itens "avulsos" que vêm antes do primeiro grupo
     grupo_codigo_atual = "GERAL"
     grupos = [{"grupo_codigo": "GERAL", "grupo_titulo": "ITENS SEM GRUPO"}]
-    # ============================
 
     for page_num, page in enumerate(doc):
         if page_num == 0:
@@ -83,6 +79,11 @@ def parse_mapa(pdf_path: str) -> Tuple[Dict[str, str], Any, List[Dict[str, str]]
             full_desc = _clean(" ".join(desc_parts))
             fabricante = _clean(" ".join(fab_parts))
             quantidade = _clean(" ".join(qtd_parts))
+
+            # ===== NOVO FILTRO PARA LINHAS SÓ COM NÚMEROS =====
+            if not re.search(r'[a-zA-Z]', full_desc):
+                continue
+            # ===============================================
 
             match_grupo_code = GRUPO_CODE_PATTERN.match(full_desc)
             is_group_line = (match_grupo_code and not fabricante and not quantidade)

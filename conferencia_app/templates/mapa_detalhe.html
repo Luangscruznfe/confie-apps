@@ -18,60 +18,17 @@
         .list-group-item { background-color: var(--panel); border-color: #222c3f; }
         .list-group-item.separado { background-color: var(--ok-bg); }
         .list-group-item.faltou { background-color: var(--err-bg); }
-        .list-group-item.forcado { outline: 1px dashed var(--warn); }
-        .form-control, .input-group-text {
+        .form-control, .input-group-text, .modal-content {
             background-color: var(--input-bg); color: var(--ink); border-color: var(--input-line);
         }
+        .form-control:focus {
+            background-color: var(--input-bg); color: var(--ink); border-color: var(--warn);
+            box-shadow: 0 0 0 0.25rem rgba(255, 209, 102, 0.25);
+        }
+        .btn-close { filter: invert(1); }
         .sticky-top-bar { position: sticky; top: 0; z-index: 1020; background: var(--bg); padding: .75rem 0; }
-        .small-mono { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 0.9rem; color: #f3f6ff; }
-/* ===== Visibilidade melhorada: busca, cabeçalhos e controles ===== */
-.form-control::placeholder{ color:#8a95a6; opacity:1; }
-.form-control:focus{
-  background:#161c24;
-  border-color:#3b82f6;
-  box-shadow:0 0 0 .25rem rgba(59,130,246,.25);
-  color:var(--ink);
-}
-
-/* Cabeçalho de cada grupo */
-.card-header{
-  background:linear-gradient(180deg,#1b2230,#161b24);
-  color:#dbe4ef;
-  border:1px solid var(--line);
-  border-radius:.5rem;
-}
-
-/* Cartões de item */
-.list-group-item{
-  background:#0f141c;
-  border-color:#2b3240;
-  border-radius:.5rem;
-  margin-bottom:.25rem;
-}
-.list-group-item .fw-bold.text-info{
-  color:#7dd3fc !important;
-  font-weight:700;
-}
-
-/* Switch “Separado” */
-.form-check.form-switch .form-check-input{
-  width:3rem; height:1.5rem;
-  background:#232b3a; border:1px solid #3a4354; cursor:pointer;
-}
-.form-check.form-switch .form-check-input:focus{
-  box-shadow:0 0 0 .2rem rgba(59,130,246,.25);
-}
-.form-check.form-switch .form-check-input:checked{
-  background:#1f9d61; border-color:#1f9d61;
-}
-
-/* Labels */
-.form-check-label{ color:#aeb6c2; font-weight:600; margin-left:.35rem; }
-.form-check-input:checked + .form-check-label{ color:#e6edf5; }
-
-/* Checkbox “Faltou” em vermelho quando marcado (precisa da classe abaixo no HTML/JS) */
-.form-check-input.check-faltou{ accent-color:#ef4444; }
-
+        .small-mono { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 0.9rem; }
+        .form-check-input:checked { background-color: var(--ok); border-color: var(--ok); }
     </style>
 </head>
 <body>
@@ -82,7 +39,7 @@
         <a class="btn btn-outline-light" href="/conferencia">Conferência</a>
     </nav>
     <div class="sticky-top-bar">
-        <h3 class="mb-3">Mapa <span class="text-info">{{ nome_mapa or numero_carga }}</span></h3>
+        <h3 class="mb-2">Mapa <span class="text-info">{{ numero_carga }}</span></h3>
         <input id="busca" class="form-control" placeholder="Buscar por código, EAN ou descrição...">
         <div id="resumo" class="text-secondary small mt-2"></div>
     </div>
@@ -91,13 +48,37 @@
     </div>
 </div>
 
+<div class="modal fade" id="modalFaltou" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalFaltouLabel">Registrar Falta Parcial</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Produto: <strong id="modal-produto-nome"></strong></p>
+                <p>Pedido: <span id="modal-qtd-pedida" class="fw-bold text-info"></span></p>
+                <div class="mb-3">
+                    <label for="modal-qtd-separada" class="form-label">Quantidade que foi separada:</label>
+                    <input type="number" class="form-control" id="modal-qtd-separada" placeholder="Ex: 9">
+                </div>
+                <input type="hidden" id="modal-item-id">
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" onclick="salvarFalta()">Salvar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
     const NUMERO_CARGA = {{ numero_carga | tojson }};
     let STATE = { grupos: [], itens: [] };
+    let modalFaltou;
 
-    function badge(text, className) {
-        return `<span class="badge ${className} me-1">${text}</span>`;
-    }
+    function badge(text, className) { return `<span class="badge ${className} me-1">${text}</span>`; }
 
     function renderItens() {
         const container = document.getElementById('grupos-container');
@@ -115,13 +96,23 @@
 
             if (itensFiltrados.length === 0) return;
 
+            // CORRIGIDO: Usa 'separador_nome', que é o nome que vem da API
+            const nomeSeparador = grupo.separador_nome || '';
+
             html += `
                 <div class="card mb-3">
-                    <div class="card-header d-flex justify-content-between align-items-center">
-                        <div><strong>${grupo.grupo_codigo}</strong> — ${grupo.grupo_titulo || ''}</div>
-                        <div>
-                            <button class="btn btn-sm btn-success" onclick="marcarGrupo('${grupo.grupo_codigo}', true)">Marcar Grupo</button>
-                            <button class="btn btn-sm btn-outline-light" onclick="marcarGrupo('${grupo.grupo_codigo}', false)">Desmarcar</button>
+                    <div class="card-header">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <div><strong>${grupo.grupo_codigo}</strong> — ${grupo.grupo_titulo || ''}</div>
+                            <div>
+                                <button class="btn btn-sm btn-success" onclick="marcarGrupo('${grupo.grupo_codigo}', true)">Marcar</button>
+                                <button class="btn btn-sm btn-outline-light" onclick="marcarGrupo('${grupo.grupo_codigo}', false)">Desmarcar</button>
+                            </div>
+                        </div>
+                        <div class="input-group input-group-sm">
+                            <span class="input-group-text">Separador:</span>
+                            <input type="text" class="form-control" id="separador-${grupo.grupo_codigo}" value="${nomeSeparador}">
+                            <button class="btn btn-outline-info" onclick="salvarSeparador('${grupo.grupo_codigo}')">Salvar</button>
                         </div>
                     </div>
                     <div class="list-group list-group-flush">`;
@@ -133,32 +124,30 @@
                 let itemClasses = "list-group-item d-flex flex-column flex-md-row justify-content-between gap-3 p-3";
                 if (it.separado) itemClasses += " separado";
                 if (it.faltou) itemClasses += " faltou";
-                if (it.forcar_conferido) itemClasses += " forcado";
 
                 const descCompleta = [it.cod_barras, it.codigo, it.descricao, it.fabricante].filter(Boolean).join(' ');
-                const qtdCompleta = `${it.qtd_unidades || ''} ${it.unidade || ''} ${it.pack_qtd > 1 ? `(C/${it.pack_qtd})` : ''}`.trim();
+                const qtdPedida = `${it.qtd_unidades || ''} ${it.unidade || ''} ${it.pack_qtd > 1 ? `(C/${it.pack_qtd})` : ''}`.trim();
+                const qtdInfo = it.faltou && it.qtd_separada != null ?
+                    `<span class="text-danger">Separado: ${it.qtd_separada} de ${it.qtd_unidades}</span>` :
+                    `<span class="text-info">${qtdPedida}</span>`;
 
                 html += `
                     <div class="${itemClasses}" id="item-${it.id}">
                         <div class="flex-grow-1">
                             <div class="small-mono">${descCompleta}</div>
-                            <div class="fw-bold text-info">${qtdCompleta}</div>
+                            <div class="fw-bold">${qtdInfo}</div>
                             <div class="mt-1">
                                 ${it.separado ? badge('Separado', 'bg-success') : ''}
                                 ${it.faltou ? badge('Faltou', 'bg-danger') : ''}
-                                ${it.forcar_conferido ? badge('Forçado', 'bg-warning text-dark') : ''}
                             </div>
                         </div>
-                        <div class="d-flex flex-wrap gap-2 align-items-center" style="min-width: 220px;">
+                        <div class="d-flex flex-wrap gap-3 align-items-center">
                             <div class="form-check form-switch">
                                 <input class="form-check-input" type="checkbox" ${it.separado ? 'checked' : ''} onchange="atualizarItem(${it.id}, { separado: this.checked })">
-                                <label class="form-check-label">Separado</label>
+                                <label class="form-check-label">OK</label>
                             </div>
-                            <div class="form-check">
-                                <input class="form-check-input check-faltou" type="checkbox" ${it.faltou ? 'checked' : ''} onchange="atualizarItem(${it.id}, { faltou: this.checked })">
-                                <label class="form-check-label">Faltou</label>
-                            </div>
-                            </div>
+                            <button class="btn btn-sm btn-warning" onclick="abrirModalFaltou(${it.id})">Faltou</button>
+                        </div>
                     </div>`;
             });
             html += `</div></div>`;
@@ -168,32 +157,81 @@
         document.getElementById('resumo').textContent = total > 0 ? `${marcados} de ${total} itens marcados.` : '';
     }
 
+    function abrirModalFaltou(itemId) {
+        const item = STATE.itens.find(it => it.id === itemId);
+        if (!item) return;
+
+        document.getElementById('modal-produto-nome').textContent = item.descricao || 'N/D';
+        document.getElementById('modal-qtd-pedida').textContent = `${item.qtd_unidades || 0} ${item.unidade || ''}`;
+        document.getElementById('modal-qtd-separada').value = item.qtd_separada || '';
+        document.getElementById('modal-item-id').value = itemId;
+
+        modalFaltou.show();
+    }
+
+    async function salvarFalta() {
+        const itemId = document.getElementById('modal-item-id').value;
+        const qtdSeparada = document.getElementById('modal-qtd-separada').value;
+
+        if (!qtdSeparada || isNaN(parseInt(qtdSeparada, 10))) {
+            alert('Por favor, insira uma quantidade válida.');
+            return;
+        }
+
+        await atualizarItem(itemId, {
+            qtd_separada: parseInt(qtdSeparada, 10)
+        });
+        modalFaltou.hide();
+    }
+    
+    async function salvarSeparador(grupoCodigo) {
+        const input = document.getElementById(`separador-${grupoCodigo}`);
+        const nome = input.value;
+        
+        const grupo = STATE.grupos.find(g => g.grupo_codigo === grupoCodigo);
+        if(grupo) grupo.separador_nome = nome;
+
+        await fetch('/api/mapa/grupo/definir-separador', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                numero_carga: NUMERO_CARGA,
+                grupo_codigo: grupoCodigo,
+                // CORRIGIDO: Envia 'separador_nome' para a API
+                separador_nome: nome 
+            })
+        });
+        input.classList.add('is-valid');
+        setTimeout(() => input.classList.remove('is-valid'), 2000);
+    }
+
     async function atualizarItem(itemId, patch) {
         const item = STATE.itens.find(it => it.id === itemId);
-        if (item) {
-            Object.assign(item, patch);
-        }
-        renderItens(); // Atualiza a UI imediatamente
+        if (item) Object.assign(item, patch);
+        renderItens();
 
-        await fetch('/api/mapa/item/atualizar', {
+        // Envia para a API. Note que a API agora retorna os campos atualizados.
+        const response = await fetch('/api/mapa/item/atualizar', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ item_id: itemId, ...patch })
         });
+        const data = await response.json();
+        // Sincroniza o estado local com a resposta da API (ex: 'faltou' calculado no backend)
+        if (data.ok && data.updated_fields) {
+            if (item) Object.assign(item, data.updated_fields);
+            renderItens();
+        }
     }
     
     async function marcarGrupo(grupoCodigo, separado) {
-        STATE.itens.forEach(it => {
-            if (it.grupo_codigo === grupoCodigo) {
-                it.separado = separado;
-            }
-        });
+        STATE.itens.forEach(it => { if (it.grupo_codigo === grupoCodigo) it.separado = separado; });
         renderItens();
 
         await fetch('/api/mapa/grupo/marcar', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ numero_carga: NUMERO_CARGA, grupo_codigo: grupoCodigo, separado: separado })
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ numero_carga: NUMERO_CARGA, grupo_codigo: grupoCodigo, separado: separado })
         });
     }
 
@@ -211,7 +249,10 @@
     }
 
     document.getElementById('busca').addEventListener('input', renderItens);
-    document.addEventListener('DOMContentLoaded', carregarDados);
+    document.addEventListener('DOMContentLoaded', () => {
+        modalFaltou = new bootstrap.Modal(document.getElementById('modalFaltou'));
+        carregarDados();
+    });
 </script>
 </body>
 </html>

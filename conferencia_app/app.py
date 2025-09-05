@@ -37,85 +37,50 @@ def get_db_connection():
     conn = psycopg2.connect(os.environ.get('DATABASE_URL'))
     return conn
 
+# Em app.py, substitua a função init_db inteira
+
 def init_db():
     conn = get_db_connection()
     cur = conn.cursor()
 
-    # === Tabela já existente (seu app atual) ===
+    # Tabela de pedidos
     cur.execute('''
         CREATE TABLE IF NOT EXISTS pedidos (
-            id SERIAL PRIMARY KEY,
-            numero_pedido TEXT UNIQUE NOT NULL,
-            nome_cliente TEXT,
-            vendedor TEXT,
-            nome_da_carga TEXT,
-            nome_arquivo TEXT,
-            status_conferencia TEXT,
-            produtos JSONB,
-            url_pdf TEXT
+            id SERIAL PRIMARY KEY, numero_pedido TEXT UNIQUE NOT NULL, nome_cliente TEXT,
+            vendedor TEXT, nome_da_carga TEXT, nome_arquivo TEXT, status_conferencia TEXT,
+            produtos JSONB, url_pdf TEXT, conferente TEXT
         );
     ''')
 
-
-    # Garante a coluna 'conferente' no pedidos
-    cur.execute("ALTER TABLE pedidos ADD COLUMN IF NOT EXISTS conferente TEXT;")
-
-
-    # === NOVO: Tabelas do Mapa de Separação ===
+    # Tabelas do Mapa de Separação
     cur.execute('''
-    CREATE TABLE IF NOT EXISTS cargas (
-          id SERIAL PRIMARY KEY,
-          numero_carga TEXT UNIQUE NOT NULL,
-          motorista TEXT,
-          descricao_romaneio TEXT,
-          peso_total NUMERIC,
-          entregas INTEGER,
-          data_emissao TEXT,
-          criado_em TIMESTAMP DEFAULT NOW(),
-          nome_exibicao TEXT
+        CREATE TABLE IF NOT EXISTS cargas (
+          id SERIAL PRIMARY KEY, numero_carga TEXT UNIQUE NOT NULL, motorista TEXT,
+          descricao_romaneio TEXT, peso_total NUMERIC, entregas INTEGER,
+          data_emissao TEXT, criado_em TIMESTAMP DEFAULT NOW()
         );
     ''')
-    # Para bancos antigos onde a coluna não existia ainda
-    cur.execute("ALTER TABLE IF EXISTS cargas ADD COLUMN IF NOT EXISTS nome_exibicao TEXT;")
-
-
-    cur.execute('''
-        CREATE TABLE IF NOT EXISTS carga_pedidos (
-          id SERIAL PRIMARY KEY,
-          numero_carga TEXT REFERENCES cargas(numero_carga) ON DELETE CASCADE,
-          pedido_numero TEXT
-        );
-    ''')
-
     cur.execute('''
         CREATE TABLE IF NOT EXISTS carga_grupos (
-          id SERIAL PRIMARY KEY,
-          numero_carga TEXT REFERENCES cargas(numero_carga) ON DELETE CASCADE,
-          grupo_codigo TEXT,
-          grupo_titulo TEXT
+          id SERIAL PRIMARY KEY, numero_carga TEXT REFERENCES cargas(numero_carga) ON DELETE CASCADE,
+          grupo_codigo TEXT, grupo_titulo TEXT
         );
     ''')
-
     cur.execute('''
         CREATE TABLE IF NOT EXISTS carga_itens (
-          id SERIAL PRIMARY KEY,
-          numero_carga TEXT REFERENCES cargas(numero_carga) ON DELETE CASCADE,
-          grupo_codigo TEXT,
-          fabricante TEXT,
-          codigo TEXT,
-          cod_barras TEXT,
-          descricao TEXT,
-          qtd_unidades INTEGER,
-          unidade TEXT,
-          pack_qtd INTEGER,
-          pack_unid TEXT,
-          observacao TEXT DEFAULT '',
-          separado BOOLEAN DEFAULT FALSE,
-          forcar_conferido BOOLEAN DEFAULT FALSE,
-          faltou BOOLEAN DEFAULT FALSE,
-          sobrando INTEGER DEFAULT 0
+          id SERIAL PRIMARY KEY, numero_carga TEXT REFERENCES cargas(numero_carga) ON DELETE CASCADE,
+          grupo_codigo TEXT, fabricante TEXT, codigo TEXT, cod_barras TEXT, descricao TEXT,
+          qtd_unidades INTEGER, unidade TEXT, pack_qtd INTEGER, pack_unid TEXT,
+          observacao TEXT DEFAULT '', separado BOOLEAN DEFAULT FALSE, forcar_conferido BOOLEAN DEFAULT FALSE,
+          faltou BOOLEAN DEFAULT FALSE, sobrando INTEGER DEFAULT 0
         );
     ''')
+    
+    # ===== ADIÇÃO CRÍTICA AQUI =====
+    # Garante que as novas colunas existem no banco de dados
+    cur.execute("ALTER TABLE IF EXISTS carga_grupos ADD COLUMN IF NOT EXISTS separador_nome TEXT;")
+    cur.execute("ALTER TABLE IF EXISTS carga_itens ADD COLUMN IF NOT EXISTS qtd_separada INTEGER;")
+    # ===============================
 
     conn.commit()
     cur.close()
@@ -800,29 +765,36 @@ def mapa_lista():
 
 # ========== MAPA: APIs de listagem e atualização (NOVO) ==========
 
+# Em app.py, substitua a função api_mapa_detalhe
+
 @app.route('/api/mapa/<numero_carga>')
 def api_mapa_detalhe(numero_carga):
     """Retorna grupos e itens da carga, para montar a tela de separação."""
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 
-    # grupos
+    # grupos (agora também busca o 'separador_nome')
     cur.execute("""
-        SELECT grupo_codigo, grupo_titulo
+        SELECT grupo_codigo, grupo_titulo, separador_nome
         FROM carga_grupos
         WHERE numero_carga = %s
-        ORDER BY grupo_codigo;
+        ORDER BY
+            CASE
+                WHEN grupo_codigo = 'GERAL' THEN 0
+                ELSE 1
+            END,
+            grupo_codigo;
     """, (numero_carga,))
     grupos = cur.fetchall()
 
-    # itens
+    # itens (agora também busca a 'qtd_separada')
     cur.execute("""
         SELECT id, grupo_codigo, fabricante, codigo, cod_barras, descricao,
                qtd_unidades, unidade, pack_qtd, pack_unid,
-               observacao, separado, forcar_conferido, faltou, sobrando
+               observacao, separado, forcar_conferido, faltou, sobrando, qtd_separada
         FROM carga_itens
         WHERE numero_carga = %s
-        ORDER BY grupo_codigo, descricao;
+        ORDER BY id;
     """, (numero_carga,))
     itens = cur.fetchall()
 
@@ -832,32 +804,59 @@ def api_mapa_detalhe(numero_carga):
 
 @app.route('/api/mapa/item/atualizar', methods=['POST'])
 def api_mapa_item_atualizar():
-    """Atualiza flags do item (separado, faltou, forçado), observação e sobrando."""
+    """Atualiza flags do item, observação, sobrando e a nova qtd_separada."""
     data = request.json or {}
     item_id = data.get('item_id')
     if not item_id:
         return jsonify({"ok": False, "erro": "item_id é obrigatório"}), 400
 
-    campos = {
-        "separado": bool(data.get('separado', False)),
-        "faltou": bool(data.get('faltou', False)),
-        "forcar_conferido": bool(data.get('forcar_conferido', False)),
-        "observacao": data.get('observacao', '') or '',
-        "sobrando": int(data.get('sobrando') or 0)
-    }
-
     conn = get_db_connection()
-    cur = conn.cursor()
-    cur.execute("""
-        UPDATE carga_itens
-           SET separado=%s, faltou=%s, forcar_conferido=%s,
-               observacao=%s, sobrando=%s
-         WHERE id=%s
-    """, (campos["separado"], campos["faltou"], campos["forcar_conferido"],
-          campos["observacao"], campos["sobrando"], item_id))
-    conn.commit()
-    cur.close(); conn.close()
-    return jsonify({"ok": True})
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+
+    try:
+        # Pega o estado atual do item, incluindo a quantidade pedida
+        cur.execute("SELECT qtd_unidades FROM carga_itens WHERE id = %s", (item_id,))
+        item_atual = cur.fetchone()
+        if not item_atual:
+            return jsonify({"ok": False, "erro": "Item não encontrado"}), 404
+
+        update_fields = {}
+        # Lista dos campos que podem ser atualizados diretamente
+        campos_diretos = ["separado", "forcar_conferido", "observacao", "sobrando"]
+        for campo in campos_diretos:
+            if campo in data:
+                update_fields[campo] = data[campo]
+        
+        # Lógica especial para 'qtd_separada'
+        if 'qtd_separada' in data:
+            qtd_pedida = item_atual['qtd_unidades'] or 0
+            qtd_separada = int(data['qtd_separada'])
+            
+            update_fields['qtd_separada'] = qtd_separada
+            # Define 'faltou' automaticamente
+            update_fields['faltou'] = qtd_separada < qtd_pedida
+            # Um item com quantidade definida é considerado 'separado'
+            update_fields['separado'] = True
+
+        if not update_fields:
+            return jsonify({"ok": False, "erro": "Nenhum campo para atualizar"}), 400
+
+        # Monta a query de UPDATE dinamicamente
+        set_clause = ", ".join([f"{key} = %s" for key in update_fields.keys()])
+        values = list(update_fields.values()) + [item_id]
+
+        cur.execute(f"UPDATE carga_itens SET {set_clause} WHERE id = %s", tuple(values))
+        conn.commit()
+        
+        return jsonify({"ok": True, "updated_fields": update_fields})
+
+    except (Exception, psycopg2.Error) as e:
+        app.logger.error(f"Erro ao atualizar item do mapa: {e}")
+        conn.rollback()
+        return jsonify({"ok": False, "erro": "Erro de banco de dados"}), 500
+    finally:
+        cur.close()
+        conn.close()
 
 
 @app.route('/api/mapa/grupo/marcar', methods=['POST'])
@@ -992,6 +991,29 @@ def mapa_deletar(numero_carga):
         if conn:
             conn.close()
     return redirect(url_for('mapa_lista'))
+
+@app.route('/api/mapa/grupo/definir-separador', methods=['POST'])
+def api_mapa_grupo_definir_separador():
+    """Atualiza dados de um grupo, como o nome do separador."""
+    data = request.json or {}
+    numero_carga = data.get('numero_carga')
+    grupo_codigo = data.get('grupo_codigo')
+    separador_nome = data.get('separador_nome')
+
+    if not numero_carga or not grupo_codigo:
+        return jsonify({"ok": False, "erro": "numero_carga e grupo_codigo obrigatórios"}), 400
+
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute("""
+        UPDATE carga_grupos
+           SET separador_nome = %s
+         WHERE numero_carga = %s AND grupo_codigo = %s
+    """, (separador_nome, numero_carga, grupo_codigo))
+    
+    conn.commit()
+    cur.close(); conn.close()
+    return jsonify({"ok": True})
 
 
 @app.route('/ping')
