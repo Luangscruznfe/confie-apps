@@ -1,4 +1,4 @@
-# Arquivo: parser_mapa.py (Versão com filtro de lixo)
+# Arquivo: parser_mapa.py (Versão final e definitiva)
 
 import re
 from typing import Dict, List, Tuple, Any
@@ -20,24 +20,29 @@ def _clean(s: str) -> str:
     return re.sub(r"\s+", " ", s).strip()
 
 def group_words_into_lines(words: list, y_tolerance: int) -> List[List[Tuple]]:
+    """
+    Agrupa palavras em 'linhas visuais' com uma tolerância vertical.
+    Contém a correção crítica da lógica de agrupamento.
+    """
     if not words: return []
     lines = []
     words.sort(key=lambda w: (w[1], w[0]))
     
-    if not words: return []
-
     current_line = [words[0]]
     last_y = words[0][1]
 
     for i in range(1, len(words)):
         word = words[i]
         y0 = word[1]
+        
         if abs(y0 - last_y) <= y_tolerance:
             current_line.append(word)
         else:
             lines.append(sorted(current_line, key=lambda w: w[0]))
             current_line = [word]
-        last_y = current_line[0][1]
+        
+        # CORREÇÃO CRÍTICA: Atualiza o 'last_y' com o Y da palavra ATUAL
+        last_y = y0
         
     lines.append(sorted(current_line, key=lambda w: w[0]))
     return lines
@@ -74,14 +79,13 @@ def parse_mapa(pdf_path: str) -> Tuple[Dict[str, str], Any, List[Dict[str, str]]
             fabricante = _clean(" ".join(fab_parts))
             quantidade = _clean(" ".join(qtd_parts))
 
-            # ===== NOVO FILTRO AQUI =====
-            # Se a linha não tiver uma quantidade, não é um produto. Pula para a próxima.
-            if not quantidade:
-                continue
-            # ============================
-
             match_grupo_code = GRUPO_CODE_PATTERN.match(full_desc)
             is_group_line = (match_grupo_code and not fabricante and not quantidade)
+
+            # Filtro final: A linha só é válida se tiver uma quantidade OU se for uma linha de grupo.
+            if not quantidade and not is_group_line:
+                continue
+
             is_item_with_group = (match_grupo_code and (fabricante or quantidade))
 
             if is_group_line or is_item_with_group:
@@ -111,15 +115,13 @@ def parse_mapa(pdf_path: str) -> Tuple[Dict[str, str], Any, List[Dict[str, str]]
 
             item["descricao"] = " ".join(desc_words)
             
-            item["qtd_unidades"] = 0
-            item["unidade"] = "UN"
+            item["qtd_unidades"] = 0; item["unidade"] = "UN"
             match_unidade = re.match(r'(\d+)\s*([A-Z]+)', quantidade);
             if match_unidade:
                 item["qtd_unidades"] = int(match_unidade.group(1))
                 item["unidade"] = match_unidade.group(2).upper()
             
-            item["pack_qtd"] = 1
-            item["pack_unid"] = "UN"
+            item["pack_qtd"] = 1; item["pack_unid"] = "UN"
             match_pack = re.search(r'C/\s*(\d+)', quantidade, re.I)
             if match_pack: item["pack_qtd"] = int(match_pack.group(1))
 
@@ -129,9 +131,12 @@ def parse_mapa(pdf_path: str) -> Tuple[Dict[str, str], Any, List[Dict[str, str]]
     doc.close()
     return header, None, grupos, itens
 
+
 def debug_extrator(pdf_path: str):
+    """Função de depuração que o app.py precisa para a rota /mapa/extrator."""
     doc = fitz.open(pdf_path)
     rows = []
+    # Esta é uma versão simplificada, apenas para garantir que a função exista
     for page in doc:
         rows.extend(page.get_text("text").splitlines())
     doc.close()
