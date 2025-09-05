@@ -5,38 +5,61 @@
   <title>Mapas de Separação</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <style>
+    :root {
+      --bg-color: #0f1115;
+      --card-bg: #161a22;
+      --border-color: #2a364a;
+      --text-color: #ecf2ff;
+      --text-muted: #b0b3b8;
+      --accent-color: #3d8bfd;
+      --danger-color: #ef4444;
+    }
     body {
-      background-color: #121212;
-      color: #e4e6eb;
-    }
-    .list-group-item {
-      background-color: #1e1e1e;
-      border: 1px solid #333;
-      color: #e4e6eb;
-    }
-    .list-group-item:hover {
-      border-color: #3d8bfd;
-      transform: translateY(-2px);
-      box-shadow: 0 6px 20px rgba(0,0,0,0.4);
-    }
-    .btn-danger {
-      font-size: 0.85rem;
+      background-color: var(--bg-color);
+      color: var(--text-color);
     }
     .main-title {
       font-weight: bold;
       color: white;
     }
+    .mapa-item {
+      background-color: var(--card-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 0.5rem; /* Cantos arredondados */
+      transition: all 0.2s ease-in-out;
+    }
+    .mapa-item:hover {
+      border-color: var(--accent-color);
+      transform: translateY(-4px);
+      box-shadow: 0 8px 25px rgba(0,0,0,0.5);
+    }
+    .mapa-title {
+      font-size: 1.25rem; /* Título maior */
+      font-weight: 600;
+      color: var(--text-color);
+    }
     .mapa-info {
       font-size: 0.9rem;
-      color: #b0b3b8;
+      color: var(--text-muted);
+    }
+    .mapa-info strong {
+      color: #cdd2da; /* Rótulos com um pouco mais de destaque */
+    }
+    .btn-outline-danger {
+        border-color: var(--danger-color);
+        color: var(--danger-color);
+    }
+    .btn-outline-danger:hover {
+        background-color: var(--danger-color);
+        color: white;
     }
   </style>
 </head>
 <body>
 
-<div class="container mt-4">
+<div class="container mt-4 mb-5">
   <h1 class="main-title mb-4">📦 Mapas de Separação</h1>
-  <a href="/gestao" class="btn btn-outline-light mb-3">&larr; Voltar para Gestão</a>
+  <a href="/gestao" class="btn btn-outline-light mb-4">&larr; Voltar para Gestão</a>
 
   {% with messages = get_flashed_messages(with_categories=true) %}
     {% if messages %}
@@ -47,36 +70,33 @@
   {% endwith %}
 
   {% if mapas %}
-    <ul class="list-group">
+    <div class="list-group">
       {% for m in mapas %}
-        <li class="list-group-item d-flex justify-content-between align-items-center">
-  <!-- LINK para abrir o mapa -->
-  <a class="text-decoration-none text-light flex-grow-1"
-     href="{{ url_for('mapa_detalhe', numero_carga=m[0]) }}">
-    <!-- Nome do PDF (fallback para número da carga) -->
-    <div class="fw-bold">
-      {{ (m[4] if m|length > 4 and m[4] else m[0]) }}
-    </div>
+        <div class="list-group-item mapa-item d-flex justify-content-between align-items-center p-4 mb-3">
+          <a class="text-decoration-none flex-grow-1"
+             href="{{ url_for('mapa_detalhe', numero_carga=m[0]) }}">
+            
+            <h5 class="mapa-title mb-3">
+              📄 {{ (m[4] if m|length > 4 and m[4] else m[0]) }}
+            </h5>
 
-    <!-- Linha de infos -->
-    <div class="mapa-info">
-      ID: {{ m[0] }}
-      · Motorista: {{ m[1] or '-' }}
-      {% if m|length > 2 %} · Emissão: {{ m[2] or '-' }}{% endif %}
-      {% if m|length > 3 %} · Romaneio: {{ m[3] or '-' }}{% endif %}
-    </div>
-  </a>
+            <div class="mapa-info d-flex flex-wrap" style="gap: 0.5rem 1.5rem;">
+              <span><strong>ID:</strong> {{ m[0] }}</span>
+              <span><strong>Motorista:</strong> {{ m[1] or 'N/A' }}</span>
+              {% if m|length > 2 and m[2] %}<span><strong>Emissão:</strong> {{ m[2] }}</span>{% endif %}
+              {% if m|length > 3 and m[3] %}<span><strong>Romaneio:</strong> {{ m[3] }}</span>{% endif %}
+            </div>
+          </a>
 
-  <form action="{{ url_for('mapa_deletar', numero_carga=m[0]) }}" method="post"
-      onsubmit="return confirm('Excluir mapa {{ (m[4] if m|length > 4 and m[4] else m[0]) }} e todos os itens vinculados?');">
-  <button type="submit" class="btn btn-sm btn-danger">🗑️ Excluir</button>
-</form>
-</li>
-
+          <form action="{{ url_for('mapa_deletar', numero_carga=m[0]) }}" method="post"
+              onsubmit="return confirm('Excluir mapa {{ (m[4] if m|length > 4 and m[4] else m[0]) }} e todos os itens vinculados?');" class="ms-4">
+            <button type="submit" class="btn btn-sm btn-outline-danger">🗑️ Excluir</button>
+          </form>
+        </div>
       {% endfor %}
-    </ul>
+    </div>
   {% else %}
-    <div class="alert alert-secondary">Nenhum mapa encontrado.</div>
+    <div class="alert alert-secondary mt-4">Nenhum mapa encontrado.</div>
   {% endif %}
 </div>
 
