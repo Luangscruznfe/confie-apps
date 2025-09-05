@@ -660,91 +660,86 @@ def resetar_dia():
             if conn: conn.close()
 
 
-@app.route('/mapa/upload', methods=['GET', 'POST'])
+@app.route("/mapa/upload", methods=["POST"])
 def mapa_upload():
-    if request.method == 'GET':
-        return '''
-        <form method="post" enctype="multipart/form-data" style="padding:20px">
-          <h3>Upload do Mapa de Separação (PDF)</h3>
-          <input type="file" name="pdf" accept="application/pdf" required />
-          <button type="submit">Enviar</button>
-        </form>
-        '''
+    # ===== PONTO DA CORREÇÃO =====
+    # O formulário envia 'file', mas o código esperava 'pdf'.
+    f = request.files.get("file")
+    # ===============================
 
-    f = request.files.get('pdf')
     if not f:
-        return "Envie um PDF", 400
+        # Mensagem de erro mais clara para o frontend
+        return "Nenhum arquivo selecionado. Por favor, escolha um PDF.", 400
 
-    path_tmp = f"/tmp/{f.filename}"
+    filename = secure_filename(f.filename)
+    # Usar /tmp é uma boa prática para ambientes de deploy temporários
+    path_tmp = os.path.join("/tmp", filename)
     f.save(path_tmp)
 
     try:
-        header, pedidos_map, grupos, itens = parse_mapa(path_tmp)
+        header, _, grupos, itens = parse_mapa(path_tmp)
+        numero_carga = header.get("numero_carga")
+        if not numero_carga:
+            # Retorna um erro 400 que o frontend pode exibir
+            return "Não foi possível extrair o número da carga do PDF.", 400
+
+        conn = get_db_connection()
+        cur = conn.cursor()
+
+        # Limpa dados antigos da carga para garantir um re-upload limpo
+        cur.execute("DELETE FROM cargas WHERE numero_carga = %s;", (numero_carga,))
+
+        # Insere a nova carga
+        cur.execute("""
+            INSERT INTO cargas (numero_carga, motorista, descricao_romaneio, data_emissao)
+            VALUES (%s, %s, %s, %s)
+        """, (numero_carga, header.get("motorista"), header.get("romaneio"), header.get("data")))
+
+        # Insere grupos
+        for g in grupos or []:
+            cur.execute("""
+                INSERT INTO carga_grupos (numero_carga, grupo_codigo, grupo_titulo)
+                VALUES (%s, %s, %s) ON CONFLICT (numero_carga, grupo_codigo) DO NOTHING
+            """, (numero_carga, g.get("grupo_codigo"), g.get("grupo_titulo")))
+
+        # Insere itens
+        for it in itens or []:
+            cur.execute("""
+                INSERT INTO carga_itens (
+                    numero_carga, grupo_codigo, fabricante, codigo, cod_barras,
+                    descricao, qtd_unidades, unidade, pack_qtd, pack_unid
+                ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+            """, (
+                numero_carga, it.get("grupo_codigo"), it.get("fabricante"),
+                it.get("codigo"), it.get("cod_barras"), it.get("descricao"),
+                it.get("qtd_unidades"), it.get("unidade"),
+                it.get("pack_qtd"), it.get("pack_unid")
+            ))
+        
+        conn.commit()
+        # Após sucesso, redireciona para a página de detalhe do mapa
+        return redirect(url_for("mapa_detalhe", numero_carga=numero_carga))
+
     except Exception as e:
-        # erro explícito para o front
-        return (f"Erro ao ler mapa: {str(e)}", 400)
+        app.logger.error(f"Falha ao processar mapa: {e}", exc_info=True)
+        # Retorna erro 500 para o frontend
+        return f"Ocorreu um erro interno ao processar o PDF do mapa: {e}", 500
+    finally:
+        # Garante que o cursor e a conexão sejam fechados
+        if 'conn' in locals() and conn:
+            if 'cur' in locals() and cur:
+                cur.close()
+            conn.close()
+        # Garante que o arquivo temporário seja removido
+        if os.path.exists(path_tmp):
+            os.remove(path_tmp)
 
-    conn = get_db_connection()
-    cur = conn.cursor()
 
-    # UPSERT da carga
-    cur.execute("""
-        INSERT INTO cargas (numero_carga, motorista, descricao_romaneio, peso_total, entregas, data_emissao)
-        VALUES (%s,%s,%s,%s,%s,%s)
-        ON CONFLICT (numero_carga) DO UPDATE SET
-            motorista=EXCLUDED.motorista,
-            descricao_romaneio=EXCLUDED.descricao_romaneio,
-            peso_total=EXCLUDED.peso_total,
-            entregas=EXCLUDED.entregas,
-            data_emissao=EXCLUDED.data_emissao
-    """, (
-        header.get("numero_carga"),
-        header.get("motorista"),
-        header.get("descricao_romaneio"),
-        str(header.get("peso_total") or "").replace('.', '').replace(',', '.'),
-        int(header.get("entregas") or 0),
-        header.get("data_emissao"),
-    ))
-
-    # Sincroniza tabelas filhas
-    cur.execute("DELETE FROM carga_pedidos WHERE numero_carga=%s", (header["numero_carga"],))
-    cur.execute("DELETE FROM carga_grupos  WHERE numero_carga=%s", (header["numero_carga"],))
-    cur.execute("DELETE FROM carga_itens   WHERE numero_carga=%s", (header["numero_carga"],))
-
-    for p in pedidos_map:
-        cur.execute(
-            "INSERT INTO carga_pedidos (numero_carga, pedido_numero) VALUES (%s,%s)",
-            (header["numero_carga"], p)
-        )
-
-    for g in grupos:
-        cur.execute("""
-            INSERT INTO carga_grupos (numero_carga, grupo_codigo, grupo_titulo)
-            VALUES (%s,%s,%s)
-        """, (header["numero_carga"], g["codigo"], g["titulo"]))
-
-    for it in itens:
-        cur.execute("""
-            INSERT INTO carga_itens
-                (numero_carga, grupo_codigo, fabricante, codigo, cod_barras, descricao,
-                 qtd_unidades, unidade, pack_qtd, pack_unid)
-            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
-        """, (
-            header["numero_carga"], it["grupo_codigo"], it["fabricante"], it["codigo"],
-            it["cod_barras"], it["descricao"], it["qtd_unidades"], it["unidade"],
-            it["pack_qtd"], it["pack_unid"]
-        ))
-
-    conn.commit()
-    cur.close(); conn.close()
-
-    return jsonify({
-        "ok": True,
-        "numero_carga": header["numero_carga"],
-        "pedidos": pedidos_map,
-        "grupos": len(grupos),
-        "itens": len(itens)
-    })
+@app.route('/mapa/<numero_carga>')
+def mapa_detalhe(numero_carga):
+    # Esta rota apenas serve o "esqueleto" da página HTML.
+    # O JavaScript dentro do template cuidará de carregar e mostrar os dados da API.
+    return render_template('mapa_detalhe.html', numero_carga=numero_carga)
 
 
 @app.route('/api/mapas')
@@ -889,202 +884,6 @@ def api_mapa_grupo_marcar():
     cur.close(); conn.close()
     return jsonify({"ok": True, "itens_afetados": afetados})
 
-@app.route('/mapa/<numero_carga>')
-def mapa_detalhe(numero_carga):
-    import json
-    html = f"""
-    <!DOCTYPE html><html lang="pt-br"><head>
-      <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>Mapa {numero_carga}</title>
-      <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-      <style>
-        :root {{
-          --bg:#0f1115; --panel:#161a22; --panel-2:#121722;
-          --ink:#ecf2ff; --muted:#b9c3d6; --line:#2a364a;
-          --ok:#1f9d61; --ok-bg:rgba(35,171,103,.18);
-          --err:#ef4444; --err-bg:rgba(239,68,68,.18);
-          --warn:#ffd166; --input-bg:#0f141b; --input-line:#2a3b5e; --chip:#233049;
-        }}
-        body {{ background:var(--bg); color:var(--ink); }}
-        .card {{ background:var(--panel); border-color:var(--line); }}
-        .card-header {{
-          background:var(--panel-2); color:var(--ink); border-bottom-color:var(--line);
-          font-weight:700; letter-spacing:.2px;
-        }}
-        .list-group-item.item-row {{ background:var(--panel); color:var(--ink); border-color:#222c3f; }}
-        .item-row.separado {{ background:var(--ok-bg); }}
-        .item-row.faltou   {{ background:var(--err-bg); }}
-        .item-row.forcado  {{ outline:1px dashed var(--warn); }}
-        .item-row .form-check-label {{ color:var(--ink); }}
-        .item-row .form-check-input {{ cursor:pointer; }}
-        .item-row .input-group-text {{ background:var(--chip); color:#dbe2f1; border-color:var(--input-line); }}
-        .item-row input.form-control {{ background:var(--input-bg); color:var(--ink); border-color:var(--input-line); }}
-        .badge.bg-warning.text-dark {{ color:#1b1f29 !important; }}
-        .small-mono {{
-          font-family: ui-monospace, Menlo, Consolas, monospace;
-          font-size:.98rem; color:#f3f6ff;
-        }}
-        .sticky-top-bar {{ position:sticky; top:0; z-index:1020; background:var(--bg); padding:.75rem 0; }}
-        .hover-row:hover {{ background:#1b2130; }}
-      </style>
-    </head><body>
-      <div class="container py-3">
-        <nav class="mb-3">
-          <a class="btn btn-outline-light me-2" href="/mapa">← Mapas</a>
-          <a class="btn btn-outline-light me-2" href="/gestao">Gestão</a>
-          <a class="btn btn-outline-light" href="/conferencia">Conferência</a>
-        </nav>
-
-        <div class="sticky-top-bar">
-          <h3 class="mb-2">Mapa <span class="text-info">{numero_carga}</span></h3>
-          <div class="row g-2">
-            <div class="col-md-6">
-              <input id="busca" class="form-control" placeholder="Buscar por código, EAN ou descrição..." />
-            </div>
-            <div class="col-md-6 text-md-end">
-              <span id="resumo" class="text-secondary"></span>
-            </div>
-          </div>
-        </div>
-
-        <div id="grupos" class="mt-3"></div>
-      </div>
-
-      <script>
-      const NUMERO_CARGA = {json.dumps(numero_carga)};
-      let STATE = {{ grupos: [], itens: [] }};
-
-      function badge(txt, cls) {{ return '<span class="badge ' + cls + ' ms-1">' + txt + '</span>'; }}
-      function pintaLinha(it) {{
-        let cls = "list-group-item item-row hover-row";
-        if (it.separado) cls += " separado";
-        if (it.faltou) cls += " faltou";
-        if (it.forcar_conferido) cls += " forcado";
-        return cls;
-      }}
-
-      function render() {{
-        const wrap = document.getElementById('grupos');
-        const q = (document.getElementById('busca').value || '').toLowerCase().trim();
-        let total = 0, marcados = 0, htmlStr = '';
-
-        for (const g of STATE.grupos) {{
-          const items = STATE.itens
-            .filter(x => x.grupo_codigo === g.grupo_codigo)
-            .filter(x => !q || (String(x.codigo||'').includes(q) ||
-                                String(x.cod_barras||'').includes(q) ||
-                                String(x.descricao||'').toLowerCase().includes(q)));
-          if (!items.length) continue;
-
-          htmlStr += ''
-            + '<div class="card mb-3">'
-              + '<div class="card-header d-flex justify-content-between align-items-center">'
-                + '<div><strong>' + g.grupo_codigo + '</strong> — ' + (g.grupo_titulo||'') + '</div>'
-                + '<div class="d-flex gap-2">'
-                  + '<button class="btn btn-sm btn-success" onclick="marcarGrupo(\\'' + g.grupo_codigo + '\\', true)">Marcar grupo</button>'
-                  + '<button class="btn btn-sm btn-outline-light" onclick="marcarGrupo(\\'' + g.grupo_codigo + '\\', false)">Desmarcar</button>'
-                + '</div>'
-              + '</div>'
-              + '<div class="list-group list-group-flush">';
-
-          for (const it of items) {{
-            total++; if (it.separado) marcados++;
-
-            // === LINHA NO FORMATO: EAN CÓD DESCRIÇÃO FAB QTD UN (C/ PACK) ===
-            const ean = (it.cod_barras || '').trim();
-            const cod  = (it.codigo || '').trim();
-            const desc = (it.descricao || '').toUpperCase().replace(/\\s+/g,' ').trim();
-            const fab  = (it.fabricante || '').toUpperCase().trim();
-            const qtd  = (it.qtd_unidades || 0);
-            const un   = (it.unidade || '').toUpperCase().trim();
-            const packSuffix = it.pack_qtd ? (' (C/ ' + it.pack_qtd + ' ' + (it.pack_unid || '') + ')') : '';
-            const qtdParte = qtd ? (qtd + ' ' + un + packSuffix) : '';
-            const linha = [ean, cod, desc, fab, qtdParte].filter(Boolean).join(' ').replace(/\\s+/g,' ');
-
-            htmlStr += ''
-              + '<div class="' + pintaLinha(it) + '">'
-                + '<div class="d-flex flex-column flex-md-row justify-content-between gap-2">'
-                  + '<div class="flex-grow-1">'
-                    + '<div class="small-mono">' + linha + '</div>'
-                    + '<div class="mt-1">'
-                      + (it.forcar_conferido ? badge('FORÇADO','bg-warning text-dark') : '')
-                      + (it.faltou ? badge('FALTOU','bg-danger') : '')
-                      + (it.separado ? badge('SEPARADO','bg-success') : '')
-                    + '</div>'
-                  + '</div>'
-                  + '<div class="d-flex flex-column align-items-start align-items-md-end gap-2">'
-                    + '<div class="form-check">'
-                      + '<input class="form-check-input" type="checkbox" ' + (it.separado ? 'checked' : '') + ' '
-                        + 'onchange="toggleItem(' + it.id + ', {{separado: this.checked}})">'
-                      + '<label class="form-check-label">Separado</label>'
-                    + '</div>'
-                    + '<div class="form-check">'
-                      + '<input class="form-check-input" type="checkbox" ' + (it.faltou ? 'checked' : '') + ' '
-                        + 'onchange="toggleItem(' + it.id + ', {{faltou: this.checked}})">'
-                      + '<label class="form-check-label">Faltou</label>'
-                    + '</div>'
-                    + '<div class="form-check">'
-                      + '<input class="form-check-input" type="checkbox" ' + (it.forcar_conferido ? 'checked' : '') + ' '
-                        + 'onchange="toggleItem(' + it.id + ', {{forcar_conferido: this.checked}})">'
-                      + '<label class="form-check-label">Forçar conferido</label>'
-                    + '</div>'
-                    + '<div class="input-group input-group-sm">'
-                      + '<span class="input-group-text">Sobrando</span>'
-                      + '<input type="number" class="form-control" value="' + (it.sobrando || 0) + '" '
-                        + 'onchange="toggleItem(' + it.id + ', {{sobrando: parseInt(this.value||0)}})">'
-                    + '</div>'
-                    + '<div class="input-group input-group-sm">'
-                      + '<span class="input-group-text">Obs</span>'
-                      + '<input type="text" class="form-control" value="' + (it.observacao || '') + '" '
-                        + 'onchange="toggleItem(' + it.id + ', {{observacao: this.value}})">'
-                    + '</div>'
-                  + '</div>'
-                + '</div>'
-              + '</div>';
-          }}
-          htmlStr += '</div></div>'; // fecha card do grupo
-        }}
-
-        wrap.innerHTML = htmlStr || '<div class="alert alert-secondary">Nenhum item para exibir.</div>';
-        document.getElementById('resumo').textContent = total ? (marcados + '/' + total + ' itens marcados') : '';
-      }}
-
-      async function carregar() {{
-        const r = await fetch('/api/mapa/' + encodeURIComponent(NUMERO_CARGA));
-        const data = await r.json();
-        STATE.grupos = data.grupos || [];
-        STATE.itens  = data.itens  || [];
-        render();
-      }}
-
-      async function toggleItem(id, patch) {{
-        const idx = STATE.itens.findIndex(x => x.id === id);
-        if (idx >= 0) Object.assign(STATE.itens[idx], patch);
-        render();
-        const body = Object.assign({{ item_id: id }}, patch);
-        await fetch('/api/mapa/item/atualizar', {{
-          method: 'POST',
-          headers: {{ 'Content-Type': 'application/json' }},
-          body: JSON.stringify(body)
-        }});
-      }}
-
-      async function marcarGrupo(grupo, flag) {{
-        for (const it of STATE.itens) if (it.grupo_codigo === grupo) it.separado = !!flag;
-        render();
-        await fetch('/api/mapa/grupo/marcar', {{
-          method: 'POST',
-          headers: {{ 'Content-Type': 'application/json' }},
-          body: JSON.stringify({{ numero_carga: NUMERO_CARGA, grupo_codigo: grupo, separado: !!flag }})
-        }});
-      }}
-
-      document.getElementById('busca').addEventListener('input', render);
-      carregar();
-      </script>
-    </body></html>
-    """
-    return html
 
 
 @app.route('/mapa/extrator', methods=['GET', 'POST'])

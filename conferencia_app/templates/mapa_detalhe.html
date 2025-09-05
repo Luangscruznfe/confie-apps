@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mapa {{ numero_carga }}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0f1115; --panel: #161a22; --panel-2: #121722; --ink: #ecf2ff;
+            --muted: #b9c3d6; --line: #2a364a; --ok: #1f9d61; --ok-bg: rgba(35, 171, 103, .18);
+            --err: #ef4444; --err-bg: rgba(239, 68, 68, .18); --warn: #ffd166;
+            --input-bg: #0f141b; --input-line: #2a3b5e; --chip: #233049;
+        }
+        body { background-color: var(--bg); color: var(--ink); }
+        .card { background-color: var(--panel); border-color: var(--line); }
+        .card-header { background-color: var(--panel-2); font-weight: 700; border-bottom-color: var(--line); }
+        .list-group-item { background-color: var(--panel); border-color: #222c3f; }
+        .list-group-item.separado { background-color: var(--ok-bg); }
+        .list-group-item.faltou { background-color: var(--err-bg); }
+        .list-group-item.forcado { outline: 1px dashed var(--warn); }
+        .form-control, .input-group-text {
+            background-color: var(--input-bg); color: var(--ink); border-color: var(--input-line);
+        }
+        .sticky-top-bar { position: sticky; top: 0; z-index: 1020; background: var(--bg); padding: .75rem 0; }
+        .small-mono { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 0.9rem; color: #f3f6ff; }
+    </style>
+</head>
+<body>
+<div class="container py-3">
+    <nav class="mb-3">
+        <a class="btn btn-outline-light me-2" href="/mapa">← Mapas</a>
+        <a class="btn btn-outline-light me-2" href="/gestao">Gestão</a>
+        <a class="btn btn-outline-light" href="/conferencia">Conferência</a>
+    </nav>
+    <div class="sticky-top-bar">
+        <h3 class="mb-2">Mapa <span class="text-info">{{ numero_carga }}</span></h3>
+        <input id="busca" class="form-control" placeholder="Buscar por código, EAN ou descrição...">
+        <div id="resumo" class="text-secondary small mt-2"></div>
+    </div>
+    <div id="grupos-container" class="mt-3">
+        <p class="text-center text-secondary">A carregar itens do mapa...</p>
+    </div>
+</div>
+
+<script>
+    const NUMERO_CARGA = {{ numero_carga | tojson }};
+    let STATE = { grupos: [], itens: [] };
+
+    function badge(text, className) {
+        return `<span class="badge ${className} me-1">${text}</span>`;
+    }
+
+    function renderItens() {
+        const container = document.getElementById('grupos-container');
+        const query = document.getElementById('busca').value.toLowerCase().trim();
+        let html = '';
+        let total = 0, marcados = 0;
+
+        STATE.grupos.forEach(grupo => {
+            const itensFiltrados = STATE.itens.filter(it => {
+                if (it.grupo_codigo !== grupo.grupo_codigo) return false;
+                if (!query) return true;
+                const searchable = `${it.codigo || ''} ${it.cod_barras || ''} ${it.descricao || ''}`.toLowerCase();
+                return searchable.includes(query);
+            });
+
+            if (itensFiltrados.length === 0) return;
+
+            html += `
+                <div class="card mb-3">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <div><strong>${grupo.grupo_codigo}</strong> — ${grupo.grupo_titulo || ''}</div>
+                        <div>
+                            <button class="btn btn-sm btn-success" onclick="marcarGrupo('${grupo.grupo_codigo}', true)">Marcar Grupo</button>
+                            <button class="btn btn-sm btn-outline-light" onclick="marcarGrupo('${grupo.grupo_codigo}', false)">Desmarcar</button>
+                        </div>
+                    </div>
+                    <div class="list-group list-group-flush">`;
+
+            itensFiltrados.forEach(it => {
+                total++;
+                if (it.separado) marcados++;
+
+                let itemClasses = "list-group-item d-flex flex-column flex-md-row justify-content-between gap-3 p-3";
+                if (it.separado) itemClasses += " separado";
+                if (it.faltou) itemClasses += " faltou";
+                if (it.forcar_conferido) itemClasses += " forcado";
+
+                const descCompleta = [it.cod_barras, it.codigo, it.descricao, it.fabricante].filter(Boolean).join(' ');
+                const qtdCompleta = `${it.qtd_unidades || ''} ${it.unidade || ''} ${it.pack_qtd > 1 ? `(C/${it.pack_qtd})` : ''}`.trim();
+
+                html += `
+                    <div class="${itemClasses}" id="item-${it.id}">
+                        <div class="flex-grow-1">
+                            <div class="small-mono">${descCompleta}</div>
+                            <div class="fw-bold text-info">${qtdCompleta}</div>
+                            <div class="mt-1">
+                                ${it.separado ? badge('Separado', 'bg-success') : ''}
+                                ${it.faltou ? badge('Faltou', 'bg-danger') : ''}
+                                ${it.forcar_conferido ? badge('Forçado', 'bg-warning text-dark') : ''}
+                            </div>
+                        </div>
+                        <div class="d-flex flex-wrap gap-2 align-items-center" style="min-width: 220px;">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" ${it.separado ? 'checked' : ''} onchange="atualizarItem(${it.id}, { separado: this.checked })">
+                                <label class="form-check-label">Separado</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" ${it.faltou ? 'checked' : ''} onchange="atualizarItem(${it.id}, { faltou: this.checked })">
+                                <label class="form-check-label">Faltou</label>
+                            </div>
+                            </div>
+                    </div>`;
+            });
+            html += `</div></div>`;
+        });
+
+        container.innerHTML = html || '<div class="alert alert-secondary">Nenhum item encontrado para a busca.</div>';
+        document.getElementById('resumo').textContent = total > 0 ? `${marcados} de ${total} itens marcados.` : '';
+    }
+
+    async function atualizarItem(itemId, patch) {
+        const item = STATE.itens.find(it => it.id === itemId);
+        if (item) {
+            Object.assign(item, patch);
+        }
+        renderItens(); // Atualiza a UI imediatamente
+
+        await fetch('/api/mapa/item/atualizar', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ item_id: itemId, ...patch })
+        });
+    }
+    
+    async function marcarGrupo(grupoCodigo, separado) {
+        STATE.itens.forEach(it => {
+            if (it.grupo_codigo === grupoCodigo) {
+                it.separado = separado;
+            }
+        });
+        renderItens();
+
+        await fetch('/api/mapa/grupo/marcar', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ numero_carga: NUMERO_CARGA, grupo_codigo: grupoCodigo, separado: separado })
+        });
+    }
+
+    async function carregarDados() {
+        try {
+            const response = await fetch(`/api/mapa/${NUMERO_CARGA}`);
+            if (!response.ok) throw new Error('Falha ao carregar os dados do mapa.');
+            const data = await response.json();
+            STATE.grupos = data.grupos || [];
+            STATE.itens = data.itens || [];
+            renderItens();
+        } catch (error) {
+            document.getElementById('grupos-container').innerHTML = `<div class="alert alert-danger">${error.message}</div>`;
+        }
+    }
+
+    document.getElementById('busca').addEventListener('input', renderItens);
+    document.addEventListener('DOMContentLoaded', carregarDados);
+</script>
+</body>
+</html>
