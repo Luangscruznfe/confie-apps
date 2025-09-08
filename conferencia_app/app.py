@@ -1016,6 +1016,23 @@ def api_mapa_grupo_definir_separador():
     return jsonify({"ok": True})
 
 
+# NOVA ROTA: Para a visualização de impressão/fundo branco
+@app.route('/mapa/<numero_carga>/print')
+def mapa_detalhe_print(numero_carga):
+    conn = get_db_connection()
+    cur = conn.cursor()
+    # No seu código, a coluna é 'nome_exibicao' na tabela 'cargas'
+    cur.execute("SELECT nome_exibicao FROM cargas WHERE numero_carga = %s", (numero_carga,))
+    row = cur.fetchone()
+    cur.close()
+    conn.close()
+    
+    nome_mapa = row[0] if row and row[0] else None
+    
+    # Renderiza o novo template de impressão
+    return render_template('mapa_detalhe_print.html', numero_carga=numero_carga, nome_mapa=nome_mapa)
+
+
 
 @app.route('/ping')
 def ping():
