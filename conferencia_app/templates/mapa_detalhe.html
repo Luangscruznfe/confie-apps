@@ -1,80 +1,124 @@
 <!DOCTYPE html>
-<html lang="pt-br">
+<html lang="pt-br" data-theme="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Mapa {{ numero_carga }}</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
-	.form-control::placeholder {
-        color: var(--muted);
-	}
+        /* TEMA ESCURO (Padrão) */
         :root {
             --bg: #0f1115; --panel: #161a22; --panel-2: #121722; --ink: #ecf2ff;
             --muted: #b9c3d6; --line: #2a364a; --ok: #1f9d61; --ok-bg: rgba(35, 171, 103, .18);
             --err: #ef4444; --err-bg: rgba(239, 68, 68, .18); --warn: #ffd166; --warn-bg: rgba(255, 209, 102, .18);
             --input-bg: #0f141b; --input-line: #2a3b5e; --chip: #233049;
+            --text-info-color: #0ea5e9;
         }
-        body { background-color: var(--bg); color: var(--ink); }
-        .card { background-color: var(--panel); border-color: var(--line); }
-        .card-header { background-color: var(--panel-2); font-weight: 700; border-bottom-color: var(--line); }
-        .list-group-item { background-color: var(--panel); border-color: #222c3f; }
+
+        /* NOVO: TEMA CLARO */
+        html[data-theme='light'] {
+            --bg: #f8f9fa; --panel: #ffffff; --panel-2: #f8f9fa; --ink: #212529;
+            --muted: #6c757d; --line: #dee2e6; --ok: #198754; --ok-bg: #d1e7dd;
+            --err: #dc3545; --err-bg: #f8d7da; --warn: #ffc107; --warn-bg: #fff3cd;
+            --input-bg: #ffffff; --input-line: #ced4da; --chip: #e9ecef;
+            --text-info-color: #0d6efd;
+        }
+
+        body {
+            background-color: var(--bg);
+            color: var(--ink);
+            transition: background-color 0.3s, color 0.3s;
+        }
+        .card, .list-group-item, .modal-content {
+            background-color: var(--panel);
+            border-color: var(--line);
+            color: var(--ink);
+        }
+        .card-header {
+            background-color: var(--panel-2);
+            border-bottom-color: var(--line);
+        }
+        .sticky-top-bar {
+            background-color: var(--bg);
+        }
+        .form-control, .input-group-text, textarea.form-control {
+            background-color: var(--input-bg);
+            color: var(--ink);
+            border-color: var(--input-line);
+        }
+        .form-control::placeholder { color: var(--muted); }
+        .form-control:focus, textarea.form-control:focus {
+            background-color: var(--input-bg);
+            color: var(--ink);
+            border-color: var(--warn);
+            box-shadow: 0 0 0 0.25rem rgba(255, 209, 102, 0.25);
+        }
         .list-group-item.separado { background-color: var(--ok-bg); }
         .list-group-item.faltou { background-color: var(--err-bg); }
         .list-group-item.pendente { background-color: var(--warn-bg); }
-        .form-control, .input-group-text, .modal-content {
-            background-color: var(--input-bg); color: var(--ink); border-color: var(--input-line);
-        }
-        .form-control:focus {
-            background-color: var(--input-bg); color: var(--ink); border-color: var(--warn);
-            box-shadow: 0 0 0 0.25rem rgba(255, 209, 102, 0.25);
-        }
-        .btn-close { filter: invert(1); }
-        .sticky-top-bar { position: sticky; top: 0; z-index: 1020; background: var(--bg); padding: .75rem 0; }
-        .small-mono { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 0.9rem; }
         .form-check-input:checked { background-color: var(--ok); border-color: var(--ok); }
 
-	/* Destaque laranja para o título do grupo */
-	.grupo-titulo{
- 	 color: #ffa500;           /* laranja */
- 	 font-weight: 700;
-  	letter-spacing: .3px;
-	}
+        .btn-close { filter: var(--btn-close-filter, invert(1)); }
+        html[data-theme='light'] .btn-close { --btn-close-filter: none; }
 
-    /* NOVO: Estilos para os botões de filtro */
-    .filter-pill {
-        display: inline-block;
-        padding: 0.25rem 0.75rem;
-        background-color: var(--chip);
-        border-radius: 1rem;
-        cursor: pointer;
-        font-size: 0.85rem;
-        transition: background-color 0.2s;
-        border: 1px solid transparent;
-    }
-    .filter-pill.active {
-        background-color: var(--warn);
-        color: var(--bg);
-        font-weight: 600;
-        border-color: var(--warn);
-    }
+        .text-info { color: var(--text-info-color) !important; }
+        .small-mono { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 1rem; }
+        html[data-theme='light'] .small-mono { font-size: 0.95rem; color: #343a40; }
+        
+        .grupo-titulo { color: #ffa500; font-weight: 700; letter-spacing: .3px; }
+        html[data-theme='light'] .grupo-titulo { color: #d9480f; }
+
+        .filter-pill {
+            display: inline-block; padding: 0.25rem 0.75rem; background-color: var(--chip); color: var(--ink);
+            border-radius: 1rem; cursor: pointer; font-size: 0.85rem;
+            transition: background-color 0.2s; border: 1px solid transparent;
+        }
+        .filter-pill.active {
+            background-color: var(--warn); color: var(--bg);
+            font-weight: 600; border-color: var(--warn);
+        }
+        .btn-outline-light { border-color: var(--line); color: var(--muted); }
+        .btn-outline-info { border-color: var(--text-info-color); color: var(--text-info-color); }
+        .btn-outline-info:hover { background-color: var(--text-info-color); color: var(--bg); }
+        
+        /* Ajuste no botão de OBS para o tema claro */
+        html[data-theme='light'] .btn-info.text-dark { background-color: #0dcaf0; border-color: #0dcaf0; color: #000 !important; }
+
     </style>
 </head>
 <body>
+
+<script>
+    (function() {
+        const savedTheme = localStorage.getItem('theme') || 'dark';
+        document.documentElement.setAttribute('data-theme', savedTheme);
+    })();
+</script>
+
 <div class="container py-3">
-    <nav class="mb-3">
-        <a class="btn btn-outline-light me-2" href="/mapa">← Mapas</a>
-        <a class="btn btn-outline-light me-2" href="/gestao">Gestão</a>
-        <a class="btn btn-outline-light" href="/conferencia">Conferência</a>
+    <nav class="mb-3 d-flex justify-content-between align-items-center">
+        <div>
+            <a class="btn btn-outline-light me-2" href="/mapa">← Mapas</a>
+            <a class="btn btn-outline-light me-2" href="/gestao">Gestão</a>
+            <a class="btn btn-outline-light" href="/conferencia">Conferência</a>
+        </div>
+        <button id="theme-toggle" class="btn btn-outline-light">
+            ☀️
+        </button>
     </nav>
     <div class="sticky-top-bar">
         <h3 class="mb-2">{{ nome_mapa or 'Mapa' }} <span class="text-info">{{ numero_carga }}</span></h3>
         <input id="busca" class="form-control" placeholder="Buscar por código, EAN ou descrição...">
         
-        <div class="d-flex gap-2 mt-3">
-            <span class="filter-pill" id="filter-todos" onclick="setFilter('todos')">Todos</span>
-            <span class="filter-pill" id="filter-falta" onclick="setFilter('falta')">Com Falta</span>
-            <span class="filter-pill" id="filter-obs" onclick="setFilter('obs')">Com OBS</span>
+        <div class="d-flex justify-content-between align-items-center mt-3">
+            <div class="d-flex gap-2">
+                <span class="filter-pill" id="filter-todos" onclick="setFilter('todos')">Todos</span>
+                <span class="filter-pill" id="filter-falta" onclick="setFilter('falta')">Com Falta</span>
+                <span class="filter-pill" id="filter-obs" onclick="setFilter('obs')">Com OBS</span>
+            </div>
+            <a href="{{ url_for('mapa_detalhe_print', numero_carga=numero_carga) }}" target="_blank" class="btn btn-sm btn-outline-secondary">
+                Versão para Impressão
+            </a>
         </div>
 
         <div id="resumo" class="text-secondary small mt-2"></div>
@@ -88,7 +132,7 @@
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="modalFaltouLabel">Registrar Falta Parcial</h5>
+                <h5 class="modal-title" id="modalFaltouLabel">Registrar Falta / Corte</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
@@ -97,6 +141,10 @@
                 <div class="mb-3">
                     <label for="modal-qtd-separada" class="form-label">Quantidade que foi separada:</label>
                     <input type="number" class="form-control" id="modal-qtd-separada" placeholder="Ex: 9">
+                </div>
+                <div class="mb-3">
+                    <label for="modal-observacao" class="form-label">Observação (Opcional):</label>
+                    <textarea class="form-control" id="modal-observacao" rows="2" placeholder="Ex: Caixa avariada, produto vencido..."></textarea>
                 </div>
                 <input type="hidden" id="modal-item-id">
             </div>
@@ -110,21 +158,17 @@
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
+    // Todo o seu script de funcionalidade existente continua aqui...
     const NUMERO_CARGA = {{ numero_carga | tojson }};
     let STATE = { grupos: [], itens: [] };
     let modalFaltou;
-    // NOVO: Variável de estado do filtro
     let activeFilter = 'todos';
 
-    // NOVO: Função para definir o filtro ativo
+    // ... (as funções renderItens, salvarFalta, etc., continuam as mesmas) ...
     function setFilter(filterType) {
         activeFilter = filterType;
-        // Atualiza a classe 'active' nos botões
-        document.querySelectorAll('.filter-pill').forEach(pill => {
-            pill.classList.remove('active');
-        });
+        document.querySelectorAll('.filter-pill').forEach(pill => pill.classList.remove('active'));
         document.getElementById(`filter-${filterType}`).classList.add('active');
-        // Re-renderiza a lista de itens com o novo filtro
         renderItens();
     }
 
@@ -137,34 +181,21 @@
         let total = 0, marcados = 0;
 
         STATE.grupos.forEach(grupo => {
-            // LÓGICA DE FILTRO ATUALIZADA
             const itensFiltrados = STATE.itens.filter(it => {
-                // 1. O item deve pertencer ao grupo atual
                 if (it.grupo_codigo !== grupo.grupo_codigo) return false;
 
-                // 2. O item deve corresponder ao filtro de status (Todos, Falta, OBS)
                 let matchesStatusFilter = false;
                 switch (activeFilter) {
-                    case 'falta':
-                        matchesStatusFilter = it.faltou === true;
-                        break;
-                    case 'obs':
-                        matchesStatusFilter = it.pendente === true;
-                        break;
-                    case 'todos':
-                    default:
-                        matchesStatusFilter = true;
-                        break;
+                    case 'falta': matchesStatusFilter = it.faltou === true; break;
+                    case 'obs': matchesStatusFilter = it.pendente === true; break;
+                    default: matchesStatusFilter = true; break;
                 }
                 if (!matchesStatusFilter) return false;
 
-                // 3. O item deve corresponder à busca por texto (se houver)
                 if (query) {
                     const searchable = `${it.codigo || ''} ${it.cod_barras || ''} ${it.descricao || ''}`.toLowerCase();
                     return searchable.includes(query);
                 }
-
-                // Se passou por todas as verificações, o item é exibido
                 return true;
             });
 
@@ -175,13 +206,10 @@
             html += `
                 <div class="card mb-3">
                     <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-3">
-    
                         <div class="fs-5 grupo-titulo">
     			    <strong class="fw-bold me-1">${grupo.grupo_codigo}</strong>
     			    <span>${grupo.grupo_titulo || ''}</span>
 			</div>
-
-
                         <div class="d-flex align-items-center gap-2 flex-wrap">
                             <div class="input-group input-group-sm" style="width: auto;">
                                 <span class="input-group-text">Separador:</span>
@@ -193,7 +221,6 @@
                                 <button class="btn btn-outline-light" onclick="marcarGrupo('${grupo.grupo_codigo}', false)">Desmarcar</button>
                             </div>
                         </div>
-
                     </div>
                     <div class="list-group list-group-flush">`;
 
@@ -204,31 +231,36 @@
                 let itemClasses = "list-group-item d-flex flex-column flex-md-row justify-content-between gap-3 p-3";
                 if (it.separado) itemClasses += " separado";
                 if (it.faltou) itemClasses += " faltou";
-                if (it.pendente) itemClasses += " pendente"; 
+                if (it.pendente) itemClasses += " pendente";
 
                 const descCompleta = [it.cod_barras, it.codigo, it.descricao, it.fabricante].filter(Boolean).join(' ');
                 const qtdPedida = `${it.qtd_unidades || ''} ${it.unidade || ''} ${it.pack_qtd > 1 ? `(C/${it.pack_qtd})` : ''}`.trim();
                 const qtdInfo = it.faltou && it.qtd_separada != null ?
                     `<span class="text-danger">Separado: ${it.qtd_separada} de ${it.qtd_unidades}</span>` :
                     `<span class="text-info">${qtdPedida}</span>`;
+                
+                const obsInfo = it.observacao ? `<div class="small text-warning mt-2"><strong>OBS:</strong> ${it.observacao}</div>` : '';
 
                 html += `
                     <div class="${itemClasses}" id="item-${it.id}">
                         <div class="flex-grow-1">
-                            <div class="small-mono text-light">${descCompleta}</div>
+                            <div class="small-mono">${descCompleta}</div>
                             <div class="fw-bold">${qtdInfo}</div>
-                            <div class="mt-1">
+                            ${obsInfo}
+                            <div class="mt-2">
                                 ${it.separado ? badge('Separado', 'bg-success') : ''}
                                 ${it.faltou ? badge('Faltou', 'bg-danger') : ''}
-                                ${it.pendente ? badge('Pendente', 'bg-warning text-dark') : ''} </div>
+                                ${it.pendente ? badge('Pendente', 'bg-warning text-dark') : ''}
+                            </div>
                         </div>
                         <div class="d-flex flex-wrap gap-3 align-items-center">
                             <div class="form-check form-switch">
-                                <input class="form-check-input" type="checkbox" ${it.separado ? 'checked' : ''} onchange="atualizarItem(${it.id}, { separado: this.checked, pendente: false })">
+                                <input class="form-check-input" type="checkbox" ${it.separado ? 'checked' : ''} onchange="atualizarItem(${it.id}, { separado: this.checked, pendente: false, observacao: '' })">
                                 <label class="form-check-label ${it.separado ? 'text-success fw-bold' : 'text-secondary'}">OK</label>
                             </div>
                             <button class="btn btn-sm btn-warning" onclick="abrirModalFaltou(${it.id})">Faltou</button>
-                            <button class="btn btn-sm btn-info text-dark" onclick="marcarPendente(${it.id}, ${!it.pendente})">OBS</button> </div>
+                            <button class="btn btn-sm btn-info text-dark" onclick="marcarPendente(${it.id}, ${!it.pendente})">OBS</button>
+                        </div>
                     </div>`;
             });
             html += `</div></div>`;
@@ -246,6 +278,7 @@
         document.getElementById('modal-qtd-pedida').textContent = `${item.qtd_unidades || 0} ${item.unidade || ''}`;
         document.getElementById('modal-qtd-separada').value = item.qtd_separada || '';
         document.getElementById('modal-item-id').value = itemId;
+        document.getElementById('modal-observacao').value = item.observacao || '';
 
         modalFaltou.show();
     }
@@ -253,6 +286,7 @@
     async function salvarFalta() {
         const itemId = parseInt(document.getElementById('modal-item-id').value, 10);
         const qtdSeparadaInput = document.getElementById('modal-qtd-separada').value;
+        const observacao = document.getElementById('modal-observacao').value.trim();
 
         if (qtdSeparadaInput === '' || isNaN(parseInt(qtdSeparadaInput, 10))) {
             alert('Por favor, insira uma quantidade numérica válida.');
@@ -272,7 +306,8 @@
             qtd_separada: qtdSeparada,
             faltou: qtdSeparada < qtdPedida,
             separado: true,
-            pendente: false
+            pendente: false,
+            observacao: observacao
         };
 
         await atualizarItem(itemId, patch);
@@ -287,7 +322,8 @@
             pendente: pendente,
             separado: false, 
             faltou: false,   
-            qtd_separada: null 
+            qtd_separada: null,
+            observacao: pendente ? (item.observacao || 'Item não encontrado pelo separador.') : ''
         };
         
         await atualizarItem(itemId, patch);
@@ -338,6 +374,7 @@
                 it.pendente = false; 
                 it.faltou = false;   
                 it.qtd_separada = null; 
+                it.observacao = '';
             }
         });
         renderItens();
@@ -362,11 +399,34 @@
         }
     }
 
-    document.getElementById('busca').addEventListener('input', renderItens);
+    // NOVO: Lógica completa para o tema
+    const themeToggle = document.getElementById('theme-toggle');
+
+    function setTheme(theme) {
+        document.documentElement.setAttribute('data-theme', theme);
+        localStorage.setItem('theme', theme);
+        // Atualiza o ícone do botão
+        if (theme === 'light') {
+            themeToggle.innerHTML = '🌙'; // Lua para mudar para escuro
+        } else {
+            themeToggle.innerHTML = '☀️'; // Sol para mudar para claro
+        }
+    }
+
+    themeToggle.addEventListener('click', () => {
+        const currentTheme = document.documentElement.getAttribute('data-theme');
+        const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+        setTheme(newTheme);
+    });
+
     document.addEventListener('DOMContentLoaded', () => {
         modalFaltou = new bootstrap.Modal(document.getElementById('modalFaltou'));
+        
+        const savedTheme = localStorage.getItem('theme') || 'dark';
+        setTheme(savedTheme); // Garante que o ícone do botão esteja correto no carregamento
+        
         carregarDados();
-        setFilter('todos'); // Define o filtro inicial como 'Todos'
+        setFilter('todos');
     });
 </script>
 </body>
