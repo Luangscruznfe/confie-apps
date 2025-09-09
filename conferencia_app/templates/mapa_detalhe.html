@@ -15,7 +15,7 @@
             --text-info-color: #0ea5e9;
         }
 
-        /* NOVO: TEMA CLARO */
+        /* TEMA CLARO */
         html[data-theme='light'] {
             --bg: #f8f9fa; --panel: #ffffff; --panel-2: #f8f9fa; --ink: #212529;
             --muted: #6c757d; --line: #dee2e6; --ok: #198754; --ok-bg: #d1e7dd;
@@ -38,9 +38,7 @@
             background-color: var(--panel-2);
             border-bottom-color: var(--line);
         }
-        .sticky-top-bar {
-            background-color: var(--bg);
-        }
+        .sticky-top-bar { background-color: var(--bg); }
         .form-control, .input-group-text, textarea.form-control {
             background-color: var(--input-bg);
             color: var(--ink);
@@ -57,17 +55,25 @@
         .list-group-item.faltou { background-color: var(--err-bg); }
         .list-group-item.pendente { background-color: var(--warn-bg); }
         .form-check-input:checked { background-color: var(--ok); border-color: var(--ok); }
-
         .btn-close { filter: var(--btn-close-filter, invert(1)); }
         html[data-theme='light'] .btn-close { --btn-close-filter: none; }
-
         .text-info { color: var(--text-info-color) !important; }
-        .small-mono { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 1rem; }
-        html[data-theme='light'] .small-mono { font-size: 0.95rem; color: #343a40; }
-        
         .grupo-titulo { color: #ffa500; font-weight: 700; letter-spacing: .3px; }
         html[data-theme='light'] .grupo-titulo { color: #d9480f; }
 
+        /* ===== PONTO DA CORREÇÃO AQUI ===== */
+        .small-mono {
+            font-family: ui-monospace, Menlo, Consolas, monospace;
+            font-size: 1rem;
+            font-weight: bold;  /* Adiciona o negrito */
+            color: var(--ink);  /* Garante que use a cor de texto correta para o tema (claro ou escuro) */
+        }
+        /* Ajuste opcional para o tema claro */
+        html[data-theme='light'] .small-mono {
+            font-size: 0.95rem;
+        }
+        /* =================================== */
+        
         .filter-pill {
             display: inline-block; padding: 0.25rem 0.75rem; background-color: var(--chip); color: var(--ink);
             border-radius: 1rem; cursor: pointer; font-size: 0.85rem;
@@ -80,8 +86,6 @@
         .btn-outline-light { border-color: var(--line); color: var(--muted); }
         .btn-outline-info { border-color: var(--text-info-color); color: var(--text-info-color); }
         .btn-outline-info:hover { background-color: var(--text-info-color); color: var(--bg); }
-        
-        /* Ajuste no botão de OBS para o tema claro */
         html[data-theme='light'] .btn-info.text-dark { background-color: #0dcaf0; border-color: #0dcaf0; color: #000 !important; }
 
     </style>
@@ -158,13 +162,11 @@
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
-    // Todo o seu script de funcionalidade existente continua aqui...
     const NUMERO_CARGA = {{ numero_carga | tojson }};
     let STATE = { grupos: [], itens: [] };
     let modalFaltou;
     let activeFilter = 'todos';
 
-    // ... (as funções renderItens, salvarFalta, etc., continuam as mesmas) ...
     function setFilter(filterType) {
         activeFilter = filterType;
         document.querySelectorAll('.filter-pill').forEach(pill => pill.classList.remove('active'));
@@ -399,17 +401,15 @@
         }
     }
 
-    // NOVO: Lógica completa para o tema
     const themeToggle = document.getElementById('theme-toggle');
 
     function setTheme(theme) {
         document.documentElement.setAttribute('data-theme', theme);
         localStorage.setItem('theme', theme);
-        // Atualiza o ícone do botão
         if (theme === 'light') {
-            themeToggle.innerHTML = '🌙'; // Lua para mudar para escuro
+            themeToggle.innerHTML = '🌙';
         } else {
-            themeToggle.innerHTML = '☀️'; // Sol para mudar para claro
+            themeToggle.innerHTML = '☀️';
         }
     }
 
@@ -423,7 +423,7 @@
         modalFaltou = new bootstrap.Modal(document.getElementById('modalFaltou'));
         
         const savedTheme = localStorage.getItem('theme') || 'dark';
-        setTheme(savedTheme); // Garante que o ícone do botão esteja correto no carregamento
+        setTheme(savedTheme);
         
         carregarDados();
         setFilter('todos');
