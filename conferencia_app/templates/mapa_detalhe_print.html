@@ -3,171 +3,209 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mapa {{ numero_carga }}</title>
+    <title>Mapa {{ numero_carga }} (Visualização para Impressão)</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
-        :root {
-            --bg: #0f1115;       /* Fundo principal */
-            --panel: #161a22;    /* Cor de fundo dos cards */
-            --panel-2: #121722;  /* Cor de fundo do cabeçalho dos cards */
-            --ink: #ecf2ff;      /* Cor de texto principal (branco) */
-            --muted: #aab8d0;    /* Cor para texto secundário, um pouco mais claro */
-            --line: #2a364a;     /* Linhas e bordas */
-            --ok: #1f9d61;       /* Cor para "OK" / Sucesso */
-            --ok-bg: rgba(35, 171, 103, .18); /* Fundo para itens "OK" */
-            --err: #ef4444;      /* Cor para "Erro" / Falta */
-            --err-bg: rgba(239, 68, 68, .18); /* Fundo para itens "Faltou" */
-            --warn: #ffd166;     /* Cor para Alerta / Foco */
-            --input-bg: #0f141b; /* Fundo dos inputs */
-            --input-line: #2a3b5e; /* Borda dos inputs */
-            --chip: #233049;     /* Cor de tags/chips */
+        body {
+            background-color: white;
+            color: black;
+            font-family: Arial, sans-serif;
         }
-        body { background-color: var(--bg); color: var(--ink); }
-        .card { background-color: var(--panel); border-color: var(--line); }
-        .card-header { background-color: var(--panel-2); font-weight: 700; border-bottom-color: var(--line); }
-        .list-group-item { background-color: var(--panel); border-color: #222c3f; }
-        .list-group-item.separado { background-color: var(--ok-bg); }
-        .list-group-item.faltou { background-color: var(--err-bg); }
-        .form-control, .input-group-text, .modal-content {
-            background-color: var(--input-bg); color: var(--ink); border-color: var(--input-line);
+        .container {
+            max-width: 992px;
         }
-        .form-control:focus {
-            background-color: var(--input-bg); color: var(--ink); border-color: var(--warn);
-            box-shadow: 0 0 0 0.25rem rgba(255, 209, 102, 0.25);
+        .sticky-top-bar, nav {
+            display: none;
         }
-        .btn-close { filter: invert(1); }
-        .sticky-top-bar { position: sticky; top: 0; z-index: 1020; background: var(--bg); padding: .75rem 0; }
+        .card {
+            background-color: white;
+            border: 1px solid #ddd;
+            margin-bottom: 15px;
+        }
+        .card-header {
+            background-color: #f0f0f0;
+            color: black;
+            border-bottom: 1px solid #ddd;
+            padding: 10px 15px;
+            font-size: 1.1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .grupo-titulo {
+            color: #333;
+            font-weight: bold;
+            font-size: 1.2em;
+        }
+        .list-group-item {
+            background-color: white;
+            border-top: 1px solid #eee;
+            color: black;
+            padding: 10px 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .list-group-item:first-child {
+            border-top: none;
+        }
+        .list-group-item.separado {
+            background-color: #e6ffe6;
+        }
+        .list-group-item.faltou {
+            background-color: #ffe6e6;
+        }
+        .list-group-item.pendente {
+            background-color: #fff9e6;
+        }
         /* ===== PONTO DA CORREÇÃO AQUI ===== */
-        .small-mono { 
-            font-family: ui-monospace, Menlo, Consolas, monospace; 
-            font-size: 0.9rem; 
-            color: var(--ink); 
-            font-weight: bold; /* Adicionado negrito aqui */
+        .small-mono {
+            font-family: Arial, sans-serif;
+            font-size: 1.3em; /* Aumentado de 1.1em para 1.3em */
+            color: #333;
+            font-weight: bold;
+            flex-grow: 1;
         }
         /* =================================== */
-        .form-check-input:checked { background-color: var(--ok); border-color: var(--ok); }
-        .list-group-item .flex-grow-1 .fw-bold { color: var(--ink); }
+        .fw-bold {
+            font-weight: bold;
+        }
+        .text-info {
+            color: #007bff;
+        }
+        .text-danger {
+            color: #dc3545;
+        }
+        .text-warning {
+            color: #ffc107;
+        }
+        .badge {
+            font-size: 0.8em;
+            padding: 0.3em 0.6em;
+            border-radius: 0.25rem;
+            margin-right: 5px;
+        }
+        .badge.bg-success { background-color: #28a745 !important; color: white !important; }
+        .badge.bg-danger { background-color: #dc3545 !important; color: white !important; }
+        .badge.bg-warning { background-color: #ffc107 !important; color: black !important; }
+        
+        .form-check-switch, .d-flex.flex-wrap.gap-3.align-items-center > button, .input-group {
+            display: none;
+        }
+        .separador-info {
+            font-size: 0.9em;
+            color: #555;
+            margin-top: 5px;
+        }
+        .obs-vazia {
+            display: none;
+        }
+
+        @media print {
+            .card {
+                page-break-inside: avoid;
+            }
+            .list-group-item {
+                page-break-inside: avoid;
+            }
+        }
     </style>
 </head>
 <body>
-<div class="container py-3">
-    <nav class="mb-3">
-        <a class="btn btn-outline-light me-2" href="/mapa">← Mapas</a>
-        <a class="btn btn-outline-light me-2" href="/gestao">Gestão</a>
-        <a class="btn btn-outline-light" href="/conferencia">Conferência</a>
-    </nav>
-    <div class="sticky-top-bar">
-        <h3 class="mb-2">Mapa <span class="text-info">{{ numero_carga }}</span></h3>
-        <input id="busca" class="form-control" placeholder="Buscar por código, EAN ou descrição...">
-        <div id="resumo" class="text-secondary small mt-2"></div>
-    </div>
-    <div id="grupos-container" class="mt-3">
-        <p class="text-center text-secondary">A carregar itens do mapa...</p>
-    </div>
-</div>
 
-<div class="modal fade" id="modalFaltou" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="modalFaltouLabel">Registrar Falta Parcial</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <p>Produto: <strong id="modal-produto-nome"></strong></p>
-                <p>Pedido: <span id="modal-qtd-pedida" class="fw-bold text-info"></span></p>
-                <div class="mb-3">
-                    <label for="modal-qtd-separada" class="form-label">Quantidade que foi separada:</label>
-                    <input type="number" class="form-control" id="modal-qtd-separada" placeholder="Ex: 9">
-                </div>
-                <input type="hidden" id="modal-item-id">
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                <button type="button" class="btn btn-primary" onclick="salvarFalta()">Salvar</button>
-            </div>
-        </div>
+<div class="container py-3">
+    <h3 class="mb-4 text-center">
+        Mapa de Separação: {{ nome_mapa or 'Mapa' }} <span class="text-info">{{ numero_carga }}</span>
+    </h3>
+
+    <div id="grupos-container" class="mt-3">
+        <p class="text-center text-secondary">Carregando dados para impressão...</p>
     </div>
+
+    <hr class="mt-5 mb-3">
+    <p class="text-center small text-secondary">Gerado em: <span id="data-geracao"></span></p>
+
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
     const NUMERO_CARGA = {{ numero_carga | tojson }};
     let STATE = { grupos: [], itens: [] };
-    let modalFaltou;
 
     function badge(text, className) { return `<span class="badge ${className} me-1">${text}</span>`; }
 
     function renderItens() {
         const container = document.getElementById('grupos-container');
-        const query = document.getElementById('busca').value.toLowerCase().trim();
         let html = '';
-        let total = 0, marcados = 0;
 
         STATE.grupos.forEach(grupo => {
-            const itensFiltrados = STATE.itens.filter(it => {
-                if (it.grupo_codigo !== grupo.grupo_codigo) return false;
-                if (!query) return true;
-                const searchable = `${it.codigo || ''} ${it.cod_barras || ''} ${it.descricao || ''}`.toLowerCase();
-                return searchable.includes(query);
-            });
+            const itensDoGrupo = STATE.itens.filter(it => it.grupo_codigo === grupo.grupo_codigo);
 
-            if (itensFiltrados.length === 0) return;
+            if (itensDoGrupo.length === 0) return;
 
-            const nomeSeparador = grupo.separador_nome || '';
+            const nomeSeparador = grupo.separador_nome || 'Não atribuído';
 
             html += `
                 <div class="card mb-3">
                     <div class="card-header">
-                        <div class="d-flex justify-content-between align-items-center mb-2">
-                            <div><strong>${grupo.grupo_codigo}</strong> — ${grupo.grupo_titulo || ''}</div>
-                            <div>
-                                <button class="btn btn-sm btn-success" onclick="marcarGrupo('${grupo.grupo_codigo}', true)">Marcar</button>
-                                <button class="btn btn-sm btn-outline-light" onclick="marcarGrupo('${grupo.grupo_codigo}', false)">Desmarcar</button>
-                            </div>
-                        </div>
-                        <div class="input-group input-group-sm">
-                            <span class="input-group-text">Separador:</span>
-                            <input type="text" class="form-control" id="separador-${grupo.grupo_codigo}" value="${nomeSeparador}">
-                            <button class="btn btn-outline-info" onclick="salvarSeparador('${grupo.grupo_codigo}')">Salvar</button>
-                        </div>
+                        <div class="grupo-titulo">
+    			            ${grupo.grupo_codigo} &mdash; ${grupo.grupo_titulo || 'Sem Título'}
+			            </div>
+                        <div class="separador-info">Separador: ${nomeSeparador}</div>
                     </div>
                     <div class="list-group list-group-flush">`;
 
-            itensFiltrados.forEach(it => {
-                total++;
-                if (it.separado) marcados++;
-
-                let itemClasses = "list-group-item d-flex flex-column flex-md-row justify-content-between gap-3 p-3";
+            itensDoGrupo.forEach(it => {
+                let itemClasses = "list-group-item";
                 if (it.separado) itemClasses += " separado";
                 if (it.faltou) itemClasses += " faltou";
+                if (!it.separado && !it.faltou) itemClasses += " pendente";
+
 
                 const descCompleta = [it.cod_barras, it.codigo, it.descricao, it.fabricante].filter(Boolean).join(' ');
                 const qtdPedida = `${it.qtd_unidades || ''} ${it.unidade || ''} ${it.pack_qtd > 1 ? `(C/${it.pack_qtd})` : ''}`.trim();
-                const qtdInfo = it.faltou && it.qtd_separada != null ?
-                    `<span class="text-danger">Separado: ${it.qtd_separada} de ${it.qtd_unidades}</span>` :
-                    `<span class="text-info">${qtdPedida}</span>`;
+                
+                let qtdExibida = `<span class="text-info fw-bold">${qtdPedida}</span>`;
+                if (it.faltou && it.qtd_separada != null) {
+                    qtdExibida = `<span class="text-danger fw-bold">Separado: ${it.qtd_separada} de ${it.qtd_unidades}</span>`;
+                }
+
+                const obsInfo = it.observacao ? `<div class="small text-warning mt-1"><strong>OBS:</strong> ${it.observacao}</div>` : `<div class="obs-vazia"></div>`;
 
                 html += `
                     <div class="${itemClasses}" id="item-${it.id}">
                         <div class="flex-grow-1">
                             <div class="small-mono">${descCompleta}</div>
-                            <div class="fw-bold">${qtdInfo}</div>
-                            <div class="mt-1">
-                                ${it.separado ? badge('Separado', 'bg-success') : ''}
-                                ${it.faltou ? badge('Faltou', 'bg-danger') : ''}
-                            </div>
+                            <div class="mt-1">${qtdExibida}</div>
+                            ${obsInfo}
                         </div>
-                        <div class="d-flex flex-wrap gap-3 align-items-center">
-                            <div class="form-check form-switch">
-                                <input class="form-check-input" type="checkbox" ${it.separado ? 'checked' : ''} onchange="atualizarItem(${it.id}, { separado: this.checked })">
-                                <label class="form-check-label">OK</label>
-                            </div>
-                            <button class="btn btn-sm btn-warning" onclick="abrirModalFaltou(${it.id})">Faltou</button>
-                        </div>
-                    </div>`;
+                        </div>`;
             });
             html += `</div></div>`;
         });
 
-        container.innerHTML = html || '<div class="alert alert-
+        container.innerHTML = html || '<div class="alert alert-secondary">Nenhum item encontrado para este mapa.</div>';
+        
+        document.getElementById('data-geracao').textContent = new Date().toLocaleString('pt-BR');
+    }
+
+    async function carregarDados() {
+        try {
+            const response = await fetch(`/api/mapa/${NUMERO_CARGA}`);
+            if (!response.ok) throw new Error('Falha ao carregar os dados do mapa.');
+            const data = await response.json();
+            STATE.grupos = data.grupos || [];
+            STATE.itens = data.itens || [];
+            renderItens();
+        } catch (error) {
+            document.getElementById('grupos-container').innerHTML = `<div class="alert alert-danger">${error.message}</div>`;
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        carregarDados();
+    });
+</script>
+</body>
+</html>
