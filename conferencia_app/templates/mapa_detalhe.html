@@ -1,165 +1,3 @@
-<!DOCTYPE html>
-<html lang="pt-br" data-theme="dark">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mapa {{ numero_carga }}</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <style>
-        /* TEMA ESCURO (Padrão) */
-        :root {
-            --bg: #0f1115; --panel: #161a22; --panel-2: #121722; --ink: #ecf2ff;
-            --muted: #b9c3d6; --line: #2a364a; --ok: #1f9d61; --ok-bg: rgba(35, 171, 103, .18);
-            --err: #ef4444; --err-bg: rgba(239, 68, 68, .18); --warn: #ffd166; --warn-bg: rgba(255, 209, 102, .18);
-            --input-bg: #0f141b; --input-line: #2a3b5e; --chip: #233049;
-            --text-info-color: #0ea5e9;
-        }
-
-        /* TEMA CLARO */
-        html[data-theme='light'] {
-            --bg: #f8f9fa; --panel: #ffffff; --panel-2: #f8f9fa; --ink: #212529;
-            --muted: #6c757d; --line: #dee2e6; --ok: #198754; --ok-bg: #d1e7dd;
-            --err: #dc3545; --err-bg: #f8d7da; --warn: #ffc107; --warn-bg: #fff3cd;
-            --input-bg: #ffffff; --input-line: #ced4da; --chip: #e9ecef;
-            --text-info-color: #0d6efd;
-        }
-
-        body {
-            background-color: var(--bg);
-            color: var(--ink);
-            transition: background-color 0.3s, color 0.3s;
-        }
-        .card, .list-group-item, .modal-content {
-            background-color: var(--panel);
-            border-color: var(--line);
-            color: var(--ink);
-        }
-        .card-header {
-            background-color: var(--panel-2);
-            border-bottom-color: var(--line);
-        }
-        .sticky-top-bar { background-color: var(--bg); }
-        .form-control, .input-group-text, textarea.form-control {
-            background-color: var(--input-bg);
-            color: var(--ink);
-            border-color: var(--input-line);
-        }
-        .form-control::placeholder { color: var(--muted); }
-        .form-control:focus, textarea.form-control:focus {
-            background-color: var(--input-bg);
-            color: var(--ink);
-            border-color: var(--warn);
-            box-shadow: 0 0 0 0.25rem rgba(255, 209, 102, 0.25);
-        }
-        .list-group-item.separado { background-color: var(--ok-bg); }
-        .list-group-item.faltou { background-color: var(--err-bg); }
-        .list-group-item.pendente { background-color: var(--warn-bg); }
-        .form-check-input:checked { background-color: var(--ok); border-color: var(--ok); }
-        .btn-close { filter: var(--btn-close-filter, invert(1)); }
-        html[data-theme='light'] .btn-close { --btn-close-filter: none; }
-        .text-info { color: var(--text-info-color) !important; }
-        .grupo-titulo { color: #ffa500; font-weight: 700; letter-spacing: .3px; }
-        html[data-theme='light'] .grupo-titulo { color: #d9480f; }
-
-        /* ===== PONTO DA CORREÇÃO AQUI ===== */
-        .small-mono {
-            font-family: ui-monospace, Menlo, Consolas, monospace;
-            font-size: 1rem;
-            font-weight: bold;  /* Adiciona o negrito */
-            color: var(--ink);  /* Garante que use a cor de texto correta para o tema (claro ou escuro) */
-        }
-        /* Ajuste opcional para o tema claro */
-        html[data-theme='light'] .small-mono {
-            font-size: 0.95rem;
-        }
-        /* =================================== */
-        
-        .filter-pill {
-            display: inline-block; padding: 0.25rem 0.75rem; background-color: var(--chip); color: var(--ink);
-            border-radius: 1rem; cursor: pointer; font-size: 0.85rem;
-            transition: background-color 0.2s; border: 1px solid transparent;
-        }
-        .filter-pill.active {
-            background-color: var(--warn); color: var(--bg);
-            font-weight: 600; border-color: var(--warn);
-        }
-        .btn-outline-light { border-color: var(--line); color: var(--muted); }
-        .btn-outline-info { border-color: var(--text-info-color); color: var(--text-info-color); }
-        .btn-outline-info:hover { background-color: var(--text-info-color); color: var(--bg); }
-        html[data-theme='light'] .btn-info.text-dark { background-color: #0dcaf0; border-color: #0dcaf0; color: #000 !important; }
-
-    </style>
-</head>
-<body>
-
-<script>
-    (function() {
-        const savedTheme = localStorage.getItem('theme') || 'dark';
-        document.documentElement.setAttribute('data-theme', savedTheme);
-    })();
-</script>
-
-<div class="container py-3">
-    <nav class="mb-3 d-flex justify-content-between align-items-center">
-        <div>
-            <a class="btn btn-outline-light me-2" href="/mapa">← Mapas</a>
-            <a class="btn btn-outline-light me-2" href="/gestao">Gestão</a>
-            <a class="btn btn-outline-light" href="/conferencia">Conferência</a>
-        </div>
-        <button id="theme-toggle" class="btn btn-outline-light">
-            ☀️
-        </button>
-    </nav>
-    <div class="sticky-top-bar">
-        <h3 class="mb-2">{{ nome_mapa or 'Mapa' }} <span class="text-info">{{ numero_carga }}</span></h3>
-        <input id="busca" class="form-control" placeholder="Buscar por código, EAN ou descrição...">
-        
-        <div class="d-flex justify-content-between align-items-center mt-3">
-            <div class="d-flex gap-2">
-                <span class="filter-pill" id="filter-todos" onclick="setFilter('todos')">Todos</span>
-                <span class="filter-pill" id="filter-falta" onclick="setFilter('falta')">Com Falta</span>
-                <span class="filter-pill" id="filter-obs" onclick="setFilter('obs')">Com OBS</span>
-            </div>
-            <a href="{{ url_for('mapa_detalhe_print', numero_carga=numero_carga) }}" target="_blank" class="btn btn-sm btn-outline-secondary">
-                Versão para Impressão
-            </a>
-        </div>
-
-        <div id="resumo" class="text-secondary small mt-2"></div>
-    </div>
-    <div id="grupos-container" class="mt-3">
-        <p class="text-center text-secondary">A carregar itens do mapa...</p>
-    </div>
-</div>
-
-<div class="modal fade" id="modalFaltou" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="modalFaltouLabel">Registrar Falta / Corte</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <p>Produto: <strong id="modal-produto-nome"></strong></p>
-                <p>Pedido: <span id="modal-qtd-pedida" class="fw-bold text-info"></span></p>
-                <div class="mb-3">
-                    <label for="modal-qtd-separada" class="form-label">Quantidade que foi separada:</label>
-                    <input type="number" class="form-control" id="modal-qtd-separada" placeholder="Ex: 9">
-                </div>
-                <div class="mb-3">
-                    <label for="modal-observacao" class="form-label">Observação (Opcional):</label>
-                    <textarea class="form-control" id="modal-observacao" rows="2" placeholder="Ex: Caixa avariada, produto vencido..."></textarea>
-                </div>
-                <input type="hidden" id="modal-item-id">
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                <button type="button" class="btn btn-primary" onclick="salvarFalta()">Salvar</button>
-            </div>
-        </div>
-    </div>
-</div>
-
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
     const NUMERO_CARGA = {{ numero_carga | tojson }};
@@ -186,32 +24,31 @@
             const itensFiltrados = STATE.itens.filter(it => {
                 if (it.grupo_codigo !== grupo.grupo_codigo) return false;
 
-                let matchesStatusFilter = false;
-                switch (activeFilter) {
-                    case 'falta': matchesStatusFilter = it.faltou === true; break;
-                    case 'obs': matchesStatusFilter = it.pendente === true; break;
-                    default: matchesStatusFilter = true; break;
-                }
-                if (!matchesStatusFilter) return false;
-
                 if (query) {
                     const searchable = `${it.codigo || ''} ${it.cod_barras || ''} ${it.descricao || ''}`.toLowerCase();
-                    return searchable.includes(query);
+                    if (!searchable.includes(query)) return false;
+                }
+
+                switch (activeFilter) {
+                    case 'falta':
+                        if (it.faltou !== true) return false;
+                        break;
+                    case 'obs':
+                        if (!it.observacao || it.observacao.trim() === '') return false;
+                        break;
                 }
                 return true;
             });
 
             if (itensFiltrados.length === 0) return;
-
             const nomeSeparador = grupo.separador_nome || '';
-
             html += `
                 <div class="card mb-3">
                     <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-3">
                         <div class="fs-5 grupo-titulo">
-    			    <strong class="fw-bold me-1">${grupo.grupo_codigo}</strong>
-    			    <span>${grupo.grupo_titulo || ''}</span>
-			</div>
+                            <strong class="fw-bold me-1">${grupo.grupo_codigo}</strong>
+                            <span>${grupo.grupo_titulo || ''}</span>
+                        </div>
                         <div class="d-flex align-items-center gap-2 flex-wrap">
                             <div class="input-group input-group-sm" style="width: auto;">
                                 <span class="input-group-text">Separador:</span>
@@ -229,20 +66,16 @@
             itensFiltrados.forEach(it => {
                 total++;
                 if (it.separado) marcados++;
-
                 let itemClasses = "list-group-item d-flex flex-column flex-md-row justify-content-between gap-3 p-3";
                 if (it.separado) itemClasses += " separado";
                 if (it.faltou) itemClasses += " faltou";
                 if (it.pendente) itemClasses += " pendente";
-
                 const descCompleta = [it.cod_barras, it.codigo, it.descricao, it.fabricante].filter(Boolean).join(' ');
                 const qtdPedida = `${it.qtd_unidades || ''} ${it.unidade || ''} ${it.pack_qtd > 1 ? `(C/${it.pack_qtd})` : ''}`.trim();
                 const qtdInfo = it.faltou && it.qtd_separada != null ?
                     `<span class="text-danger">Separado: ${it.qtd_separada} de ${it.qtd_unidades}</span>` :
                     `<span class="text-info">${qtdPedida}</span>`;
-                
                 const obsInfo = it.observacao ? `<div class="small text-warning mt-2"><strong>OBS:</strong> ${it.observacao}</div>` : '';
-
                 html += `
                     <div class="${itemClasses}" id="item-${it.id}">
                         <div class="flex-grow-1">
@@ -267,7 +100,6 @@
             });
             html += `</div></div>`;
         });
-
         container.innerHTML = html || '<div class="alert alert-secondary">Nenhum item encontrado. Verifique a busca e o filtro selecionado.</div>';
         document.getElementById('resumo').textContent = total > 0 ? `${marcados} de ${total} itens marcados.` : '';
     }
@@ -275,13 +107,11 @@
     function abrirModalFaltou(itemId) {
         const item = STATE.itens.find(it => it.id === itemId);
         if (!item) return;
-
         document.getElementById('modal-produto-nome').textContent = item.descricao || 'N/D';
         document.getElementById('modal-qtd-pedida').textContent = `${item.qtd_unidades || 0} ${item.unidade || ''}`;
         document.getElementById('modal-qtd-separada').value = item.qtd_separada || '';
         document.getElementById('modal-item-id').value = itemId;
         document.getElementById('modal-observacao').value = item.observacao || '';
-
         modalFaltou.show();
     }
 
@@ -289,21 +119,14 @@
         const itemId = parseInt(document.getElementById('modal-item-id').value, 10);
         const qtdSeparadaInput = document.getElementById('modal-qtd-separada').value;
         const observacao = document.getElementById('modal-observacao').value.trim();
-
         if (qtdSeparadaInput === '' || isNaN(parseInt(qtdSeparadaInput, 10))) {
             alert('Por favor, insira uma quantidade numérica válida.');
             return;
         }
         const qtdSeparada = parseInt(qtdSeparadaInput, 10);
-
         const item = STATE.itens.find(it => it.id === itemId);
-        if (!item) {
-            alert('Erro: Item não encontrado.');
-            return;
-        }
-
+        if (!item) { alert('Erro: Item não encontrado.'); return; }
         const qtdPedida = item.qtd_unidades || 0;
-
         const patch = {
             qtd_separada: qtdSeparada,
             faltou: qtdSeparada < qtdPedida,
@@ -311,7 +134,6 @@
             pendente: false,
             observacao: observacao
         };
-
         await atualizarItem(itemId, patch);
         modalFaltou.hide();
     }
@@ -319,7 +141,6 @@
     async function marcarPendente(itemId, pendente) {
         const item = STATE.itens.find(it => it.id === itemId);
         if (!item) return;
-
         const patch = {
             pendente: pendente,
             separado: false, 
@@ -327,17 +148,14 @@
             qtd_separada: null,
             observacao: pendente ? (item.observacao || 'Item não encontrado pelo separador.') : ''
         };
-        
         await atualizarItem(itemId, patch);
     }
 
     async function salvarSeparador(grupoCodigo) {
         const input = document.getElementById(`separador-${grupoCodigo}`);
         const nome = input.value;
-        
         const grupo = STATE.grupos.find(g => g.grupo_codigo === grupoCodigo);
         if(grupo) grupo.separador_nome = nome;
-
         await fetch('/api/mapa/grupo/definir-separador', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -354,15 +172,13 @@
     async function atualizarItem(itemId, patch) {
         const item = STATE.itens.find(it => it.id === itemId);
         if (item) Object.assign(item, patch);
-        renderItens(); 
-
+        renderItens();
         const response = await fetch('/api/mapa/item/atualizar', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ item_id: itemId, ...patch })
         });
         const data = await response.json();
-        
         if (data.ok && data.updated_fields) {
             if (item) Object.assign(item, data.updated_fields);
             renderItens();
@@ -380,7 +196,6 @@
             }
         });
         renderItens();
-
         await fetch('/api/mapa/grupo/marcar', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -419,14 +234,26 @@
         setTheme(newTheme);
     });
 
+    // ===== PONTO DA CORREÇÃO AQUI =====
+    // Nova função para lidar com a busca
+    function handleSearchInput() {
+        // Se o filtro ativo não for 'todos', muda para 'todos'
+        if (activeFilter !== 'todos') {
+            setFilter('todos'); // Isso já vai chamar o renderItens()
+        } else {
+            renderItens(); // Se já estiver em 'todos', apenas renderiza
+        }
+    }
+
     document.addEventListener('DOMContentLoaded', () => {
         modalFaltou = new bootstrap.Modal(document.getElementById('modalFaltou'));
-        
         const savedTheme = localStorage.getItem('theme') || 'dark';
         setTheme(savedTheme);
-        
         carregarDados();
         setFilter('todos');
+        
+        // O event listener da busca agora chama a nova função
+        document.getElementById('busca').addEventListener('input', handleSearchInput);
     });
 </script>
 </body>
