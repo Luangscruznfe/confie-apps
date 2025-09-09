@@ -7,78 +7,73 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
         body {
-            background-color: white;
-            color: black;
-            font-family: Arial, sans-serif;
+            background-color: white; /* Fundo branco */
+            color: black; /* Texto preto */
+            font-family: Arial, sans-serif; /* Fonte mais comum para impressão */
         }
         .container {
-            max-width: 992px;
+            max-width: 992px; /* Largura para impressão */
         }
         .sticky-top-bar, nav {
-            display: none;
+            display: none; /* Esconde a barra superior e navegação em modo de impressão */
         }
         .card {
             background-color: white;
-            border: 1px solid #ddd;
+            border: 1px solid #ddd; /* Borda suave */
             margin-bottom: 15px;
         }
         .card-header {
-            background-color: #f0f0f0;
+            background-color: #f0f0f0; /* Fundo cinza claro para o cabeçalho do grupo */
             color: black;
             border-bottom: 1px solid #ddd;
             padding: 10px 15px;
             font-size: 1.1rem;
-            display: flex;
+            display: flex; /* Para alinhar bem os elementos do header */
             justify-content: space-between;
             align-items: center;
         }
         .grupo-titulo {
-            color: #333;
+            color: #333; /* Cor mais escura para o título do grupo */
             font-weight: bold;
-            font-size: 1.2em;
+            font-size: 1.2em; /* Título do grupo um pouco maior */
         }
         .list-group-item {
             background-color: white;
-            border-top: 1px solid #eee;
+            border: 1px solid #eee; /* Borda mais clara entre itens */
             color: black;
             padding: 10px 15px;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            flex-wrap: wrap;
-        }
-        .list-group-item:first-child {
-            border-top: none;
+            flex-wrap: wrap; /* Para responsividade */
         }
         .list-group-item.separado {
-            background-color: #e6ffe6;
+            background-color: #e6ffe6; /* Verde claro para separado */
         }
         .list-group-item.faltou {
-            background-color: #ffe6e6;
+            background-color: #ffe6e6; /* Vermelho claro para falta */
         }
         .list-group-item.pendente {
-            background-color: #fff9e6;
+            background-color: #fff9e6; /* Amarelo claro para pendente */
         }
-        /* ===== PONTO DA CORREÇÃO AQUI ===== */
         .small-mono {
-            font-family: Arial, sans-serif;
-            font-size: 1.3em; /* Aumentado de 1.1em para 1.3em */
-            color: #333;
-            font-weight: bold;
-            flex-grow: 1;
+            font-family: Arial, sans-serif; /* Descrição com fonte normal */
+            font-size: 1.1em; /* Descrição maior */
+            color: #333; /* Preto mais suave para descrição */
+            font-weight: normal;
+            flex-grow: 1; /* Permite que o texto ocupe mais espaço */
         }
-        /* =================================== */
         .fw-bold {
             font-weight: bold;
         }
         .text-info {
-            color: #007bff;
+            color: #007bff; /* Azul padrão para quantidades */
         }
         .text-danger {
-            color: #dc3545;
+            color: #dc3545; /* Vermelho padrão para quantidades com falta */
         }
         .text-warning {
-            color: #ffc107;
+            color: #ffc107; /* Amarelo padrão para observações */
         }
         .badge {
             font-size: 0.8em;
@@ -90,25 +85,21 @@
         .badge.bg-danger { background-color: #dc3545 !important; color: white !important; }
         .badge.bg-warning { background-color: #ffc107 !important; color: black !important; }
         
+        /* Oculta os controles de interação (checkbox, botões) na versão de impressão */
         .form-check-switch, .d-flex.flex-wrap.gap-3.align-items-center > button, .input-group {
             display: none;
         }
+
+        /* Ajustes para o motorista/separador */
         .separador-info {
             font-size: 0.9em;
             color: #555;
             margin-top: 5px;
         }
+
+        /* Estilo para quando a observação está vazia, para não aparecer */
         .obs-vazia {
             display: none;
-        }
-
-        @media print {
-            .card {
-                page-break-inside: avoid;
-            }
-            .list-group-item {
-                page-break-inside: avoid;
-            }
         }
     </style>
 </head>
@@ -160,8 +151,7 @@
                 let itemClasses = "list-group-item";
                 if (it.separado) itemClasses += " separado";
                 if (it.faltou) itemClasses += " faltou";
-                if (!it.separado && !it.faltou) itemClasses += " pendente";
-
+                if (it.pendente) itemClasses += " pendente";
 
                 const descCompleta = [it.cod_barras, it.codigo, it.descricao, it.fabricante].filter(Boolean).join(' ');
                 const qtdPedida = `${it.qtd_unidades || ''} ${it.unidade || ''} ${it.pack_qtd > 1 ? `(C/${it.pack_qtd})` : ''}`.trim();
@@ -171,6 +161,7 @@
                     qtdExibida = `<span class="text-danger fw-bold">Separado: ${it.qtd_separada} de ${it.qtd_unidades}</span>`;
                 }
 
+                // Exibição da observação (se houver)
                 const obsInfo = it.observacao ? `<div class="small text-warning mt-1"><strong>OBS:</strong> ${it.observacao}</div>` : `<div class="obs-vazia"></div>`;
 
                 html += `
@@ -179,6 +170,11 @@
                             <div class="small-mono">${descCompleta}</div>
                             <div class="mt-1">${qtdExibida}</div>
                             ${obsInfo}
+                            <div class="mt-2">
+                                ${it.separado ? badge('Separado', 'bg-success') : ''}
+                                ${it.faltou ? badge('Faltou', 'bg-danger') : ''}
+                                ${it.pendente ? badge('Pendente', 'bg-warning text-dark') : ''}
+                            </div>
                         </div>
                         </div>`;
             });
@@ -186,7 +182,8 @@
         });
 
         container.innerHTML = html || '<div class="alert alert-secondary">Nenhum item encontrado para este mapa.</div>';
-        
+
+        // Define a data de geração
         document.getElementById('data-geracao').textContent = new Date().toLocaleString('pt-BR');
     }
 
@@ -205,6 +202,8 @@
 
     document.addEventListener('DOMContentLoaded', () => {
         carregarDados();
+        // Em um cenário de impressão, você pode querer disparar a impressão automaticamente
+        // window.print(); 
     });
 </script>
 </body>
