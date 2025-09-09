@@ -1,4 +1,4 @@
-# Arquivo: parser_mapa.py (Versão com filtro para linhas numéricas)
+# Arquivo: parser_mapa.py (Versão com mais filtros de cabeçalho)
 
 import re
 from typing import Dict, List, Tuple, Any
@@ -13,7 +13,14 @@ X_FABRICANTE = 430
 X_QUANTIDADE = 500
 Y_LINE_TOLERANCE = 4
 GRUPO_CODE_PATTERN = re.compile(r"([A-Z]{2,}\d{1,2})")
-HEADER_KEYWORDS = ["Data Emissão", "PAG.:", "SEPARAÇÃO DE CARGA", "Peso Total", "Pedidos:", "AtivLogRomSepa"]
+
+# ===== PONTO DA CORREÇÃO AQUI =====
+# Adicionadas as novas palavras-chave para serem ignoradas
+HEADER_KEYWORDS = [
+    "Data Emissão", "PAG.:", "SEPARAÇÃO DE CARGA", "Peso Total",
+    "Pedidos:", "AtivLogRomSepa", "Desc. Romaneio", "Motorista"
+]
+# ===================================
 
 # ---------- Funções Auxiliares ----------
 def _clean(s: str) -> str:
@@ -80,10 +87,8 @@ def parse_mapa(pdf_path: str) -> Tuple[Dict[str, str], Any, List[Dict[str, str]]
             fabricante = _clean(" ".join(fab_parts))
             quantidade = _clean(" ".join(qtd_parts))
 
-            # ===== NOVO FILTRO PARA LINHAS SÓ COM NÚMEROS =====
             if not re.search(r'[a-zA-Z]', full_desc):
                 continue
-            # ===============================================
 
             match_grupo_code = GRUPO_CODE_PATTERN.match(full_desc)
             is_group_line = (match_grupo_code and not fabricante and not quantidade)
