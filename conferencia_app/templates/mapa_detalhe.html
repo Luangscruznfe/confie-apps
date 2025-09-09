@@ -6,74 +6,110 @@
     <title>Mapa {{ numero_carga }}</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
-        /* TEMA ESCURO (Padrão) */
-        :root {
-            --bg: #0f1115; --panel: #161a22; --panel-2: #121722; --ink: #ecf2ff;
-            --muted: #b9c3d6; --line: #2a364a; --ok: #1f9d61; --ok-bg: rgba(35, 171, 103, .18);
-            --err: #ef4444; --err-bg: rgba(239, 68, 68, .18); --warn: #ffd166; --warn-bg: rgba(255, 209, 102, .18);
-            --input-bg: #0f141b; --input-line: #2a3b5e; --chip: #233049;
-            --text-info-color: #0ea5e9;
-        }
-        /* TEMA CLARO */
-        html[data-theme='light'] {
-            --bg: #f8f9fa; --panel: #ffffff; --panel-2: #f8f9fa; --ink: #212529;
-            --muted: #6c757d; --line: #dee2e6; --ok: #198754; --ok-bg: #d1e7dd;
-            --err: #dc3545; --err-bg: #f8d7da; --warn: #ffc107; --warn-bg: #fff3cd;
-            --input-bg: #ffffff; --input-line: #ced4da; --chip: #e9ecef;
-            --text-info-color: #0d6efd;
-        }
-        body {
-            background-color: var(--bg);
-            color: var(--ink);
-            transition: background-color 0.3s, color 0.3s;
-        }
-        .card, .list-group-item, .modal-content {
-            background-color: var(--panel);
-            border-color: var(--line);
-            color: var(--ink);
-        }
-        .card-header {
-            background-color: var(--panel-2);
-            border-bottom-color: var(--line);
-        }
-        .sticky-top-bar { background-color: var(--bg); }
-        .form-control, .input-group-text, textarea.form-control {
-            background-color: var(--input-bg);
-            color: var(--ink);
-            border-color: var(--input-line);
-        }
-        .form-control::placeholder { color: var(--muted); }
-        .form-control:focus, textarea.form-control:focus {
-            background-color: var(--input-bg);
-            color: var(--ink);
-            border-color: var(--warn);
-            box-shadow: 0 0 0 0.25rem rgba(255, 209, 102, 0.25);
-        }
-        .list-group-item.separado { background-color: var(--ok-bg); }
-        .list-group-item.faltou { background-color: var(--err-bg); }
-        .list-group-item.pendente { background-color: var(--warn-bg); }
-        .form-check-input:checked { background-color: var(--ok); border-color: var(--ok); }
-        .btn-close { filter: var(--btn-close-filter, invert(1)); }
-        html[data-theme='light'] .btn-close { --btn-close-filter: none; }
-        .text-info { color: var(--text-info-color) !important; }
-        .small-mono { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 1rem; font-weight: bold; color: var(--ink); }
-        html[data-theme='light'] .small-mono { font-size: 0.95rem; }
-        .grupo-titulo { color: #ffa500; font-weight: 700; letter-spacing: .3px; }
-        html[data-theme='light'] .grupo-titulo { color: #d9480f; }
-        .filter-pill {
-            display: inline-block; padding: 0.25rem 0.75rem; background-color: var(--chip); color: var(--ink);
-            border-radius: 1rem; cursor: pointer; font-size: 0.85rem;
-            transition: background-color 0.2s; border: 1px solid transparent;
-        }
-        .filter-pill.active {
-            background-color: var(--warn); color: var(--bg);
-            font-weight: 600; border-color: var(--warn);
-        }
-        .btn-outline-light { border-color: var(--line); color: var(--muted); }
-        .btn-outline-info { border-color: var(--text-info-color); color: var(--text-info-color); }
-        .btn-outline-info:hover { background-color: var(--text-info-color); color: var(--bg); }
-        html[data-theme='light'] .btn-info.text-dark { background-color: #0dcaf0; border-color: #0dcaf0; color: #000 !important; }
-    </style>
+    /* TEMA ESCURO (Padrão) */
+    :root {
+        --bg: #0f1115; --panel: #161a22; --panel-2: #121722; --ink: #ecf2ff;
+        --muted: #b9c3d6; --line: #2a364a; --ok: #1f9d61; --ok-bg: rgba(35, 171, 103, .18);
+        --err: #ef4444; --err-bg: rgba(239, 68, 68, .18); --warn: #ffd166; --warn-bg: rgba(255, 209, 102, .18);
+        --input-bg: #0f141b; --input-line: #2a3b5e; --chip: #233049;
+        --text-info-color: #0ea5e9;
+    }
+    /* TEMA CLARO */
+    html[data-theme='light'] {
+        --bg: #f8f9fa; --panel: #ffffff; --panel-2: #f8f9fa; --ink: #212529;
+        --muted: #6c757d; --line: #dee2e6; --ok: #198754; --ok-bg: #d1e7dd;
+        --err: #dc3545; --err-bg: #f8d7da; --warn: #ffc107; --warn-bg: #fff3cd;
+        --input-bg: #ffffff; --input-line: #ced4da; --chip: #e9ecef;
+        --text-info-color: #0d6efd;
+    }
+    body {
+        background-color: var(--bg);
+        color: var(--ink);
+        transition: background-color 0.3s, color 0.3s;
+    }
+    /* ===== PONTO DA CORREÇÃO 1: INICIA O CONTADOR ===== */
+    #grupos-container {
+        counter-reset: group-counter; /* Inicia o nosso contador de grupos */
+    }
+    .card, .list-group-item, .modal-content {
+        background-color: var(--panel);
+        border-color: var(--line);
+        color: var(--ink);
+    }
+    /* ===== PONTO DA CORREÇÃO 2: PREPARA O CARD ===== */
+    .card {
+        position: relative; /* Necessário para posicionar o número flutuante */
+        padding-left: 20px; /* Adiciona um espaço à esquerda para o número não sobrepor o conteúdo */
+    }
+    .card-header {
+        background-color: var(--panel-2);
+        border-bottom-color: var(--line);
+    }
+    .sticky-top-bar { background-color: var(--bg); }
+    .form-control, .input-group-text, textarea.form-control {
+        background-color: var(--input-bg);
+        color: var(--ink);
+        border-color: var(--input-line);
+    }
+    .form-control::placeholder { color: var(--muted); }
+    .form-control:focus, textarea.form-control:focus {
+        background-color: var(--input-bg);
+        color: var(--ink);
+        border-color: var(--warn);
+        box-shadow: 0 0 0 0.25rem rgba(255, 209, 102, 0.25);
+    }
+    .list-group-item.separado { background-color: var(--ok-bg); }
+    .list-group-item.faltou { background-color: var(--err-bg); }
+    .list-group-item.pendente { background-color: var(--warn-bg); }
+    .form-check-input:checked { background-color: var(--ok); border-color: var(--ok); }
+    .btn-close { filter: var(--btn-close-filter, invert(1)); }
+    html[data-theme='light'] .btn-close { --btn-close-filter: none; }
+    .text-info { color: var(--text-info-color) !important; }
+    .small-mono { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 1rem; font-weight: bold; color: var(--ink); }
+    html[data-theme='light'] .small-mono { font-size: 0.95rem; }
+    .grupo-titulo { color: #ffa500; font-weight: 700; letter-spacing: .3px; }
+    html[data-theme='light'] .grupo-titulo { color: #d9480f; }
+    .filter-pill {
+        display: inline-block; padding: 0.25rem 0.75rem; background-color: var(--chip); color: var(--ink);
+        border-radius: 1rem; cursor: pointer; font-size: 0.85rem;
+        transition: background-color 0.2s; border: 1px solid transparent;
+    }
+    .filter-pill.active {
+        background-color: var(--warn); color: var(--bg);
+        font-weight: 600; border-color: var(--warn);
+    }
+    .btn-outline-light { border-color: var(--line); color: var(--muted); }
+    .btn-outline-info { border-color: var(--text-info-color); color: var(--text-info-color); }
+    .btn-outline-info:hover { background-color: var(--text-info-color); color: var(--bg); }
+    html[data-theme='light'] .btn-info.text-dark { background-color: #0dcaf0; border-color: #0dcaf0; color: #000 !important; }
+
+    /* ===== PONTO DA CORREÇÃO 3: CRIA E ESTILIZA O NÚMERO FLUTUANTE ===== */
+    .card::before {
+        counter-increment: group-counter; /* A cada card, aumenta o contador em 1 */
+        content: counter(group-counter); /* O texto do elemento será o número do contador */
+        
+        /* Posicionamento flutuante */
+        position: absolute;
+        left: -20px; /* Move para a esquerda, para fora do card */
+        top: 50%;
+        transform: translateY(-50%); /* Centraliza verticalmente */
+        
+        /* Estilo do círculo */
+        background-color: var(--chip);
+        color: var(--muted);
+        border: 1px solid var(--line);
+        border-radius: 50%; /* Deixa redondo */
+        width: 40px;
+        height: 40px;
+        font-size: 1.2rem;
+        font-weight: bold;
+        
+        /* Centraliza o número dentro do círculo */
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+</style>
 </head>
 <body>
 
