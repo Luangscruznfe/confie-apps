@@ -1,126 +1,48 @@
 <!DOCTYPE html>
-<html lang="pt-br" data-theme="dark">
+<html lang="pt-br">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Mapa {{ numero_carga }}</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
-        /* TEMA ESCURO (Padrão) */
         :root {
             --bg: #0f1115; --panel: #161a22; --panel-2: #121722; --ink: #ecf2ff;
             --muted: #b9c3d6; --line: #2a364a; --ok: #1f9d61; --ok-bg: rgba(35, 171, 103, .18);
-            --err: #ef4444; --err-bg: rgba(239, 68, 68, .18); --warn: #ffd166; --warn-bg: rgba(255, 209, 102, .18);
+            --err: #ef4444; --err-bg: rgba(239, 68, 68, .18); --warn: #ffd166;
             --input-bg: #0f141b; --input-line: #2a3b5e; --chip: #233049;
-            --text-info-color: #0ea5e9;
         }
-
-        /* NOVO: TEMA CLARO */
-        html[data-theme='light'] {
-            --bg: #f8f9fa; --panel: #ffffff; --panel-2: #f8f9fa; --ink: #212529;
-            --muted: #6c757d; --line: #dee2e6; --ok: #198754; --ok-bg: #d1e7dd;
-            --err: #dc3545; --err-bg: #f8d7da; --warn: #ffc107; --warn-bg: #fff3cd;
-            --input-bg: #ffffff; --input-line: #ced4da; --chip: #e9ecef;
-            --text-info-color: #0d6efd;
-        }
-
-        body {
-            background-color: var(--bg);
-            color: var(--ink);
-            transition: background-color 0.3s, color 0.3s;
-        }
-        .card, .list-group-item, .modal-content {
-            background-color: var(--panel);
-            border-color: var(--line);
-            color: var(--ink);
-        }
-        .card-header {
-            background-color: var(--panel-2);
-            border-bottom-color: var(--line);
-        }
-        .sticky-top-bar {
-            background-color: var(--bg);
-        }
-        .form-control, .input-group-text, textarea.form-control {
-            background-color: var(--input-bg);
-            color: var(--ink);
-            border-color: var(--input-line);
-        }
-        .form-control::placeholder { color: var(--muted); }
-        .form-control:focus, textarea.form-control:focus {
-            background-color: var(--input-bg);
-            color: var(--ink);
-            border-color: var(--warn);
-            box-shadow: 0 0 0 0.25rem rgba(255, 209, 102, 0.25);
-        }
+        body { background-color: var(--bg); color: var(--ink); }
+        .card { background-color: var(--panel); border-color: var(--line); }
+        .card-header { background-color: var(--panel-2); font-weight: 700; border-bottom-color: var(--line); }
+        .list-group-item { background-color: var(--panel); border-color: #222c3f; }
         .list-group-item.separado { background-color: var(--ok-bg); }
         .list-group-item.faltou { background-color: var(--err-bg); }
-        .list-group-item.pendente { background-color: var(--warn-bg); }
+        .form-control, .input-group-text, .modal-content {
+            background-color: var(--input-bg); color: var(--ink); border-color: var(--input-line);
+        }
+        .btn-close { filter: invert(1); }
+        .sticky-top-bar { position: sticky; top: 0; z-index: 1020; background: var(--bg); padding: .75rem 0; }
+        /* ===== PONTO DA CORREÇÃO AQUI ===== */
+        .small-mono { 
+            font-family: ui-monospace, Menlo, Consolas, monospace; 
+            font-size: 0.9rem; 
+            font-weight: bold; /* Adicionado negrito */
+        }
+        /* =================================== */
         .form-check-input:checked { background-color: var(--ok); border-color: var(--ok); }
-
-        .btn-close { filter: var(--btn-close-filter, invert(1)); }
-        html[data-theme='light'] .btn-close { --btn-close-filter: none; }
-
-        .text-info { color: var(--text-info-color) !important; }
-        .small-mono { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 1rem; }
-        html[data-theme='light'] .small-mono { font-size: 0.95rem; color: #343a40; }
-        
-        .grupo-titulo { color: #ffa500; font-weight: 700; letter-spacing: .3px; }
-        html[data-theme='light'] .grupo-titulo { color: #d9480f; }
-
-        .filter-pill {
-            display: inline-block; padding: 0.25rem 0.75rem; background-color: var(--chip); color: var(--ink);
-            border-radius: 1rem; cursor: pointer; font-size: 0.85rem;
-            transition: background-color 0.2s; border: 1px solid transparent;
-        }
-        .filter-pill.active {
-            background-color: var(--warn); color: var(--bg);
-            font-weight: 600; border-color: var(--warn);
-        }
-        .btn-outline-light { border-color: var(--line); color: var(--muted); }
-        .btn-outline-info { border-color: var(--text-info-color); color: var(--text-info-color); }
-        .btn-outline-info:hover { background-color: var(--text-info-color); color: var(--bg); }
-        
-        /* Ajuste no botão de OBS para o tema claro */
-        html[data-theme='light'] .btn-info.text-dark { background-color: #0dcaf0; border-color: #0dcaf0; color: #000 !important; }
-
     </style>
 </head>
 <body>
-
-<script>
-    (function() {
-        const savedTheme = localStorage.getItem('theme') || 'dark';
-        document.documentElement.setAttribute('data-theme', savedTheme);
-    })();
-</script>
-
 <div class="container py-3">
-    <nav class="mb-3 d-flex justify-content-between align-items-center">
-        <div>
-            <a class="btn btn-outline-light me-2" href="/mapa">← Mapas</a>
-            <a class="btn btn-outline-light me-2" href="/gestao">Gestão</a>
-            <a class="btn btn-outline-light" href="/conferencia">Conferência</a>
-        </div>
-        <button id="theme-toggle" class="btn btn-outline-light">
-            ☀️
-        </button>
+    <nav class="mb-3">
+        <a class="btn btn-outline-light me-2" href="/mapa">← Mapas</a>
+        <a class="btn btn-outline-light me-2" href="/gestao">Gestão</a>
+        <a class="btn btn-outline-light" href="/conferencia">Conferência</a>
     </nav>
     <div class="sticky-top-bar">
-        <h3 class="mb-2">{{ nome_mapa or 'Mapa' }} <span class="text-info">{{ numero_carga }}</span></h3>
+        <h3 class="mb-2">Mapa <span class="text-info">{{ numero_carga }}</span></h3>
         <input id="busca" class="form-control" placeholder="Buscar por código, EAN ou descrição...">
-        
-        <div class="d-flex justify-content-between align-items-center mt-3">
-            <div class="d-flex gap-2">
-                <span class="filter-pill" id="filter-todos" onclick="setFilter('todos')">Todos</span>
-                <span class="filter-pill" id="filter-falta" onclick="setFilter('falta')">Com Falta</span>
-                <span class="filter-pill" id="filter-obs" onclick="setFilter('obs')">Com OBS</span>
-            </div>
-            <a href="{{ url_for('mapa_detalhe_print', numero_carga=numero_carga) }}" target="_blank" class="btn btn-sm btn-outline-secondary">
-                Versão para Impressão
-            </a>
-        </div>
-
         <div id="resumo" class="text-secondary small mt-2"></div>
     </div>
     <div id="grupos-container" class="mt-3">
@@ -132,7 +54,7 @@
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="modalFaltouLabel">Registrar Falta / Corte</h5>
+                <h5 class="modal-title" id="modalFaltouLabel">Registrar Falta Parcial</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
@@ -141,10 +63,6 @@
                 <div class="mb-3">
                     <label for="modal-qtd-separada" class="form-label">Quantidade que foi separada:</label>
                     <input type="number" class="form-control" id="modal-qtd-separada" placeholder="Ex: 9">
-                </div>
-                <div class="mb-3">
-                    <label for="modal-observacao" class="form-label">Observação (Opcional):</label>
-                    <textarea class="form-control" id="modal-observacao" rows="2" placeholder="Ex: Caixa avariada, produto vencido..."></textarea>
                 </div>
                 <input type="hidden" id="modal-item-id">
             </div>
@@ -158,19 +76,9 @@
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
-    // Todo o seu script de funcionalidade existente continua aqui...
     const NUMERO_CARGA = {{ numero_carga | tojson }};
     let STATE = { grupos: [], itens: [] };
     let modalFaltou;
-    let activeFilter = 'todos';
-
-    // ... (as funções renderItens, salvarFalta, etc., continuam as mesmas) ...
-    function setFilter(filterType) {
-        activeFilter = filterType;
-        document.querySelectorAll('.filter-pill').forEach(pill => pill.classList.remove('active'));
-        document.getElementById(`filter-${filterType}`).classList.add('active');
-        renderItens();
-    }
 
     function badge(text, className) { return `<span class="badge ${className} me-1">${text}</span>`; }
 
@@ -183,43 +91,28 @@
         STATE.grupos.forEach(grupo => {
             const itensFiltrados = STATE.itens.filter(it => {
                 if (it.grupo_codigo !== grupo.grupo_codigo) return false;
-
-                let matchesStatusFilter = false;
-                switch (activeFilter) {
-                    case 'falta': matchesStatusFilter = it.faltou === true; break;
-                    case 'obs': matchesStatusFilter = it.pendente === true; break;
-                    default: matchesStatusFilter = true; break;
-                }
-                if (!matchesStatusFilter) return false;
-
-                if (query) {
-                    const searchable = `${it.codigo || ''} ${it.cod_barras || ''} ${it.descricao || ''}`.toLowerCase();
-                    return searchable.includes(query);
-                }
-                return true;
+                if (!query) return true;
+                const searchable = `${it.codigo || ''} ${it.cod_barras || ''} ${it.descricao || ''}`.toLowerCase();
+                return searchable.includes(query);
             });
 
             if (itensFiltrados.length === 0) return;
-
             const nomeSeparador = grupo.separador_nome || '';
 
             html += `
                 <div class="card mb-3">
-                    <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-3">
-                        <div class="fs-5 grupo-titulo">
-    			    <strong class="fw-bold me-1">${grupo.grupo_codigo}</strong>
-    			    <span>${grupo.grupo_titulo || ''}</span>
-			</div>
-                        <div class="d-flex align-items-center gap-2 flex-wrap">
-                            <div class="input-group input-group-sm" style="width: auto;">
-                                <span class="input-group-text">Separador:</span>
-                                <input type="text" class="form-control" id="separador-${grupo.grupo_codigo}" value="${nomeSeparador}" style="min-width: 120px;">
-                                <button class="btn btn-outline-info" onclick="salvarSeparador('${grupo.grupo_codigo}')">Salvar</button>
+                    <div class="card-header">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <div><strong>${grupo.grupo_codigo}</strong> — ${grupo.grupo_titulo || ''}</div>
+                            <div>
+                                <button class="btn btn-sm btn-success" onclick="marcarGrupo('${grupo.grupo_codigo}', true)">Marcar</button>
+                                <button class="btn btn-sm btn-outline-light" onclick="marcarGrupo('${grupo.grupo_codigo}', false)">Desmarcar</button>
                             </div>
-                            <div class="btn-group btn-group-sm">
-                                <button class="btn btn-success" onclick="marcarGrupo('${grupo.grupo_codigo}', true)">Marcar</button>
-                                <button class="btn btn-outline-light" onclick="marcarGrupo('${grupo.grupo_codigo}', false)">Desmarcar</button>
-                            </div>
+                        </div>
+                        <div class="input-group input-group-sm">
+                            <span class="input-group-text">Separador:</span>
+                            <input type="text" class="form-control" id="separador-${grupo.grupo_codigo}" value="${nomeSeparador}">
+                            <button class="btn btn-outline-info" onclick="salvarSeparador('${grupo.grupo_codigo}')">Salvar</button>
                         </div>
                     </div>
                     <div class="list-group list-group-flush">`;
@@ -231,42 +124,36 @@
                 let itemClasses = "list-group-item d-flex flex-column flex-md-row justify-content-between gap-3 p-3";
                 if (it.separado) itemClasses += " separado";
                 if (it.faltou) itemClasses += " faltou";
-                if (it.pendente) itemClasses += " pendente";
 
                 const descCompleta = [it.cod_barras, it.codigo, it.descricao, it.fabricante].filter(Boolean).join(' ');
                 const qtdPedida = `${it.qtd_unidades || ''} ${it.unidade || ''} ${it.pack_qtd > 1 ? `(C/${it.pack_qtd})` : ''}`.trim();
                 const qtdInfo = it.faltou && it.qtd_separada != null ?
                     `<span class="text-danger">Separado: ${it.qtd_separada} de ${it.qtd_unidades}</span>` :
                     `<span class="text-info">${qtdPedida}</span>`;
-                
-                const obsInfo = it.observacao ? `<div class="small text-warning mt-2"><strong>OBS:</strong> ${it.observacao}</div>` : '';
 
                 html += `
                     <div class="${itemClasses}" id="item-${it.id}">
                         <div class="flex-grow-1">
                             <div class="small-mono">${descCompleta}</div>
                             <div class="fw-bold">${qtdInfo}</div>
-                            ${obsInfo}
-                            <div class="mt-2">
+                            <div class="mt-1">
                                 ${it.separado ? badge('Separado', 'bg-success') : ''}
                                 ${it.faltou ? badge('Faltou', 'bg-danger') : ''}
-                                ${it.pendente ? badge('Pendente', 'bg-warning text-dark') : ''}
                             </div>
                         </div>
                         <div class="d-flex flex-wrap gap-3 align-items-center">
                             <div class="form-check form-switch">
-                                <input class="form-check-input" type="checkbox" ${it.separado ? 'checked' : ''} onchange="atualizarItem(${it.id}, { separado: this.checked, pendente: false, observacao: '' })">
-                                <label class="form-check-label ${it.separado ? 'text-success fw-bold' : 'text-secondary'}">OK</label>
+                                <input class="form-check-input" type="checkbox" ${it.separado ? 'checked' : ''} onchange="atualizarItem(${it.id}, { separado: this.checked })">
+                                <label class="form-check-label">OK</label>
                             </div>
                             <button class="btn btn-sm btn-warning" onclick="abrirModalFaltou(${it.id})">Faltou</button>
-                            <button class="btn btn-sm btn-info text-dark" onclick="marcarPendente(${it.id}, ${!it.pendente})">OBS</button>
                         </div>
                     </div>`;
             });
             html += `</div></div>`;
         });
 
-        container.innerHTML = html || '<div class="alert alert-secondary">Nenhum item encontrado. Verifique a busca e o filtro selecionado.</div>';
+        container.innerHTML = html || '<div class="alert alert-secondary">Nenhum item encontrado para a busca.</div>';
         document.getElementById('resumo').textContent = total > 0 ? `${marcados} de ${total} itens marcados.` : '';
     }
 
@@ -278,57 +165,25 @@
         document.getElementById('modal-qtd-pedida').textContent = `${item.qtd_unidades || 0} ${item.unidade || ''}`;
         document.getElementById('modal-qtd-separada').value = item.qtd_separada || '';
         document.getElementById('modal-item-id').value = itemId;
-        document.getElementById('modal-observacao').value = item.observacao || '';
 
         modalFaltou.show();
     }
 
     async function salvarFalta() {
-        const itemId = parseInt(document.getElementById('modal-item-id').value, 10);
-        const qtdSeparadaInput = document.getElementById('modal-qtd-separada').value;
-        const observacao = document.getElementById('modal-observacao').value.trim();
+        const itemId = document.getElementById('modal-item-id').value;
+        const qtdSeparada = document.getElementById('modal-qtd-separada').value;
 
-        if (qtdSeparadaInput === '' || isNaN(parseInt(qtdSeparadaInput, 10))) {
-            alert('Por favor, insira uma quantidade numérica válida.');
-            return;
-        }
-        const qtdSeparada = parseInt(qtdSeparadaInput, 10);
-
-        const item = STATE.itens.find(it => it.id === itemId);
-        if (!item) {
-            alert('Erro: Item não encontrado.');
+        if (!qtdSeparada || isNaN(parseInt(qtdSeparada, 10))) {
+            alert('Por favor, insira uma quantidade válida.');
             return;
         }
 
-        const qtdPedida = item.qtd_unidades || 0;
-
-        const patch = {
-            qtd_separada: qtdSeparada,
-            faltou: qtdSeparada < qtdPedida,
-            separado: true,
-            pendente: false,
-            observacao: observacao
-        };
-
-        await atualizarItem(itemId, patch);
+        await atualizarItem(itemId, {
+            qtd_separada: parseInt(qtdSeparada, 10)
+        });
         modalFaltou.hide();
     }
     
-    async function marcarPendente(itemId, pendente) {
-        const item = STATE.itens.find(it => it.id === itemId);
-        if (!item) return;
-
-        const patch = {
-            pendente: pendente,
-            separado: false, 
-            faltou: false,   
-            qtd_separada: null,
-            observacao: pendente ? (item.observacao || 'Item não encontrado pelo separador.') : ''
-        };
-        
-        await atualizarItem(itemId, patch);
-    }
-
     async function salvarSeparador(grupoCodigo) {
         const input = document.getElementById(`separador-${grupoCodigo}`);
         const nome = input.value;
@@ -352,7 +207,7 @@
     async function atualizarItem(itemId, patch) {
         const item = STATE.itens.find(it => it.id === itemId);
         if (item) Object.assign(item, patch);
-        renderItens(); 
+        renderItens();
 
         const response = await fetch('/api/mapa/item/atualizar', {
             method: 'POST',
@@ -360,7 +215,6 @@
             body: JSON.stringify({ item_id: itemId, ...patch })
         });
         const data = await response.json();
-        
         if (data.ok && data.updated_fields) {
             if (item) Object.assign(item, data.updated_fields);
             renderItens();
@@ -368,15 +222,7 @@
     }
     
     async function marcarGrupo(grupoCodigo, separado) {
-        STATE.itens.forEach(it => { 
-            if (it.grupo_codigo === grupoCodigo) {
-                it.separado = separado; 
-                it.pendente = false; 
-                it.faltou = false;   
-                it.qtd_separada = null; 
-                it.observacao = '';
-            }
-        });
+        STATE.itens.forEach(it => { if (it.grupo_codigo === grupoCodigo) it.separado = separado; });
         renderItens();
 
         await fetch('/api/mapa/grupo/marcar', {
@@ -399,34 +245,10 @@
         }
     }
 
-    // NOVO: Lógica completa para o tema
-    const themeToggle = document.getElementById('theme-toggle');
-
-    function setTheme(theme) {
-        document.documentElement.setAttribute('data-theme', theme);
-        localStorage.setItem('theme', theme);
-        // Atualiza o ícone do botão
-        if (theme === 'light') {
-            themeToggle.innerHTML = '🌙'; // Lua para mudar para escuro
-        } else {
-            themeToggle.innerHTML = '☀️'; // Sol para mudar para claro
-        }
-    }
-
-    themeToggle.addEventListener('click', () => {
-        const currentTheme = document.documentElement.getAttribute('data-theme');
-        const newTheme = currentTheme === 'light' ? 'dark' : 'light';
-        setTheme(newTheme);
-    });
-
+    document.getElementById('busca').addEventListener('input', renderItens);
     document.addEventListener('DOMContentLoaded', () => {
         modalFaltou = new bootstrap.Modal(document.getElementById('modalFaltou'));
-        
-        const savedTheme = localStorage.getItem('theme') || 'dark';
-        setTheme(savedTheme); // Garante que o ícone do botão esteja correto no carregamento
-        
         carregarDados();
-        setFilter('todos');
     });
 </script>
 </body>
