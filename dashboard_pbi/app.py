@@ -28,32 +28,28 @@ def pagina_upload():
         if file and (file.filename.endswith('.xlsx') or file.filename.endswith('.xls')):
             try:
                 # 4. Lê o arquivo Excel com o Pandas
-                # O Pandas consegue ler o arquivo diretamente da memória, sem precisar salvar no disco
                 df = pd.read_excel(file)
 
                 # --- LÓGICA DE ANÁLISE E CRIAÇÃO DE GRÁFICOS ---
-                # Esta parte é um EXEMPLO. Você precisará adaptar para as colunas do seu relatório.
+                # Esta parte agora está ADAPTADA para as colunas do seu relatório.
                 
-                # Exemplo 1: Gráfico de Barras - Vendas por Produto
-                # Supondo que seu Excel tenha as colunas 'Produto' e 'Vendas'
+                # Exemplo 1: Gráfico de Barras - Vendas por Item
                 fig_bar = px.bar(
                     df, 
-                    x='Produto', 
-                    y='Vendas', 
-                    title='Total de Vendas por Produto'
+                    x='ITENS',      # <-- CORRIGIDO
+                    y='VENDA',      # <-- CORRIGIDO
+                    title='Total de Venda por Item'
                 )
 
-                # Exemplo 2: Gráfico de Pizza - Vendas por Categoria
-                # Supondo que seu Excel tenha a coluna 'Categoria'
+                # Exemplo 2: Gráfico de Pizza - Vendas por Fabricante
                 fig_pie = px.pie(
                     df, 
-                    names='Categoria', 
-                    values='Vendas', 
-                    title='Distribuição de Vendas por Categoria'
+                    names='FABRICANTE', # <-- CORRIGIDO
+                    values='VENDA',     # <-- CORRIGIDO
+                    title='Distribuição de Venda por Fabricante'
                 )
                 
                 # 5. Converte os gráficos para HTML
-                # Isso gera um <div> com o JavaScript necessário para o gráfico interativo
                 grafico_bar_html = fig_bar.to_html(full_html=False)
                 grafico_pie_html = fig_pie.to_html(full_html=False)
 
