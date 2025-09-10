@@ -2,6 +2,7 @@ from flask import Flask
 from werkzeug.middleware.dispatcher import DispatcherMiddleware
 from conferencia_app.app import app as conferencia_app
 from pontuacao_app.app import app as pontuacao_app
+from dashboard_pbi.app import app as dashboard_app
 
 # (opcional) isolar sessão da Pontuação
 pontuacao_app.config.update(SESSION_COOKIE_NAME='pont_session',
@@ -15,5 +16,6 @@ def ok(): return "ok", 200
 # Conferência na raiz; Pontuação em /pontuacao
 app = DispatcherMiddleware(conferencia_app, {
     "/pontuacao": pontuacao_app,
+    "/dashboard": dashboard_app,
     "/_": health,
 })
