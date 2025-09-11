@@ -1,4 +1,4 @@
-# dashboard_pbi/app.py --- VERSÃO FINAL COM CRUZAMENTO PELA DESCRIÇÃO
+# dashboard_pbi/app.py --- VERSÃO FINAL COM PADRONIZAÇÃO DE TEXTO
 
 import pandas as pd
 import plotly.express as px
@@ -44,14 +44,18 @@ def pagina_upload():
                 
                 dados_completos_df = vendas_df
                 if catalogo_df is not None:
-                    # Garante que as colunas de DESCRIÇÃO em ambas as tabelas sejam do mesmo tipo (texto)
+                    # Garante que as colunas sejam do tipo texto
                     vendas_df['ITENS'] = vendas_df['ITENS'].astype(str)
                     catalogo_df['DESCRICAO'] = catalogo_df['DESCRICAO'].astype(str)
+
+                    # --- ETAPA DE PADRONIZAÇÃO (NORMALIZAÇÃO) DOS DADOS ---
+                    # Cria novas colunas padronizadas para o cruzamento
+                    vendas_df['CHAVE_MERGE'] = vendas_df['ITENS'].str.upper().str.strip()
+                    catalogo_df['CHAVE_MERGE'] = catalogo_df['DESCRICAO'].str.upper().str.strip()
                     
                     dados_completos_df = pd.merge(
                         left=vendas_df, right=catalogo_df,
-                        left_on='ITENS',      # <-- USA A DESCRIÇÃO DO ITEM DO RELATÓRIO
-                        right_on='DESCRICAO', # <-- USA A DESCRIÇÃO DO ITEM DO CATÁLOGO
+                        on='CHAVE_MERGE', # Usa a chave padronizada para o cruzamento
                         how='left', suffixes=('_VENDA', '_CATALOGO')
                     )
 
