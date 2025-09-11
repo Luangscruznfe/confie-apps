@@ -1,4 +1,4 @@
-# dashboard_pbi/app.py --- VERSÃO DE PRODUÇÃO FINAL
+# dashboard_pbi/app.py --- VERSÃO FINAL COM LÓGICA DE FABRICANTE CORRIGIDA
 
 import pandas as pd
 import plotly.express as px
@@ -42,16 +42,15 @@ def pagina_upload():
                     flash("ERRO: O arquivo não contém nenhuma linha de dados.")
                     return render_template('upload.html')
                 
-                dados_completos_df = vendas_df # Começa com a tabela de vendas
+                dados_completos_df = vendas_df
                 if catalogo_df is not None:
-                    # Garante que as chaves de cruzamento sejam do mesmo tipo (texto)
                     vendas_df['CÓDIGO'] = vendas_df['CÓDIGO'].astype(str)
                     catalogo_df['CODIGO'] = catalogo_df['CODIGO'].astype(str)
                     
                     dados_completos_df = pd.merge(
                         left=vendas_df, right=catalogo_df,
                         left_on='CÓDIGO', right_on='CODIGO',
-                        how='left', suffixes=('_VENDA', '_CATALOGO') # Adiciona sufixos claros
+                        how='left', suffixes=('_VENDA', '_CATALOGO')
                     )
 
                 dados_completos_df['VENDA'] = pd.to_numeric(dados_completos_df['VENDA'], errors='coerce').fillna(0)
@@ -64,15 +63,22 @@ def pagina_upload():
                 )
                 fig_top_itens.update_layout(yaxis_title="Item", xaxis_title="Total de Venda")
                 
-                # GRÁFICO 2: TOP 15 FABRICANTES
-                # Define a coluna de fabricante a ser usada
-                coluna_fabricante = 'FABRICANTE_CATALOGO' if 'FABRICANTE_CATALOGO' in dados_completos_df.columns else 'FABRICANTE_VENDA'
-                
-                grafico_fabricantes_html = "<div class='alert alert-warning'>Coluna de Fabricante não encontrada.</div>"
-                if coluna_fabricante in dados_completos_df.columns:
-                    df_fabricantes = dados_completos_df.dropna(subset=[coluna_fabricante])
+                # --- LÓGICA DE GRÁFICO DE FABRICANTES (REESCRITA E ROBUSTA) ---
+                grafico_fabricantes_html = "<div class='alert alert-warning'>Gráfico de Fabricantes indisponível. Verifique o catálogo e a correspondência de códigos.</div>"
+                coluna_fabricante_final = None
+
+                # Cenário 1: Ambos os arquivos tinham 'FABRICANTE', então o merge criou '_CATALOGO'
+                if 'FABRICANTE_CATALOGO' in dados_completos_df.columns:
+                    coluna_fabricante_final = 'FABRICANTE_CATALOGO'
+                # Cenário 2: Apenas um dos arquivos tinha 'FABRICANTE', então o merge manteve o nome simples
+                elif 'FABRICANTE' in dados_completos_df.columns:
+                    coluna_fabricante_final = 'FABRICANTE'
+
+                # Se encontramos uma coluna de fabricante para usar, criamos o gráfico
+                if coluna_fabricante_final:
+                    df_fabricantes = dados_completos_df.dropna(subset=[coluna_fabricante_final])
                     if not df_fabricantes.empty:
-                        vendas_por_fabricante = df_fabricantes.groupby(coluna_fabricante)['VENDA'].sum().nlargest(15).sort_values(ascending=False)
+                        vendas_por_fabricante = df_fabricantes.groupby(coluna_fabricante_final)['VENDA'].sum().nlargest(15).sort_values(ascending=False)
                         fig_fabricantes = px.bar(
                             vendas_por_fabricante, x=vendas_por_fabricante.index, y='VENDA',
                             title='Top 15 Fabricantes por Venda', text_auto='.2s'
@@ -80,7 +86,7 @@ def pagina_upload():
                         fig_fabricantes.update_layout(xaxis_title="Fabricante", yaxis_title="Total de Venda")
                         grafico_fabricantes_html = fig_fabricantes.to_html(full_html=False)
                     else:
-                        grafico_fabricantes_html = "<div class='alert alert-info'>Nenhuma correspondência de fabricante encontrada.</div>"
+                        grafico_fabricantes_html = "<div class='alert alert-info'>Nenhuma correspondência de fabricante encontrada entre o relatório e o catálogo.</div>"
                 
                 return render_template(
                     'dashboard.html',
