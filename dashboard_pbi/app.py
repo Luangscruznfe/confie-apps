@@ -12,16 +12,25 @@ app.secret_key = 'sua-chave-secreta-aqui-novamente'
 # --- CARREGAMENTO DO CATÁLOGO DE PRODUTOS ---
 CATALOGO_PATH = os.path.join(os.path.dirname(__file__), 'catalogo_produtos.csv')
 try:
-    colunas_catalogo = ['CODIGO', 'DESCRICAO', 'FABRICANTE', 'DEPARTAMENTO']
-    # LEITOR DE CSV ATUALIZADO PARA SER MAIS ROBUSTO
+    # Ler colunas pela POSIÇÃO (A=0, B=1, F=5, G=6)
+    colunas_posicoes = [0, 1, 5, 6] 
+    # Definir os nomes padrão que usaremos no código
+    colunas_nomes_padrao = ['CODIGO', 'DESCRICAO', 'FABRICante', 'COD_BARRAS'] # ATUALIZADO
+
     catalogo_df = pd.read_csv(
         CATALOGO_PATH, 
-        usecols=colunas_catalogo,
-        sep=';',                   # Define o ponto e vírgula como separador
-        encoding='latin1',         # Melhora a compatibilidade com acentos
-        on_bad_lines='skip'        # Pula linhas com erro de formatação (COMO A LINHA 4)
+        usecols=colunas_posicoes,
+        sep=';',
+        encoding='latin1',
+        on_bad_lines='skip',
+        header=0
     )
-    print("SUCESSO: Arquivo 'catalogo_produtos.csv' carregado.")
+    
+    # Renomeia as colunas carregadas para os nossos nomes padrão
+    catalogo_df.columns = colunas_nomes_padrao
+
+    print("SUCESSO: Arquivo 'catalogo_produtos.csv' carregado e colunas renomeadas.")
+
 except FileNotFoundError:
     catalogo_df = None
     print("AVISO: Arquivo 'catalogo_produtos.csv' não encontrado. Gráficos de fabricante e departamento serão desativados.")
@@ -73,7 +82,7 @@ def pagina_upload():
                 dados_completos_df['VENDA'] = pd.to_numeric(dados_completos_df['VENDA'], errors='coerce').fillna(0)
 
 
-                # --- LÓGICA DOS NOVOS GRÁFICOS ---
+                # --- LÓGICA DOS GRÁFICOS ---
                 
                 # GRÁFICO 1: TOP 10 ITENS MAIS VENDIDOS
                 top_10_itens = dados_completos_df.groupby('ITENS')['VENDA'].sum().nlargest(10).sort_values(ascending=True)
@@ -102,25 +111,12 @@ def pagina_upload():
                 else:
                     grafico_fabricantes_html = "<div class='alert alert-warning'>Gráfico de Fabricantes indisponível. Verifique se o arquivo 'catalogo_produtos.csv' foi enviado corretamente.</div>"
 
-                # GRÁFICO 3: VENDAS POR DEPARTAMENTO E ITEM
-                if catalogo_df is not None and 'DEPARTAMENTO' in dados_completos_df.columns and 'ITENS' in dados_completos_df.columns:
-                    df_treemap = dados_completos_df.dropna(subset=['DEPARTAMENTO'])
-                    fig_treemap = px.treemap(
-                        df_treemap,
-                        path=[px.Constant("Todos Departamentos"), 'DEPARTAMENTO', 'ITENS'],
-                        values='VENDA',
-                        title='Vendas por Departamento e Itens (clique para explorar)'
-                    )
-                    grafico_treemap_html = fig_treemap.to_html(full_html=False)
-                else:
-                    grafico_treemap_html = "<div class='alert alert-warning'>Gráfico de Departamentos indisponível. Verifique se o arquivo 'catalogo_produtos.csv' foi enviado corretamente.</div>"
-
+                # GRÁFICO 3 (TREEMAP) FOI REMOVIDO PORQUE NÃO TEMOS MAIS A COLUNA DEPARTAMENTO
 
                 return render_template(
                     'dashboard.html', 
                     grafico1_html=fig_top_itens.to_html(full_html=False), 
-                    grafico2_html=grafico_fabricantes_html,
-                    grafico3_html=grafico_treemap_html
+                    grafico2_html=grafico_fabricantes_html
                 )
 
             except Exception as e:
