@@ -313,6 +313,4 @@ def upload_analise():
             
             # Estatísticas por tipo de match
             stats_match = df.dropna(subset=['MATCH_TIPO']).groupby('MATCH_TIPO').agg({
-                'ITENS': 'nunique',
-                'VENDA': 'sum'
-            }).reset_index()
+                'ITENS':
