@@ -1,29 +1,24 @@
-# dashboard_pbi/app.py --- VERSÃO FINAL
+# dashboard_pbi/app.py --- VERSÃO FINAL COM CORREÇÃO DE TIPO DE DADO
 
 import pandas as pd
 import plotly.express as px
 from flask import Flask, request, render_template, flash
 import os
 
-# Cria a instância da aplicação Flask para o dashboard
 app = Flask(__name__)
-app.secret_key = 'sua-chave-secreta-aqui-novamente' 
+app.secret_key = 'sua-chave-secreta-aqui-novamente'
 
 # --- CARREGAMENTO DO CATÁLOGO DE PRODUTOS ---
-# AGORA LENDO O ARQUIVO .XLSX DIRETAMENTE
 CATALOGO_PATH = os.path.join(os.path.dirname(__file__), 'catalogo_produtos.xlsx')
 try:
-    # Ler colunas pela POSIÇÃO (A=0, B=1, F=5, G=6)
-    colunas_posicoes = [0, 1, 5, 6] 
+    colunas_posicoes = [0, 1, 5, 6]
     colunas_nomes_padrao = ['CODIGO', 'DESCRICAO', 'FABRICANTE', 'COD_BARRAS']
 
-    # USA pd.read_excel() para ler o arquivo Excel
     catalogo_df = pd.read_excel(
-        CATALOGO_PATH, 
+        CATALOGO_PATH,
         usecols=colunas_posicoes,
         header=0
     )
-    
     catalogo_df.columns = colunas_nomes_padrao
     print("SUCESSO: Arquivo 'catalogo_produtos.xlsx' carregado.")
 
@@ -60,12 +55,19 @@ def pagina_upload():
                     flash("ERRO DE CONTEÚDO: O arquivo não contém nenhuma linha de dados para analisar.")
                     return render_template('upload.html')
                 
+                # --- CORREÇÃO DO TIPO DE DADO ANTES DO MERGE ---
+                # Garante que a chave 'ITENS' do relatório de vendas seja do tipo TEXTO
+                vendas_df['ITENS'] = vendas_df['ITENS'].astype(str)
+
                 if catalogo_df is not None:
+                    # Garante que a chave 'DESCRICAO' do catálogo também seja do tipo TEXTO
+                    catalogo_df['DESCRICAO'] = catalogo_df['DESCRICAO'].astype(str)
+                    
                     dados_completos_df = pd.merge(
-                        left=vendas_df, 
-                        right=catalogo_df, 
-                        left_on='ITENS', 
-                        right_on='DESCRICAO', 
+                        left=vendas_df,
+                        right=catalogo_df,
+                        left_on='ITENS',
+                        right_on='DESCRICAO',
                         how='left'
                     )
                 else:
@@ -93,8 +95,8 @@ def pagina_upload():
                     grafico_fabricantes_html = "<div class='alert alert-warning'>Gráfico de Fabricantes indisponível. Verifique se o arquivo 'catalogo_produtos.xlsx' foi enviado.</div>"
 
                 return render_template(
-                    'dashboard.html', 
-                    grafico1_html=fig_top_itens.to_html(full_html=False), 
+                    'dashboard.html',
+                    grafico1_html=fig_top_itens.to_html(full_html=False),
                     grafico2_html=grafico_fabricantes_html
                 )
 
