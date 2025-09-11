@@ -50,8 +50,10 @@ def pagina_upload():
 
                 # --- LIMPEZA E PREPARAÇÃO DOS DADOS ---
                 if 'VENDA' in dados_completos_df.columns:
-                    # CORREÇÃO APLICADA AQUI: Adicionamos .replace('', '0') para tratar células vazias
-                    dados_completos_df['VENDA'] = dados_completos_df['VENDA'].astype(str).str.replace('R$', '', regex=False).str.strip().str.replace(',', '.', regex=False).replace('', '0').astype(float)
+                    # SOLUÇÃO DEFINITIVA: Usando pd.to_numeric que é mais robusto
+                    # errors='coerce' transforma qualquer valor inválido (texto, etc.) em NaN
+                    # .fillna(0) então substitui esses NaN por 0.
+                    dados_completos_df['VENDA'] = pd.to_numeric(dados_completos_df['VENDA'], errors='coerce').fillna(0)
                 else:
                     raise ValueError("A coluna 'VENDA' não foi encontrada no relatório.")
 
