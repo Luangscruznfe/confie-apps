@@ -36,6 +36,14 @@ def pagina_upload():
             try:
                 vendas_df = pd.read_excel(file)
 
+                # --- VALIDAÇÃO DO ARQUIVO (NOVA SEÇÃO) ---
+                # Verifica se as colunas essenciais para a análise existem no arquivo enviado.
+                if 'ITENS' not in vendas_df.columns or 'VENDA' not in vendas_df.columns:
+                    flash("ERRO DE ARQUIVO: O relatório enviado não contém as colunas obrigatórias 'ITENS' e 'VENDA'. Por favor, verifique o arquivo e tente novamente.")
+                    return render_template('upload.html')
+                
+                # Se a validação passar, o código continua...
+
                 if catalogo_df is not None:
                     dados_completos_df = pd.merge(
                         left=vendas_df, 
@@ -49,13 +57,7 @@ def pagina_upload():
                     flash("Aviso: Catálogo de produtos não carregado. Análise feita com dados limitados.")
 
                 # --- LIMPEZA E PREPARAÇÃO DOS DADOS ---
-                if 'VENDA' in dados_completos_df.columns:
-                    # SOLUÇÃO DEFINITIVA: Usando pd.to_numeric que é mais robusto
-                    # errors='coerce' transforma qualquer valor inválido (texto, etc.) em NaN
-                    # .fillna(0) então substitui esses NaN por 0.
-                    dados_completos_df['VENDA'] = pd.to_numeric(dados_completos_df['VENDA'], errors='coerce').fillna(0)
-                else:
-                    raise ValueError("A coluna 'VENDA' não foi encontrada no relatório.")
+                dados_completos_df['VENDA'] = pd.to_numeric(dados_completos_df['VENDA'], errors='coerce').fillna(0)
 
 
                 # --- LÓGICA DOS NOVOS GRÁFICOS ---
