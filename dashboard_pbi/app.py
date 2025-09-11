@@ -1,4 +1,4 @@
-# dashboard_pbi/app.py --- VERSÃO DE DIAGNÓSTICO (COM INDENTAÇÃO 100% CORRIGIDA)
+# dashboard_pbi/app.py --- VERSÃO FINAL DEFINITIVA
 
 import pandas as pd
 import plotly.express as px
@@ -68,6 +68,17 @@ def pagina_upload():
                         left_on='ITENS', right_on='DESCRICAO', how='left'
                     )
                     DEBUG_INFO['merged_df_cols'] = str(dados_completos_df.columns.tolist())
+
+                    # --- AJUSTE FINAL PARA COLUNAS DUPLICADAS ---
+                    # Se o merge criou FABRICANTE_x e FABRICANTE_y, vamos tratar isso.
+                    if 'FABRICANTE_y' in dados_completos_df.columns:
+                        # Vamos usar a coluna do catálogo (_y) como a oficial.
+                        # Primeiro, preenchemos os valores vazios na coluna _y com os valores da _x
+                        dados_completos_df['FABRICANTE_y'].fillna(dados_completos_df['FABRICANTE_x'], inplace=True)
+                        # Renomeamos a coluna _y para o nome padrão 'FABRICANTE'
+                        dados_completos_df.rename(columns={'FABRICANTE_y': 'FABRICANTE'}, inplace=True)
+                        # Removemos a coluna _x que não é mais necessária
+                        dados_completos_df.drop(columns=['FABRICANTE_x'], inplace=True)
                 else:
                     dados_completos_df = vendas_df
                     flash("Aviso: Catálogo de produtos não carregado.")
@@ -81,9 +92,8 @@ def pagina_upload():
                 )
                 fig_top_itens.update_layout(yaxis_title="Item", xaxis_title="Total de Venda")
                 
-                # Lógica do Gráfico de Fabricantes (Revisada para clareza)
                 grafico_fabricantes_html = "<div class='alert alert-warning'>Gráfico de Fabricantes indisponível. Verifique se o arquivo 'catalogo_produtos.xlsx' foi enviado.</div>"
-                if catalogo_df is not None and 'FABRICANTE' in dados_completos_df.columns:
+                if 'FABRICANTE' in dados_completos_df.columns:
                     df_fabricantes = dados_completos_df.dropna(subset=['FABRICANTE'])
                     if not df_fabricantes.empty:
                         vendas_por_fabricante = df_fabricantes.groupby('FABRICANTE')['VENDA'].sum().nlargest(15).sort_values(ascending=False)
