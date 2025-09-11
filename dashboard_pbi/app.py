@@ -4,7 +4,7 @@ import unicodedata
 import pandas as pd
 import plotly.express as px
 from flask import Flask, request, render_template, flash
-from fuzzywuzzy import fuzz, process
+from rapidfuzz import fuzz, process
 import os
 import logging
 
