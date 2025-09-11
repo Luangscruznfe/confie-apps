@@ -1,4 +1,4 @@
-# dashboard_pbi/app.py --- VERSÃO FINAL DEFINITIVA
+# dashboard_pbi/app.py --- VERSÃO FINAL COM CORREÇÃO NO MERGE
 
 import pandas as pd
 import plotly.express as px
@@ -52,37 +52,32 @@ def pagina_upload():
                 vendas_df = pd.read_excel(file)
                 DEBUG_INFO['vendas_df_cols'] = str(vendas_df.columns.tolist())
 
-                if 'ITENS' not in vendas_df.columns or 'VENDA' not in vendas_df.columns:
-                    flash("ERRO DE ARQUIVO: O relatório enviado não contém as colunas 'ITENS' e 'VENDA'.")
+                if 'CÓDIGO' not in vendas_df.columns or 'VENDA' not in vendas_df.columns:
+                    flash("ERRO DE ARQUIVO: O relatório enviado não contém as colunas obrigatórias 'CÓDIGO' e 'VENDA'.")
                     return render_template('upload.html', debug_info=DEBUG_INFO)
                 
                 if vendas_df.empty:
                     flash("ERRO DE CONTEÚDO: O arquivo não contém nenhuma linha de dados.")
                     return render_template('upload.html', debug_info=DEBUG_INFO)
                 
-                vendas_df['ITENS'] = vendas_df['ITENS'].astype(str)
+                # --- LÓGICA DE MERGE CORRIGIDA ---
                 if catalogo_df is not None:
-                    catalogo_df['DESCRICAO'] = catalogo_df['DESCRICAO'].astype(str)
+                    # Garante que as colunas de CÓDIGO em ambas as tabelas sejam do mesmo tipo (texto)
+                    vendas_df['CÓDIGO'] = vendas_df['CÓDIGO'].astype(str)
+                    catalogo_df['CODIGO'] = catalogo_df['CODIGO'].astype(str)
+
                     dados_completos_df = pd.merge(
                         left=vendas_df, right=catalogo_df,
-                        left_on='ITENS', right_on='DESCRICAO', how='left'
+                        left_on='CÓDIGO',      # <-- USA A COLUNA DE CÓDIGO DO RELATÓRIO
+                        right_on='CODIGO',     # <-- USA A COLUNA DE CÓDIGO DO CATÁLOGO
+                        how='left'
                     )
                     DEBUG_INFO['merged_df_cols'] = str(dados_completos_df.columns.tolist())
-
-                    # --- AJUSTE FINAL PARA COLUNAS DUPLICADAS ---
-                    # Se o merge criou FABRICANTE_x e FABRICANTE_y, vamos tratar isso.
-                    if 'FABRICANTE_y' in dados_completos_df.columns:
-                        # Vamos usar a coluna do catálogo (_y) como a oficial.
-                        # Primeiro, preenchemos os valores vazios na coluna _y com os valores da _x
-                        dados_completos_df['FABRICANTE_y'].fillna(dados_completos_df['FABRICANTE_x'], inplace=True)
-                        # Renomeamos a coluna _y para o nome padrão 'FABRICANTE'
-                        dados_completos_df.rename(columns={'FABRICANTE_y': 'FABRICANTE'}, inplace=True)
-                        # Removemos a coluna _x que não é mais necessária
-                        dados_completos_df.drop(columns=['FABRICANTE_x'], inplace=True)
                 else:
                     dados_completos_df = vendas_df
                     flash("Aviso: Catálogo de produtos não carregado.")
-
+                
+                # ... (resto do código continua igual)
                 dados_completos_df['VENDA'] = pd.to_numeric(dados_completos_df['VENDA'], errors='coerce').fillna(0)
                 
                 top_10_itens = dados_completos_df.groupby('ITENS')['VENDA'].sum().nlargest(10).sort_values(ascending=True)
@@ -93,7 +88,10 @@ def pagina_upload():
                 fig_top_itens.update_layout(yaxis_title="Item", xaxis_title="Total de Venda")
                 
                 grafico_fabricantes_html = "<div class='alert alert-warning'>Gráfico de Fabricantes indisponível. Verifique se o arquivo 'catalogo_produtos.xlsx' foi enviado.</div>"
-                if 'FABRICANTE' in dados_completos_df.columns:
+                if 'FABRICANTE_y' in dados_completos_df.columns: # Checa se o merge produziu a coluna do fabricante
+                    # Renomeia a coluna do fabricante vinda do catálogo para um nome simples
+                    dados_completos_df.rename(columns={'FABRICANTE_y': 'FABRICANTE'}, inplace=True)
+                    
                     df_fabricantes = dados_completos_df.dropna(subset=['FABRICANTE'])
                     if not df_fabricantes.empty:
                         vendas_por_fabricante = df_fabricantes.groupby('FABRICANTE')['VENDA'].sum().nlargest(15).sort_values(ascending=False)
