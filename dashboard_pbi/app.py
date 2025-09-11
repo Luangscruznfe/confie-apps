@@ -9,7 +9,7 @@ import os
 import logging
 
 app = Flask(__name__)
-app.secret_key = 'sua_chave_secreta_aqui'  # Necessário para flash messages
+app.secret_key = 'sua_chave_secreta_aqui'
 
 # Configurar logging
 logging.basicConfig(level=logging.INFO)
@@ -34,17 +34,7 @@ def normalizar_serie(serie: pd.Series) -> pd.Series:
     )
 
 def encontrar_melhor_match(produto, catalogo_produtos, threshold=80):
-    """
-    Encontra o melhor match usando similaridade fuzzy
-    
-    Args:
-        produto: Nome do produto a ser procurado
-        catalogo_produtos: Lista de produtos do catálogo
-        threshold: Limite mínimo de similaridade (0-100)
-    
-    Returns:
-        Tuple (produto_encontrado, score) ou None se não encontrar
-    """
+    """Encontra o melhor match usando similaridade fuzzy"""
     if not produto or pd.isna(produto):
         return None
     
@@ -58,12 +48,7 @@ def encontrar_melhor_match(produto, catalogo_produtos, threshold=80):
         return None
 
 def criar_mapeamento_produtos(df_vendas, catalogo_df, threshold=80):
-    """
-    Cria mapeamento entre produtos do relatório e catálogo usando match fuzzy
-    
-    Returns:
-        dict: Mapeamento produto_venda -> (produto_catalogo, fabricante, score)
-    """
+    """Cria mapeamento entre produtos do relatório e catálogo usando match fuzzy"""
     produtos_vendas = df_vendas['ITENS_NORM'].unique()
     produtos_catalogo = catalogo_df['DESCRICAO_NORM'].tolist()
     
@@ -80,7 +65,6 @@ def criar_mapeamento_produtos(df_vendas, catalogo_df, threshold=80):
         match_exato = catalogo_df[catalogo_df['DESCRICAO_NORM'] == produto]
         
         if not match_exato.empty:
-            # Match exato encontrado
             fabricante = match_exato.iloc[0]['FABRICANTE']
             mapeamento[produto] = (produto, fabricante, 100, 'EXATO')
             logger.info(f"Match EXATO: '{produto}' -> Fabricante: {fabricante}")
@@ -98,7 +82,6 @@ def criar_mapeamento_produtos(df_vendas, catalogo_df, threshold=80):
                     logger.info(f"Match FUZZY ({score}%): '{produto}' -> '{produto_encontrado}' -> Fabricante: {fabricante}")
                 else:
                     produtos_nao_encontrados.append(produto)
-                    logger.warning(f"Produto encontrado mas sem fabricante: '{produto}'")
             else:
                 produtos_nao_encontrados.append(produto)
                 logger.warning(f"Produto NÃO encontrado: '{produto}'")
@@ -118,8 +101,6 @@ def carregar_catalogo():
             return None, f"Arquivo {CATALOGO_PATH} não encontrado"
         
         catalogo_df = pd.read_excel(CATALOGO_PATH, engine='openpyxl')
-        
-        # Padroniza nomes das colunas
         catalogo_df.columns = catalogo_df.columns.str.strip().str.upper()
         
         # Verifica se as colunas necessárias existem
@@ -199,7 +180,7 @@ def upload_analise():
             logger.info(f"Processando relatório com {len(df)} linhas válidas")
 
             # Cria mapeamento usando match fuzzy
-            threshold = int(request.form.get('threshold', 80))  # Permite ajustar threshold via form
+            threshold = int(request.form.get('threshold', 80))
             mapeamento, produtos_nao_encontrados = criar_mapeamento_produtos(df, catalogo_df, threshold)
 
             # Aplica o mapeamento
@@ -313,4 +294,17 @@ def upload_analise():
             
             # Estatísticas por tipo de match
             stats_match = df.dropna(subset=['MATCH_TIPO']).groupby('MATCH_TIPO').agg({
-                'ITENS':
+                'ITENS': 'nunique',
+                'VENDA': 'sum'
+            }).reset_index()
+
+            # Renderiza o template com todos os dados
+            return render_template('dashboard.html',
+                                 grafico_top_itens=fig_top_itens.to_html(full_html=False),
+                                 grafico_fabricantes=grafico_fabricantes_html,
+                                 tabela_conferencia=tabela_conf_html,
+                                 produtos_nao_encontrados=nao_encontrados_html,
+                                 itens_total=itens_total,
+                                 itens_casados=itens_casados,
+                                 match_rate=round(match_rate, 1),
+                                 vendas_total=f'R
