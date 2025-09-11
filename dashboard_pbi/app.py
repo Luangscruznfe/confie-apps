@@ -36,13 +36,18 @@ def pagina_upload():
             try:
                 vendas_df = pd.read_excel(file)
 
-                # --- VALIDAÇÃO DO ARQUIVO (NOVA SEÇÃO) ---
-                # Verifica se as colunas essenciais para a análise existem no arquivo enviado.
+                # --- VALIDAÇÕES DO ARQUIVO (SEÇÃO ATUALIZADA) ---
+                # VALIDAÇÃO 1: Verifica se as colunas essenciais existem.
                 if 'ITENS' not in vendas_df.columns or 'VENDA' not in vendas_df.columns:
                     flash("ERRO DE ARQUIVO: O relatório enviado não contém as colunas obrigatórias 'ITENS' e 'VENDA'. Por favor, verifique o arquivo e tente novamente.")
                     return render_template('upload.html')
                 
-                # Se a validação passar, o código continua...
+                # VALIDAÇÃO 2 (NOVA): Verifica se a planilha contém alguma linha de dados.
+                if vendas_df.empty:
+                    flash("ERRO DE CONTEÚDO: O arquivo possui as colunas corretas, mas não contém nenhuma linha de dados para analisar.")
+                    return render_template('upload.html')
+                
+                # Se ambas as validações passarem, o código continua...
 
                 if catalogo_df is not None:
                     dados_completos_df = pd.merge(
