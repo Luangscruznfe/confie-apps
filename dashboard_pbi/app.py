@@ -17,14 +17,12 @@ logger = logging.getLogger(__name__)
 
 # --- Normalização de texto ---
 def remover_acentos(s: str) -> str:
-    """Remove acentos e caracteres especiais de uma string"""
     if not isinstance(s, str):
         s = str(s)
     nfkd = unicodedata.normalize('NFKD', s)
     return ''.join(ch for ch in nfkd if not unicodedata.combining(ch))
 
 def normalizar_serie(serie: pd.Series) -> pd.Series:
-    """Normaliza uma série pandas removendo acentos, espaços extras e padronizando"""
     return (
         serie.astype(str)
              .str.strip()
@@ -34,10 +32,8 @@ def normalizar_serie(serie: pd.Series) -> pd.Series:
     )
 
 def encontrar_melhor_match(produto, catalogo_produtos, threshold=80):
-    """Encontra o melhor match usando similaridade fuzzy"""
     if not produto or pd.isna(produto):
         return None
-    
     try:
         match = process.extractOne(produto, catalogo_produtos, scorer=fuzz.token_sort_ratio)
         if match and match[1] >= threshold:
@@ -48,28 +44,22 @@ def encontrar_melhor_match(produto, catalogo_produtos, threshold=80):
         return None
 
 def criar_mapeamento_produtos(df_vendas, catalogo_df, threshold=80):
-    """Cria mapeamento entre produtos do relatório e catálogo usando match fuzzy"""
     produtos_vendas = df_vendas['ITENS_NORM'].unique()
     produtos_catalogo = catalogo_df['DESCRICAO_NORM'].tolist()
     
     mapeamento = {}
     produtos_nao_encontrados = []
     
-    logger.info(f"Iniciando match para {len(produtos_vendas)} produtos únicos...")
-    
     for produto in produtos_vendas:
         if pd.isna(produto) or produto == '':
             continue
             
-        # Primeiro tenta match exato
         match_exato = catalogo_df[catalogo_df['DESCRICAO_NORM'] == produto]
         
         if not match_exato.empty:
             fabricante = match_exato.iloc[0]['FABRICANTE']
             mapeamento[produto] = (produto, fabricante, 100, 'EXATO')
-            logger.info(f"Match EXATO: '{produto}' -> Fabricante: {fabricante}")
         else:
-            # Tenta match fuzzy
             match_result = encontrar_melhor_match(produto, produtos_catalogo, threshold)
             
             if match_result:
@@ -79,22 +69,16 @@ def criar_mapeamento_produtos(df_vendas, catalogo_df, threshold=80):
                 if not fabricante_row.empty:
                     fabricante = fabricante_row.iloc[0]['FABRICANTE']
                     mapeamento[produto] = (produto_encontrado, fabricante, score, 'FUZZY')
-                    logger.info(f"Match FUZZY ({score}%): '{produto}' -> '{produto_encontrado}' -> Fabricante: {fabricante}")
                 else:
                     produtos_nao_encontrados.append(produto)
             else:
                 produtos_nao_encontrados.append(produto)
-                logger.warning(f"Produto NÃO encontrado: '{produto}'")
-    
-    logger.info(f"Match concluído: {len(mapeamento)} produtos mapeados, {len(produtos_nao_encontrados)} não encontrados")
     
     return mapeamento, produtos_nao_encontrados
-
 # --- Carrega e prepara o catálogo uma vez ---
 CATALOGO_PATH = 'catalogo_produtos.xlsx'
 
 def carregar_catalogo():
-    """Carrega e prepara o catálogo de produtos"""
     try:
         if not os.path.exists(CATALOGO_PATH):
             logger.error(f"Arquivo de catálogo não encontrado: {CATALOGO_PATH}")
@@ -103,25 +87,16 @@ def carregar_catalogo():
         catalogo_df = pd.read_excel(CATALOGO_PATH, engine='openpyxl')
         catalogo_df.columns = catalogo_df.columns.str.strip().str.upper()
         
-        # Verifica se as colunas necessárias existem
         colunas_necessarias = ['DESCRICAO', 'FABRICANTE']
         colunas_faltando = [col for col in colunas_necessarias if col not in catalogo_df.columns]
         
         if colunas_faltando:
-            erro = f"Colunas faltando no catálogo: {colunas_faltando}. Colunas disponíveis: {list(catalogo_df.columns)}"
+            erro = f"Colunas faltando no catálogo: {colunas_faltando}"
             logger.error(erro)
             return None, erro
         
-        # Normaliza descrições
         catalogo_df['DESCRICAO_NORM'] = normalizar_serie(catalogo_df['DESCRICAO'])
-        
-        # Remove duplicatas
-        catalogo_original = len(catalogo_df)
         catalogo_df = catalogo_df.drop_duplicates(subset=['DESCRICAO_NORM']).reset_index(drop=True)
-        catalogo_final = len(catalogo_df)
-        
-        if catalogo_original != catalogo_final:
-            logger.info(f"Removidas {catalogo_original - catalogo_final} duplicatas do catálogo")
         
         logger.info(f"Catálogo carregado com sucesso: {len(catalogo_df)} produtos únicos")
         return catalogo_df, None
@@ -136,9 +111,6 @@ catalogo_df, catalogo_erro = carregar_catalogo()
 
 @app.route('/', methods=['GET', 'POST'])
 def upload_analise():
-    """Rota principal para upload e análise do relatório"""
-    
-    # Informações de debug para o template
     debug_info = {
         'catalogo_status': 'OK' if catalogo_df is not None else 'ERRO',
         'catalogo_error': catalogo_erro or 'Nenhum',
@@ -157,32 +129,23 @@ def upload_analise():
             return render_template('upload.html', debug_info=debug_info)
 
         try:
-            # Lê relatório de vendas
             df = pd.read_excel(file, engine='openpyxl')
             df.columns = df.columns.str.strip().str.upper()
 
-            # Validação das colunas necessárias
             if not {'ITENS', 'VENDA'}.issubset(df.columns):
                 flash("O relatório precisa ter as colunas 'ITENS' e 'VENDA'.")
                 return render_template('upload.html', debug_info=debug_info)
 
-            # Normaliza e limpa dados
             df['ITENS_NORM'] = normalizar_serie(df['ITENS'])
             df['VENDA'] = pd.to_numeric(df['VENDA'], errors='coerce').fillna(0)
-            
-            # Remove linhas com vendas zero ou itens vazios
             df = df[(df['VENDA'] > 0) & (df['ITENS_NORM'].str.len() > 0)]
             
             if df.empty:
                 flash('Nenhum dado válido encontrado no relatório.')
                 return render_template('upload.html', debug_info=debug_info)
 
-            logger.info(f"Processando relatório com {len(df)} linhas válidas")
-
-            # Cria mapeamento usando match fuzzy
             threshold = int(request.form.get('threshold', 80))
             mapeamento, produtos_nao_encontrados = criar_mapeamento_produtos(df, catalogo_df, threshold)
-
             # Aplica o mapeamento
             df['FABRICANTE_FINAL'] = None
             df['PRODUTO_CATALOGO'] = None
@@ -222,7 +185,7 @@ def upload_analise():
             df_fab = df.dropna(subset=['FABRICANTE_FINAL'])
             
             if df_fab.empty:
-                grafico_fabricantes_html = "<div class='alert alert-warning'>Nenhum fabricante encontrado no match.</div>"
+                grafico_fabricantes_html = "<div class='alert alert-warning'>Nenhum fabricante encontrado.</div>"
             else:
                 fab_df = (
                     df_fab.groupby('FABRICANTE_FINAL', as_index=False)['VENDA']
@@ -240,10 +203,7 @@ def upload_analise():
                     color='VENDA',
                     color_continuous_scale='Greens'
                 )
-                fig_fabricantes.update_layout(
-                    height=500,
-                    xaxis_tickangle=-45
-                )
+                fig_fabricantes.update_layout(height=500, xaxis_tickangle=-45)
                 grafico_fabricantes_html = fig_fabricantes.to_html(full_html=False)
 
             # --------- Tabela de Conferência ----------
@@ -254,7 +214,6 @@ def upload_analise():
                   .head(50)
             )
             
-            # Formata a tabela
             tabela_conf_df['VENDA_FORMATADA'] = tabela_conf_df['VENDA'].apply(lambda x: f'R$ {x:,.2f}')
             tabela_conf_df['MATCH_SCORE'] = tabela_conf_df['MATCH_SCORE'].fillna(0).astype(int)
             
@@ -263,7 +222,6 @@ def upload_analise():
                 classes="table table-striped table-sm table-hover",
                 table_id="tabela-conferencia"
             )
-
             # --------- Relatório de Produtos Não Encontrados ----------
             if produtos_nao_encontrados:
                 vendas_nao_encontradas = df[df['ITENS_NORM'].isin(produtos_nao_encontrados)]['VENDA'].sum()
@@ -291,12 +249,6 @@ def upload_analise():
             vendas_total = df['VENDA'].sum()
             vendas_casadas = df.dropna(subset=['FABRICANTE_FINAL'])['VENDA'].sum()
             vendas_match_rate = (vendas_casadas / vendas_total * 100) if vendas_total else 0
-            
-            # Estatísticas por tipo de match
-            stats_match = df.dropna(subset=['MATCH_TIPO']).groupby('MATCH_TIPO').agg({
-                'ITENS': 'nunique',
-                'VENDA': 'sum'
-            }).reset_index()
 
             # Renderiza o template com todos os dados
             return render_template('dashboard.html',
@@ -307,4 +259,19 @@ def upload_analise():
                                  itens_total=itens_total,
                                  itens_casados=itens_casados,
                                  match_rate=round(match_rate, 1),
-                                 vendas_total=f'R
+                                 vendas_total=f'R$ {vendas_total:,.2f}',
+                                 vendas_casadas=f'R$ {vendas_casadas:,.2f}',
+                                 vendas_match_rate=round(vendas_match_rate, 1),
+                                 vendas_nao_encontradas=f'R$ {vendas_nao_encontradas:,.2f}',
+                                 threshold_usado=threshold)
+
+        except Exception as e:
+            flash(f'Erro ao processar arquivo: {str(e)}')
+            logger.error(f"Erro no processamento: {e}")
+            return render_template('upload.html', debug_info=debug_info)
+    
+    # GET request - mostra página de upload
+    return render_template('upload.html', debug_info=debug_info)
+
+if __name__ == '__main__':
+    app.run(debug=True)
