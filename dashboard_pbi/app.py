@@ -1,4 +1,4 @@
-# dashboard_pbi/app.py --- VERSÃO COM DIAGNÓSTICO DE COLUNAS
+# dashboard_pbi/app.py --- VERSÃO DE DIAGNÓSTICO (COM INDENTAÇÃO CORRIGIDA)
 
 import pandas as pd
 import plotly.express as px
@@ -6,7 +6,7 @@ from flask import Flask, request, render_template, flash
 import os
 
 app = Flask(__name__)
-app.secret_key = 'sua-chave-secreta-aqui-novamente' 
+app.secret_key = 'sua-chave-secreta-aqui-novamente'
 
 # --- PAINEL DE DIAGNÓSTICO (INICIALIZAÇÃO) ---
 DEBUG_INFO = {
@@ -43,11 +43,10 @@ except Exception as e:
 def pagina_upload():
     if request.method == 'POST':
         try:
-            if 'file' not in request.files or file.filename == '':
+            file = request.files.get('file')
+            if not file or file.filename == '':
                 flash('Nenhum arquivo selecionado')
                 return render_template('upload.html', debug_info=DEBUG_INFO)
-            
-            file = request.files['file']
 
             if file and (file.filename.endswith('.xlsx') or file.filename.endswith('.xls')):
                 vendas_df = pd.read_excel(file)
@@ -84,15 +83,20 @@ def pagina_upload():
                 
                 grafico_fabricantes_html = "" # Inicializa a variável
                 if catalogo_df is not None and 'FABRICANTE' in dados_completos_df.columns:
-                    vendas_por_fabricante = dados_completos_df.groupby('FABRICANTE')['VENDA'].sum().nlargest(15).sort_values(ascending=False)
-                    fig_fabricantes = px.bar(
-                        vendas_por_fabricante, x=vendas_por_fabricante.index, y='VENDA',
-                        title='Top 15 Fabricantes por Venda', text_auto='.2s'
-                    )
-                    fig_fabricantes.update_layout(xaxis_title="Fabricante", yaxis_title="Total de Venda")
-                    grafico_fabricantes_html = fig_fabricantes.to_html(full_html=False)
+                    # Filtra os NaNs da coluna fabricante ANTES de agrupar
+                    df_fabricantes = dados_completos_df.dropna(subset=['FABRICANTE'])
+                    if not df_fabricantes.empty:
+                        vendas_por_fabricante = df_fabricantes.groupby('FABRICANTE')['VENDA'].sum().nlargest(15).sort_values(ascending=False)
+                        fig_fabricantes = px.bar(
+                            vendas_por_fabricante, x=vendas_por_fabricante.index, y='VENDA',
+                            title='Top 15 Fabricantes por Venda', text_auto='.2s'
+                        )
+                        fig_fabricantes.update_layout(xaxis_title="Fabricante", yaxis_title="Total de Venda")
+                        grafico_fabricantes_html = fig_fabricantes.to_html(full_html=False)
+                    else:
+                        grafico_fabricantes_html = "<div class='alert alert-info'>Nenhuma correspondência de fabricante encontrada entre o relatório e o catálogo.</div>"
                 else:
-                    grafico_fabricantes_html = "<div class='alert alert-warning'>Gráfico de Fabricantes indisponível. Verifique se o arquivo 'catalogo_produtos.xlsx' foi enviado e se há correspondência de itens.</div>"
+                    grafico_fabricantes_html = "<div class='alert alert-warning'>Gráfico de Fabricantes indisponível. Verifique se o arquivo 'catalogo_produtos.xlsx' foi enviado.</div>"
                 
                 return render_template(
                     'dashboard.html',
@@ -102,6 +106,9 @@ def pagina_upload():
                 )
             except Exception as e:
                 flash(f'Erro ao processar o arquivo: {e}')
+                # Tenta popular o debug info mesmo em caso de erro
+                if 'vendas_df' in locals():
+                    DEBUG_INFO['vendas_df_cols'] = str(vendas_df.columns.tolist())
                 return render_template('upload.html', debug_info=DEBUG_INFO)
         else:
             flash('Formato de arquivo inválido.')
