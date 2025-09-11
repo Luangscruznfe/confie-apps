@@ -1,4 +1,4 @@
-# dashboard_pbi/app.py --- VERSÃO FINAL COM LÓGICA DE FABRICANTE CORRIGIDA
+# dashboard_pbi/app.py --- VERSÃO FINAL COM CRUZAMENTO PELA DESCRIÇÃO
 
 import pandas as pd
 import plotly.express as px
@@ -34,8 +34,8 @@ def pagina_upload():
             if file and (file.filename.endswith('.xlsx') or file.filename.endswith('.xls')):
                 vendas_df = pd.read_excel(file)
 
-                if 'CÓDIGO' not in vendas_df.columns or 'VENDA' not in vendas_df.columns or 'ITENS' not in vendas_df.columns:
-                    flash("ERRO: O relatório enviado não contém as colunas obrigatórias 'CÓDIGO', 'ITENS' e 'VENDA'.")
+                if 'ITENS' not in vendas_df.columns or 'VENDA' not in vendas_df.columns:
+                    flash("ERRO: O relatório enviado não contém as colunas obrigatórias 'ITENS' e 'VENDA'.")
                     return render_template('upload.html')
                 
                 if vendas_df.empty:
@@ -44,12 +44,14 @@ def pagina_upload():
                 
                 dados_completos_df = vendas_df
                 if catalogo_df is not None:
-                    vendas_df['CÓDIGO'] = vendas_df['CÓDIGO'].astype(str)
-                    catalogo_df['CODIGO'] = catalogo_df['CODIGO'].astype(str)
+                    # Garante que as colunas de DESCRIÇÃO em ambas as tabelas sejam do mesmo tipo (texto)
+                    vendas_df['ITENS'] = vendas_df['ITENS'].astype(str)
+                    catalogo_df['DESCRICAO'] = catalogo_df['DESCRICAO'].astype(str)
                     
                     dados_completos_df = pd.merge(
                         left=vendas_df, right=catalogo_df,
-                        left_on='CÓDIGO', right_on='CODIGO',
+                        left_on='ITENS',      # <-- USA A DESCRIÇÃO DO ITEM DO RELATÓRIO
+                        right_on='DESCRICAO', # <-- USA A DESCRIÇÃO DO ITEM DO CATÁLOGO
                         how='left', suffixes=('_VENDA', '_CATALOGO')
                     )
 
@@ -63,18 +65,15 @@ def pagina_upload():
                 )
                 fig_top_itens.update_layout(yaxis_title="Item", xaxis_title="Total de Venda")
                 
-                # --- LÓGICA DE GRÁFICO DE FABRICANTES (REESCRITA E ROBUSTA) ---
-                grafico_fabricantes_html = "<div class='alert alert-warning'>Gráfico de Fabricantes indisponível. Verifique o catálogo e a correspondência de códigos.</div>"
+                # GRÁFICO 2: TOP 15 FABRICANTES
+                grafico_fabricantes_html = "<div class='alert alert-warning'>Gráfico de Fabricantes indisponível.</div>"
                 coluna_fabricante_final = None
 
-                # Cenário 1: Ambos os arquivos tinham 'FABRICANTE', então o merge criou '_CATALOGO'
                 if 'FABRICANTE_CATALOGO' in dados_completos_df.columns:
                     coluna_fabricante_final = 'FABRICANTE_CATALOGO'
-                # Cenário 2: Apenas um dos arquivos tinha 'FABRICANTE', então o merge manteve o nome simples
                 elif 'FABRICANTE' in dados_completos_df.columns:
                     coluna_fabricante_final = 'FABRICANTE'
 
-                # Se encontramos uma coluna de fabricante para usar, criamos o gráfico
                 if coluna_fabricante_final:
                     df_fabricantes = dados_completos_df.dropna(subset=[coluna_fabricante_final])
                     if not df_fabricantes.empty:
