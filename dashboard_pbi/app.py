@@ -13,11 +13,21 @@ app.secret_key = 'sua-chave-secreta-aqui-novamente'
 CATALOGO_PATH = os.path.join(os.path.dirname(__file__), 'catalogo_produtos.csv')
 try:
     colunas_catalogo = ['CODIGO', 'DESCRICAO', 'FABRICANTE', 'DEPARTAMENTO']
-    catalogo_df = pd.read_csv(CATALOGO_PATH, usecols=colunas_catalogo)
+    # LEITOR DE CSV ATUALIZADO PARA SER MAIS ROBUSTO
+    catalogo_df = pd.read_csv(
+        CATALOGO_PATH, 
+        usecols=colunas_catalogo,
+        sep=';',                   # Define o ponto e vírgula como separador
+        encoding='latin1',         # Melhora a compatibilidade com acentos
+        on_bad_lines='skip'        # Pula linhas com erro de formatação (COMO A LINHA 4)
+    )
     print("SUCESSO: Arquivo 'catalogo_produtos.csv' carregado.")
 except FileNotFoundError:
     catalogo_df = None
     print("AVISO: Arquivo 'catalogo_produtos.csv' não encontrado. Gráficos de fabricante e departamento serão desativados.")
+except Exception as e:
+    catalogo_df = None
+    print(f"ERRO AO LER O CATÁLOGO: {e}")
 
 
 @app.route('/', methods=['GET', 'POST'])
@@ -77,8 +87,7 @@ def pagina_upload():
                 )
                 fig_top_itens.update_layout(yaxis_title="Item", xaxis_title="Total de Venda")
 
-                # GRÁFICO 2: VENDAS POR FABRICANTE (com segurança extra)
-                # SÓ TENTA CRIAR O GRÁFICO SE O CATÁLOGO FOI CARREGADO
+                # GRÁFICO 2: VENDAS POR FABRICANTE
                 if catalogo_df is not None and 'FABRICANTE' in dados_completos_df.columns:
                     vendas_por_fabricante = dados_completos_df.groupby('FABRICANTE')['VENDA'].sum().nlargest(15).sort_values(ascending=False)
                     fig_fabricantes = px.bar(
@@ -93,8 +102,7 @@ def pagina_upload():
                 else:
                     grafico_fabricantes_html = "<div class='alert alert-warning'>Gráfico de Fabricantes indisponível. Verifique se o arquivo 'catalogo_produtos.csv' foi enviado corretamente.</div>"
 
-                # GRÁFICO 3: VENDAS POR DEPARTAMENTO E ITEM (com segurança extra)
-                # SÓ TENTA CRIAR O GRÁFICO SE O CATÁLOGO FOI CARREGADO
+                # GRÁFICO 3: VENDAS POR DEPARTAMENTO E ITEM
                 if catalogo_df is not None and 'DEPARTAMENTO' in dados_completos_df.columns and 'ITENS' in dados_completos_df.columns:
                     df_treemap = dados_completos_df.dropna(subset=['DEPARTAMENTO'])
                     fig_treemap = px.treemap(
