@@ -1,4 +1,4 @@
-# dashboard_pbi/app.py --- VERSÃO DE DIAGNÓSTICO (COM INDENTAÇÃO CORRIGIDA)
+# dashboard_pbi/app.py --- VERSÃO DE DIAGNÓSTICO (COM INDENTAÇÃO 100% CORRIGIDA)
 
 import pandas as pd
 import plotly.express as px
@@ -81,9 +81,9 @@ def pagina_upload():
                 )
                 fig_top_itens.update_layout(yaxis_title="Item", xaxis_title="Total de Venda")
                 
-                grafico_fabricantes_html = "" # Inicializa a variável
+                # Lógica do Gráfico de Fabricantes (Revisada para clareza)
+                grafico_fabricantes_html = "<div class='alert alert-warning'>Gráfico de Fabricantes indisponível. Verifique se o arquivo 'catalogo_produtos.xlsx' foi enviado.</div>"
                 if catalogo_df is not None and 'FABRICANTE' in dados_completos_df.columns:
-                    # Filtra os NaNs da coluna fabricante ANTES de agrupar
                     df_fabricantes = dados_completos_df.dropna(subset=['FABRICANTE'])
                     if not df_fabricantes.empty:
                         vendas_por_fabricante = df_fabricantes.groupby('FABRICANTE')['VENDA'].sum().nlargest(15).sort_values(ascending=False)
@@ -95,8 +95,6 @@ def pagina_upload():
                         grafico_fabricantes_html = fig_fabricantes.to_html(full_html=False)
                     else:
                         grafico_fabricantes_html = "<div class='alert alert-info'>Nenhuma correspondência de fabricante encontrada entre o relatório e o catálogo.</div>"
-                else:
-                    grafico_fabricantes_html = "<div class='alert alert-warning'>Gráfico de Fabricantes indisponível. Verifique se o arquivo 'catalogo_produtos.xlsx' foi enviado.</div>"
                 
                 return render_template(
                     'dashboard.html',
@@ -104,12 +102,11 @@ def pagina_upload():
                     grafico2_html=grafico_fabricantes_html,
                     debug_info=DEBUG_INFO
                 )
-            except Exception as e:
-                flash(f'Erro ao processar o arquivo: {e}')
-                # Tenta popular o debug info mesmo em caso de erro
-                if 'vendas_df' in locals():
-                    DEBUG_INFO['vendas_df_cols'] = str(vendas_df.columns.tolist())
-                return render_template('upload.html', debug_info=DEBUG_INFO)
+        except Exception as e:
+            flash(f'Erro ao processar o arquivo: {e}')
+            if 'vendas_df' in locals():
+                DEBUG_INFO['vendas_df_cols'] = str(vendas_df.columns.tolist())
+            return render_template('upload.html', debug_info=DEBUG_INFO)
         else:
             flash('Formato de arquivo inválido.')
             return render_template('upload.html', debug_info=DEBUG_INFO)
