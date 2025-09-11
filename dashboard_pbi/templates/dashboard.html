@@ -10,23 +10,7 @@
     </style>
 </head>
 <body>
-    {% if debug_info %}
-    <div class="alert alert-info m-3">
-        <h5 class="alert-heading">Painel de Diagnóstico do Servidor</h5>
-        <hr>
-        <p class="mb-1"><strong>Status do Catálogo (Inicialização):</strong> {{ debug_info.catalogo_status }}</p>
-        <p class="mb-1"><strong>Erro no Catálogo (se houver):</strong> <pre class="mb-0"><code>{{ debug_info.catalogo_error }}</code></pre></p>
-        <p class="mb-1"><strong>Caminho Esperado do Catálogo:</strong> <pre class="mb-0"><code>{{ debug_info.catalogo_path_esperado }}</code></pre></p>
-        <p class="mb-1"><strong>Arquivos no Diretório (Inicialização):</strong> <pre class="mb-0"><code>{{ debug_info.arquivos_no_diretorio }}</code></pre></p>
-        <hr>
-        <h6 class="alert-heading">Diagnóstico do Upload (Tempo Real)</h6>
-        <p class="mb-1"><strong>Colunas (Relatório de Vendas Enviado):</strong> <pre class="mb-0"><code>{{ debug_info.vendas_df_cols }}</code></pre></p>
-        <p class="mb-1"><strong>Colunas (Catálogo Carregado):</strong> <pre class="mb-0"><code>{{ debug_info.catalogo_df_cols }}</code></pre></p>
-        <p class="mb-1"><strong>Colunas (Resultado Após Cruzamento):</strong> <pre class="mb-0"><code>{{ debug_info.merged_df_cols }}</code></pre></p>
-    </div>
-    {% endif %}
-
-    <div class="container-fluid mt-2 px-4">
+    <div class="container-fluid mt-4 px-4">
         <div class="d-flex justify-content-between align-items-center mb-4">
             <h1 class="h2">Dashboard Interativo de Vendas</h1>
             <a href="/dashboard" class="btn btn-primary">Analisar outro arquivo</a>
