@@ -1,4 +1,4 @@
-# app.py - Versão com correção de sintaxe no groupby
+# app.py - Versão ajustada para achar catalogo relativo ao app.py e logs melhores
 
 import unicodedata
 import pandas as pd
@@ -7,9 +7,14 @@ from flask import Flask, request, render_template, flash
 from fuzzywuzzy import fuzz, process
 import os
 import logging
+import glob
+
+# Configuração básica
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+CATALOGO_PATH = os.path.join(BASE_DIR, 'catalogo_produtos.xlsx')
 
 app = Flask(__name__)
-app.secret_key = 'sua_chave_secreta_aqui'
+app.secret_key = os.environ.get('FLASK_SECRET_KEY', 'chave_de_dev_temporaria')
 
 # Configurar logging
 logging.basicConfig(level=logging.INFO)
@@ -36,8 +41,13 @@ def encontrar_melhor_match(produto, catalogo_produtos, threshold=80):
         return None
     try:
         match = process.extractOne(produto, catalogo_produtos, scorer=fuzz.token_sort_ratio)
-        if match and match[1] >= threshold:
-            return match
+        if not match:
+            return None
+        # match pode ter 2 ou 3 elementos; padronizamos para (texto, score)
+        match_text = match[0]
+        match_score = match[1] if len(match) > 1 else 0
+        if match_score >= threshold:
+            return (match_text, match_score)
         return None
     except Exception as e:
         logger.error(f"Erro no match fuzzy para '{produto}': {e}")
@@ -77,15 +87,29 @@ def criar_mapeamento_produtos(df_vendas, catalogo_df, threshold=80):
     return mapeamento, produtos_nao_encontrados
 
 # --- Carrega e prepara o catálogo uma vez ---
-CATALOGO_PATH = 'catalogo_produtos.xlsx'
-
 def carregar_catalogo():
     try:
-        if not os.path.exists(CATALOGO_PATH):
-            logger.error(f"Arquivo de catálogo não encontrado: {CATALOGO_PATH}")
-            return None, f"Arquivo {CATALOGO_PATH} não encontrado"
-        
-        catalogo_df = pd.read_excel(CATALOGO_PATH, engine='openpyxl')
+        logger.info(f"BASE_DIR: {BASE_DIR}")
+        logger.info(f"Procurando catálogo em: {CATALOGO_PATH}")
+        logger.info(f"Arquivos em BASE_DIR: {os.listdir(BASE_DIR)}")
+
+        # Tenta caminho direto primeiro
+        if os.path.exists(CATALOGO_PATH):
+            catalogo_df = pd.read_excel(CATALOGO_PATH, engine='openpyxl')
+            logger.info(f"Catálogo carregado diretamente de {CATALOGO_PATH}")
+        else:
+            # Fallback: procura recursivamente por arquivos com 'catalogo' no nome
+            padrao = os.path.join(BASE_DIR, '**', '*catalogo*.xlsx')
+            encontrados = glob.glob(padrao, recursive=True)
+            if encontrados:
+                encontrado = encontrados[0]
+                logger.warning(f"Arquivo de catálogo encontrado em local alternativo: {encontrado}")
+                catalogo_df = pd.read_excel(encontrado, engine='openpyxl')
+            else:
+                erro = f"Arquivo {CATALOGO_PATH} não encontrado em BASE_DIR e subpastas."
+                logger.error(erro)
+                return None, erro
+
         catalogo_df.columns = catalogo_df.columns.str.strip().str.upper()
         
         colunas_necessarias = ['DESCRICAO', 'FABRICANTE']
@@ -104,7 +128,7 @@ def carregar_catalogo():
         
     except Exception as e:
         erro = f"Erro ao carregar catálogo: {str(e)}"
-        logger.error(erro)
+        logger.error(erro, exc_info=True)
         return None, erro
 
 catalogo_df, catalogo_erro = carregar_catalogo()
@@ -114,8 +138,8 @@ def upload_analise():
     debug_info = {
         'catalogo_status': 'OK' if catalogo_df is not None else 'ERRO',
         'catalogo_error': catalogo_erro or 'Nenhum',
-        'catalogo_path_esperado': os.path.abspath(CATALOGO_PATH),
-        'arquivos_no_diretorio': str(os.listdir('.'))
+        'catalogo_path_esperado': CATALOGO_PATH,
+        'arquivos_no_diretorio': str(os.listdir(BASE_DIR))
     }
     
     if catalogo_df is None:
@@ -170,7 +194,7 @@ def upload_analise():
             top_itens_df = (
                 df.groupby('ITENS')['VENDA']
                   .sum()
-                  .reset_index() # Adicionado para transformar o índice em coluna
+                  .reset_index()
                   .nlargest(10, 'VENDA')
                   .sort_values('VENDA', ascending=True)
             )
@@ -181,7 +205,7 @@ def upload_analise():
                 y='ITENS',
                 orientation='h',
                 title='Top 10 Itens Mais Vendidos',
-                text_auto='.2s',
+                text_auto=True,
                 color='VENDA',
                 color_continuous_scale='Blues'
             )
@@ -196,7 +220,7 @@ def upload_analise():
                 fab_df = (
                     df_fab.groupby('FABRICANTE_FINAL')['VENDA']
                           .sum()
-                          .reset_index() # Adicionado para transformar o índice em coluna
+                          .reset_index()
                           .nlargest(15, 'VENDA')
                           .sort_values('VENDA', ascending=False)
                 )
@@ -206,7 +230,7 @@ def upload_analise():
                     x='FABRICANTE_FINAL', 
                     y='VENDA',
                     title='Top 15 Fabricantes por Venda',
-                    text_auto='.2s',
+                    text_auto=True,
                     color='VENDA',
                     color_continuous_scale='Greens'
                 )
@@ -217,7 +241,7 @@ def upload_analise():
             tabela_conf_df = (
                 df.groupby(['ITENS', 'FABRICANTE_FINAL', 'MATCH_TIPO', 'MATCH_SCORE'])['VENDA']
                   .sum()
-                  .reset_index() # Adicionado para transformar o índice em coluna
+                  .reset_index()
                   .sort_values('VENDA', ascending=False)
                   .head(50)
             )
@@ -238,7 +262,7 @@ def upload_analise():
                     df[df['ITENS_NORM'].isin(produtos_nao_encontrados)]
                     .groupby('ITENS')['VENDA']
                     .sum()
-                    .reset_index() # Adicionado para transformar o índice em coluna
+                    .reset_index()
                     .sort_values('VENDA', ascending=False)
                 )
                 nao_encontrados_df['VENDA_FORMATADA'] = nao_encontrados_df['VENDA'].apply(lambda x: f'R$ {x:,.2f}')
