@@ -3,16 +3,35 @@
 <head>
     <meta charset="UTF-8">
     <title>Dashboard de Vendas</title>
-    </head>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" />
+</head>
 <body class="bg-light">
     <div class="container-fluid mt-4">
         <h1 class="h2 mb-4">Dashboard de Análise de Vendas</h1>
         
         <div class="card mb-4">
+            <div class="card-header">Carregar Relatório de Vendas</div>
+            <div class="card-body">
+                <form method="post" enctype="multipart/form-data" action="{{ url_for('dashboard') }}">
+                    <div class="input-group">
+                        <input class="form-control" type="file" name="file" required>
+                        <button type="submit" class="btn btn-primary">Analisar</button>
+                    </div>
+                </form>
             </div>
-        
+        </div>
         {% with messages = get_flashed_messages(with_categories=true) %}
-          {% endwith %}
+          {% if messages %}
+            {% for category, message in messages %}
+              <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+              </div>
+            {% endfor %}
+          {% endif %}
+        {% endwith %}
 
         {% if resultados %}
         <div class="accordion mb-4" id="accordion-filtros">
@@ -25,6 +44,68 @@
                 <div id="collapseOne" class="accordion-collapse collapse">
                     <div class="accordion-body">
                         <form method="get" action="{{ url_for('dashboard') }}">
+                            <div class="row g-3">
+                                <div class="col-md-4">
+                                    <label for="vendedor-select" class="form-label">Vendedores</label>
+                                    <div class="d-flex gap-2 mb-1">
+                                        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="toggleAll('vendedor-select', true)">Todos</button>
+                                        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="toggleAll('vendedor-select', false)">Nenhum</button>
+                                    </div>
+                                    <select name="vendedor" id="vendedor-select" class="form-select" multiple>
+                                        {% for item in resultados.opcoes_vendedor %}<option value="{{ item }}" {% if item in resultados.selected_vendedores %}selected{% endif %}>{{ item }}</option>{% endfor %}
+                                    </select>
+                                </div>
+                                <div class="col-md-4">
+                                    <label for="produto-select" class="form-label">Produtos</label>
+                                    <div class="d-flex gap-2 mb-1">
+                                        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="toggleAll('produto-select', true)">Todos</button>
+                                        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="toggleAll('produto-select', false)">Nenhum</button>
+                                    </div>
+                                    <select name="produto" id="produto-select" class="form-select" multiple>
+                                        {% for item in resultados.opcoes_produto %}<option value="{{ item }}" {% if item in resultados.selected_produtos %}selected{% endif %}>{{ item }}</option>{% endfor %}
+                                    </select>
+                                </div>
+                                <div class="col-md-4">
+                                    <label for="fabricante-select" class="form-label">Fabricantes</label>
+                                    <div class="d-flex gap-2 mb-1">
+                                        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="toggleAll('fabricante-select', true)">Todos</button>
+                                        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="toggleAll('fabricante-select', false)">Nenhum</button>
+                                    </div>
+                                    <select name="fabricante" id="fabricante-select" class="form-select" multiple>
+                                        {% for item in resultados.opcoes_fabricante %}<option value="{{ item }}" {% if item in resultados.selected_fabricantes %}selected{% endif %}>{{ item }}</option>{% endfor %}
+                                    </select>
+                                </div>
+                                <div class="col-md-4">
+                                    <label for="categoria-select" class="form-label">Categorias</label>
+                                     <div class="d-flex gap-2 mb-1">
+                                        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="toggleAll('categoria-select', true)">Todos</button>
+                                        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="toggleAll('categoria-select', false)">Nenhum</button>
+                                    </div>
+                                    <select name="categoria" id="categoria-select" class="form-select" multiple>
+                                        {% for item in resultados.opcoes_categoria %}<option value="{{ item }}" {% if item in resultados.selected_categorias %}selected{% endif %}>{{ item }}</option>{% endfor %}
+                                    </select>
+                                </div>
+                                <div class="col-md-4">
+                                    <label for="cidade-select" class="form-label">Cidades</label>
+                                     <div class="d-flex gap-2 mb-1">
+                                        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="toggleAll('cidade-select', true)">Todos</button>
+                                        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="toggleAll('cidade-select', false)">Nenhum</button>
+                                    </div>
+                                    <select name="cidade" id="cidade-select" class="form-select" multiple>
+                                        {% for item in resultados.opcoes_cidade %}<option value="{{ item }}" {% if item in resultados.selected_cidades %}selected{% endif %}>{{ item }}</option>{% endfor %}
+                                    </select>
+                                </div>
+                                <div class="col-md-4">
+                                    <label for="segmento-select" class="form-label">Segmentos</label>
+                                     <div class="d-flex gap-2 mb-1">
+                                        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="toggleAll('segmento-select', true)">Todos</button>
+                                        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="toggleAll('segmento-select', false)">Nenhum</button>
+                                    </div>
+                                    <select name="segmento" id="segmento-select" class="form-select" multiple>
+                                        {% for item in resultados.opcoes_segmento %}<option value="{{ item }}" {% if item in resultados.selected_segmentos %}selected{% endif %}>{{ item }}</option>{% endfor %}
+                                    </select>
+                                </div>
+                            </div>
                             <div class="row mt-3">
                                 <div class="col-12 text-center">
                                     <button type="submit" class="btn btn-success w-50">Aplicar Filtros e Ver Análise Detalhada</button>
@@ -35,9 +116,7 @@
                 </div>
             </div>
         </div>
-
         <hr>
-
         {% if resultados.view_mode == 'initial' %}
             <div class="row">
                 <div class="col-12 mb-4">
@@ -66,5 +145,21 @@
         {% endif %}
     </div>
 
-    </body>
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+    <script>
+        $(document).ready(function() {
+            $('select').select2({
+                theme: 'bootstrap-5',
+                placeholder: 'Selecione uma ou mais opções',
+                closeOnSelect: false
+            });
+        });
+        function toggleAll(selectId, select) {
+            $('#' + selectId + ' > option').prop("selected", select);
+            $('#' + selectId).trigger('change');
+        }
+    </script>
+</body>
 </html>
