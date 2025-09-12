@@ -1,7 +1,6 @@
 # requirements.txt para a pasta dashboard_pbi
 
 Flask
-streamlit
 pandas
 plotly
 openpyxl
