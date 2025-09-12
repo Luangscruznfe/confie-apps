@@ -10,7 +10,7 @@ from datetime import datetime
 app = Flask(__name__)
 app.secret_key = 'chave_final_correcao_colunas_v3' # Chave secreta atualizada
 
-DEBUG_MODE = True 
+DEBUG_MODE = False 
 DEBUG_FOLDER = 'debug_files'
 if not os.path.exists(DEBUG_FOLDER):
     os.makedirs(DEBUG_FOLDER)
