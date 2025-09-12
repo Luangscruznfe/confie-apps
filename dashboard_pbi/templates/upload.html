@@ -18,14 +18,11 @@
                   {% endif %}
                 {% endwith %}
 
+                <p>Envie sua planilha de vendas (.xlsx) contendo as colunas 'ITENS', 'VENDA' e 'FABRICANTE'.</p>
                 <form method="post" enctype="multipart/form-data">
                     <div class="mb-3">
-                        <label for="file" class="form-label">Selecione o relatório de vendas (.xlsx)</label>
+                        <label for="file" class="form-label">Selecione o relatório</label>
                         <input class="form-control" type="file" name="file" id="file" required>
-                    </div>
-                    <div class="mb-3">
-                        <label for="threshold" class="form-label">Nível de Confiança para Correspondência: <span id="threshold-value">80</span>%</label>
-                        <input type="range" class="form-range" min="50" max="100" value="80" id="threshold" name="threshold" oninput="document.getElementById('threshold-value').innerText = this.value;">
                     </div>
                     <button type="submit" class="btn btn-primary w-100">Analisar</button>
                 </form>
