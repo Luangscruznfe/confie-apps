@@ -1,73 +1,97 @@
-# dashboard_pbi/app.py --- VERSÃO SIMPLIFICADA (SEM CATÁLOGO)
+# dashboard_pbi/app.py - Versão Flask com Filtros e Tabela Interativa
 
 import pandas as pd
 import plotly.express as px
-from flask import Flask, request, render_template, flash
+from flask import Flask, request, render_template, flash, session, redirect, url_for
 import os
 
 app = Flask(__name__)
-app.secret_key = 'sua_chave_secreta_aqui_final'
+app.secret_key = 'sua_chave_secreta_aqui_flask_final'
+
+# Função para carregar e processar os dados
+def processar_dados(arquivo_bytes):
+    df = pd.read_excel(arquivo_bytes, engine='openpyxl')
+    df.columns = df.columns.str.strip().str.upper()
+    
+    # Validação de colunas essenciais
+    colunas_necessarias = ['ITENS', 'VENDA', 'FABRICANTE', 'VENDEDOR'] # Adicione outras se necessário
+    if not set(colunas_necessarias).issubset(df.columns):
+        raise ValueError(f"ERRO: O relatório não contém as colunas obrigatórias: {colunas_necessarias}.")
+    
+    df['VENDA'] = pd.to_numeric(df['VENDA'], errors='coerce').fillna(0)
+    df.dropna(subset=['ITENS', 'FABRICANTE', 'VENDEDOR'], inplace=True)
+    df = df[df['VENDA'] > 0].copy()
+    
+    return df
 
 @app.route('/', methods=['GET', 'POST'])
-def upload_analise():
+def upload_page():
     if request.method == 'POST':
         file = request.files.get('file')
         if not file or file.filename == '':
             flash('Nenhum arquivo selecionado.')
-            return render_template('upload.html')
-
+            return redirect(request.url)
+        
         try:
-            # 1. Carrega a planilha de vendas (que já tem tudo)
-            df = pd.read_excel(file, engine='openpyxl')
-            df.columns = df.columns.str.strip().str.upper()
-
-            # 2. Valida se as colunas essenciais existem
-            colunas_necessarias = ['ITENS', 'VENDA', 'FABRICANTE']
-            if not set(colunas_necessarias).issubset(df.columns):
-                flash(f"ERRO: O relatório enviado não contém as colunas obrigatórias: {colunas_necessarias}.")
-                return render_template('upload.html')
-            
-            if df.empty:
-                flash("ERRO: O arquivo não contém nenhuma linha de dados.")
-                return render_template('upload.html')
-
-            # 3. Limpa os dados
-            df['VENDA'] = pd.to_numeric(df['VENDA'], errors='coerce').fillna(0)
-            # Remove linhas onde o fabricante ou o item esteja vazio
-            df.dropna(subset=['ITENS', 'FABRICANTE'], inplace=True)
-            df = df[df['VENDA'] > 0].copy()
-
-            if df.empty:
-                flash("Nenhum dado válido encontrado no relatório após a limpeza.")
-                return render_template('upload.html')
-
-            # 4. Gera os Gráficos
-            # GRÁFICO 1: TOP 10 ITENS
-            top_10_itens = df.groupby('ITENS')['VENDA'].sum().nlargest(10).sort_values(ascending=True)
-            fig_top_itens = px.bar(
-                top_10_itens, x='VENDA', y=top_10_itens.index,
-                orientation='h', title='Top 10 Itens Mais Vendidos', text_auto='.2s'
-            )
-            fig_top_itens.update_layout(yaxis_title="Item", xaxis_title="Total de Venda")
-
-            # GRÁFICO 2: TOP 15 FABRICANTES
-            vendas_por_fabricante = df.groupby('FABRICANTE')['VENDA'].sum().nlargest(15).sort_values(ascending=False)
-            fig_fabricantes = px.bar(
-                vendas_por_fabricante, x=vendas_por_fabricante.index, y='VENDA',
-                title='Top 15 Fabricantes por Venda', text_auto='.2s'
-            )
-            fig_fabricantes.update_layout(xaxis_tickangle=-45)
-            
-            # 5. Renderiza o Dashboard com os resultados
-            return render_template(
-                'dashboard.html',
-                grafico_top_itens=fig_top_itens.to_html(full_html=False),
-                grafico_fabricantes=fig_fabricantes.to_html(full_html=False)
-            )
-
+            # Armazena os bytes do arquivo na sessão do usuário
+            session['uploaded_file'] = file.read()
+            # Redireciona para a página do dashboard
+            return redirect(url_for('dashboard_page'))
         except Exception as e:
-            flash(f'Erro inesperado ao processar o arquivo: {e}')
-            return render_template('upload.html')
+            flash(f"Erro ao ler o arquivo: {e}")
+            return redirect(request.url)
             
-    # Se o método for GET, apenas mostra a página de upload
     return render_template('upload.html')
+
+@app.route('/dashboard')
+def dashboard_page():
+    if 'uploaded_file' not in session:
+        return redirect(url_for('upload_page'))
+        
+    try:
+        # Lê os dados do arquivo armazenado na sessão
+        arquivo_bytes = session['uploaded_file']
+        df = processar_dados(arquivo_bytes)
+
+        # --- Lógica dos Filtros ---
+        # Pega as opções de filtro da tabela COMPLETA
+        opcoes_vendedor = sorted(df['VENDEDOR'].unique())
+        opcoes_fabricante = sorted(df['FABRICANTE'].unique())
+
+        # Pega os valores selecionados pelo usuário (da URL)
+        vendedores_selecionados = request.args.getlist('vendedor')
+        fabricantes_selecionados = request.args.getlist('fabricante')
+
+        # Se nenhum filtro foi selecionado, seleciona todos por padrão
+        if not vendedores_selecionados: vendedores_selecionados = opcoes_vendedor
+        if not fabricantes_selecionados: fabricantes_selecionados = opcoes_fabricante
+        
+        # Aplica os filtros na tabela
+        df_filtrado = df[
+            df['VENDEDOR'].isin(vendedores_selecionados) &
+            df['FABRICANTE'].isin(fabricantes_selecionados)
+        ]
+
+        # --- Geração dos Gráficos (com dados filtrados) ---
+        grafico_fabricantes_html = ""
+        if not df_filtrado.empty:
+            vendas_fabricante = df_filtrado.groupby('FABRICANTE')['VENDA'].sum().nlargest(20).sort_values(ascending=False)
+            fig_fab = px.bar(vendas_fabricante, x=vendas_fabricante.index, y='VENDA', title='Vendas por Fabricante', text_auto='.2s')
+            grafico_fabricantes_html = fig_fab.to_html(full_html=False)
+
+        # --- Geração da Tabela HTML (com dados filtrados) ---
+        tabela_html = df_filtrado.to_html(classes='table table-striped table-hover', index=False, table_id='tabela-dados')
+
+        return render_template('dashboard.html',
+                               grafico_fabricantes=grafico_fabricantes_html,
+                               tabela_dados=tabela_html,
+                               # Passa as opções e seleções para os filtros
+                               opcoes_vendedor=opcoes_vendedor,
+                               opcoes_fabricante=opcoes_fabricante,
+                               vendedores_selecionados=vendedores_selecionados,
+                               fabricantes_selecionados=fabricantes_selecionados
+                               )
+
+    except Exception as e:
+        flash(f"Erro ao processar os dados: {e}")
+        return redirect(url_for('upload_page'))

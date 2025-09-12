@@ -17,14 +17,12 @@
                     {% endfor %}
                   {% endif %}
                 {% endwith %}
-
-                <p>Envie sua planilha de vendas (.xlsx) contendo as colunas 'ITENS', 'VENDA' e 'FABRICANTE'.</p>
+                <p>Envie sua planilha de vendas completa para iniciar a análise.</p>
                 <form method="post" enctype="multipart/form-data">
                     <div class="mb-3">
-                        <label for="file" class="form-label">Selecione o relatório</label>
-                        <input class="form-control" type="file" name="file" id="file" required>
+                        <input class="form-control" type="file" name="file" required>
                     </div>
-                    <button type="submit" class="btn btn-primary w-100">Analisar</button>
+                    <button type="submit" class="btn btn-primary w-100">Carregar e Analisar</button>
                 </form>
             </div>
         </div>
