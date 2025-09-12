@@ -1,4 +1,4 @@
-# app.py - Versão Melhorada com Match Fuzzy e Validação de Leitura
+# app.py - Versão com correção de sintaxe no groupby
 
 import unicodedata
 import pandas as pd
@@ -27,7 +27,7 @@ def normalizar_serie(serie: pd.Series) -> pd.Series:
         serie.astype(str)
              .str.strip()
              .str.upper()
-             .apply(remover_acentos) # Usar apply para a função customizada
+             .apply(remover_acentos)
              .str.replace(r'\s+', ' ', regex=True)
     )
 
@@ -75,111 +75,6 @@ def criar_mapeamento_produtos(df_vendas, catalogo_df, threshold=80):
                 produtos_nao_encontrados.append(produto)
     
     return mapeamento, produtos_nao_encontrados
-
-# --------- Gráfico 1: Top 10 Itens ----------
-            top_itens_df = (
-                df.groupby('ITENS', as_index=False)['VENDA']
-                  .sum()
-                  .nlargest(10, 'VENDA')
-                  .sort_values('VENDA', ascending=True)
-            )
-            
-            fig_top_itens = px.bar(
-                top_itens_df, 
-                x='VENDA', 
-                y='ITENS',
-                orientation='h',
-                title='Top 10 Itens Mais Vendidos',
-                text_auto='.2s',
-                color='VENDA',
-                color_continuous_scale='Blues'
-            )
-            fig_top_itens.update_layout(height=500)
-
-            # --------- Gráfico 2: Top 15 Fabricantes ----------
-            df_fab = df.dropna(subset=['FABRICANTE_FINAL'])
-            
-            if df_fab.empty:
-                grafico_fabricantes_html = "<div class='alert alert-warning'>Nenhum fabricante encontrado.</div>"
-            else:
-                fab_df = (
-                    df_fab.groupby('FABRICANTE_FINAL', as_index=False)['VENDA']
-                          .sum()
-                          .nlargest(15, 'VENDA')
-                          .sort_values('VENDA', ascending=False)
-                )
-                
-                fig_fabricantes = px.bar(
-                    fab_df, 
-                    x='FABRICANTE_FINAL', 
-                    y='VENDA',
-                    title='Top 15 Fabricantes por Venda',
-                    text_auto='.2s',
-                    color='VENDA',
-                    color_continuous_scale='Greens'
-                )
-                fig_fabricantes.update_layout(height=500, xaxis_tickangle=-45)
-                grafico_fabricantes_html = fig_fabricantes.to_html(full_html=False)
-
-            # --------- Tabela de Conferência ----------
-            tabela_conf_df = (
-                df.groupby(['ITENS', 'FABRICANTE_FINAL', 'MATCH_TIPO', 'MATCH_SCORE'], as_index=False)['VENDA']
-                  .sum()
-                  .sort_values('VENDA', ascending=False)
-                  .head(50)
-            )
-            
-            tabela_conf_df['VENDA_FORMATADA'] = tabela_conf_df['VENDA'].apply(lambda x: f'R$ {x:,.2f}')
-            tabela_conf_df['MATCH_SCORE'] = tabela_conf_df['MATCH_SCORE'].fillna(0).astype(int)
-            
-            tabela_conf_html = tabela_conf_df[['ITENS', 'FABRICANTE_FINAL', 'MATCH_TIPO', 'MATCH_SCORE', 'VENDA_FORMATADA']].to_html(
-                index=False, 
-                classes="table table-striped table-sm table-hover",
-                table_id="tabela-conferencia"
-            )
-            
-            # --------- Relatório de Produtos Não Encontrados ----------
-            if produtos_nao_encontrados:
-                vendas_nao_encontradas = df[df['ITENS_NORM'].isin(produtos_nao_encontrados)]['VENDA'].sum()
-                nao_encontrados_df = (
-                    df[df['ITENS_NORM'].isin(produtos_nao_encontrados)]
-                    .groupby('ITENS', as_index=False)['VENDA']
-                    .sum()
-                    .sort_values('VENDA', ascending=False)
-                )
-                nao_encontrados_df['VENDA_FORMATADA'] = nao_encontrados_df['VENDA'].apply(lambda x: f'R$ {x:,.2f}')
-                
-                nao_encontrados_html = nao_encontrados_df[['ITENS', 'VENDA_FORMATADA']].to_html(
-                    index=False,
-                    classes="table table-striped table-sm table-danger"
-                )
-            else:
-                vendas_nao_encontradas = 0
-                nao_encontrados_html = "<div class='alert alert-success'>Todos os produtos foram encontrados!</div>"
-
-            # --------- Métricas de Match ----------
-            itens_total = df['ITENS'].nunique()
-            itens_casados = df.dropna(subset=['FABRICANTE_FINAL'])['ITENS'].nunique()
-            match_rate = (itens_casados / itens_total * 100) if itens_total else 0
-            
-            vendas_total = df['VENDA'].sum()
-            vendas_casadas = df.dropna(subset=['FABRICANTE_FINAL'])['VENDA'].sum()
-            vendas_match_rate = (vendas_casadas / vendas_total * 100) if vendas_total else 0
-
-            # Renderiza o template com todos os dados
-            return render_template('dashboard.html',
-                                   grafico_top_itens=fig_top_itens.to_html(full_html=False),
-                                   grafico_fabricantes=grafico_fabricantes_html,
-                                   tabela_conferencia=tabela_conf_html,
-                                   produtos_nao_encontrados=nao_encontrados_html,
-                                   itens_total=itens_total,
-                                   itens_casados=itens_casados,
-                                   match_rate=round(match_rate, 1),
-                                   vendas_total=f'R$ {vendas_total:,.2f}',
-                                   vendas_casadas=f'R$ {vendas_casadas:,.2f}',
-                                   vendas_match_rate=round(vendas_match_rate, 1),
-                                   vendas_nao_encontradas=f'R$ {vendas_nao_encontradas:,.2f}',
-                                   threshold_usado=threshold)
 
 # --- Carrega e prepara o catálogo uma vez ---
 CATALOGO_PATH = 'catalogo_produtos.xlsx'
@@ -236,8 +131,6 @@ def upload_analise():
         try:
             df = pd.read_excel(file, engine='openpyxl')
             
-            # --- NOVA VALIDAÇÃO ADICIONADA AQUI ---
-            # Verifica se o DataFrame foi lido corretamente
             if df is None or df.empty:
                 flash("Erro: O arquivo Excel não pôde ser lido, está vazio ou corrompido.")
                 return render_template('upload.html', debug_info=debug_info)
@@ -258,7 +151,7 @@ def upload_analise():
 
             threshold = int(request.form.get('threshold', 80))
             mapeamento, produtos_nao_encontrados = criar_mapeamento_produtos(df, catalogo_df, threshold)
-
+            
             df['FABRICANTE_FINAL'] = None
             df['PRODUTO_CATALOGO'] = None
             df['MATCH_SCORE'] = None
@@ -273,11 +166,114 @@ def upload_analise():
                     df.loc[mask, 'MATCH_SCORE'] = score
                     df.loc[mask, 'MATCH_TIPO'] = tipo
 
-            # (O resto do código para gerar gráficos e tabelas continua aqui...)
-            # ...
-            # ... (código dos gráficos omitido para brevidade, ele continua o mesmo)
-            # ...
-            return render_template('dashboard.html', ...) # Substituir ... pelos argumentos corretos
+            # --------- Gráfico 1: Top 10 Itens (SINTAXE CORRIGIDA) ----------
+            top_itens_df = (
+                df.groupby('ITENS')['VENDA']
+                  .sum()
+                  .reset_index() # Adicionado para transformar o índice em coluna
+                  .nlargest(10, 'VENDA')
+                  .sort_values('VENDA', ascending=True)
+            )
+            
+            fig_top_itens = px.bar(
+                top_itens_df, 
+                x='VENDA', 
+                y='ITENS',
+                orientation='h',
+                title='Top 10 Itens Mais Vendidos',
+                text_auto='.2s',
+                color='VENDA',
+                color_continuous_scale='Blues'
+            )
+            fig_top_itens.update_layout(height=500)
+
+            # --------- Gráfico 2: Top 15 Fabricantes (SINTAXE CORRIGIDA) ----------
+            df_fab = df.dropna(subset=['FABRICANTE_FINAL'])
+            
+            if df_fab.empty:
+                grafico_fabricantes_html = "<div class='alert alert-warning'>Nenhum fabricante encontrado.</div>"
+            else:
+                fab_df = (
+                    df_fab.groupby('FABRICANTE_FINAL')['VENDA']
+                          .sum()
+                          .reset_index() # Adicionado para transformar o índice em coluna
+                          .nlargest(15, 'VENDA')
+                          .sort_values('VENDA', ascending=False)
+                )
+                
+                fig_fabricantes = px.bar(
+                    fab_df, 
+                    x='FABRICANTE_FINAL', 
+                    y='VENDA',
+                    title='Top 15 Fabricantes por Venda',
+                    text_auto='.2s',
+                    color='VENDA',
+                    color_continuous_scale='Greens'
+                )
+                fig_fabricantes.update_layout(height=500, xaxis_tickangle=-45)
+                grafico_fabricantes_html = fig_fabricantes.to_html(full_html=False)
+
+            # --------- Tabela de Conferência (SINTAXE CORRIGIDA) ----------
+            tabela_conf_df = (
+                df.groupby(['ITENS', 'FABRICANTE_FINAL', 'MATCH_TIPO', 'MATCH_SCORE'])['VENDA']
+                  .sum()
+                  .reset_index() # Adicionado para transformar o índice em coluna
+                  .sort_values('VENDA', ascending=False)
+                  .head(50)
+            )
+            
+            tabela_conf_df['VENDA_FORMATADA'] = tabela_conf_df['VENDA'].apply(lambda x: f'R$ {x:,.2f}')
+            tabela_conf_df['MATCH_SCORE'] = tabela_conf_df['MATCH_SCORE'].fillna(0).astype(int)
+            
+            tabela_conf_html = tabela_conf_df[['ITENS', 'FABRICANTE_FINAL', 'MATCH_TIPO', 'MATCH_SCORE', 'VENDA_FORMATADA']].to_html(
+                index=False, 
+                classes="table table-striped table-sm table-hover",
+                table_id="tabela-conferencia"
+            )
+            
+            # --------- Relatório de Produtos Não Encontrados ----------
+            if produtos_nao_encontrados:
+                vendas_nao_encontradas = df[df['ITENS_NORM'].isin(produtos_nao_encontrados)]['VENDA'].sum()
+                nao_encontrados_df = (
+                    df[df['ITENS_NORM'].isin(produtos_nao_encontrados)]
+                    .groupby('ITENS')['VENDA']
+                    .sum()
+                    .reset_index() # Adicionado para transformar o índice em coluna
+                    .sort_values('VENDA', ascending=False)
+                )
+                nao_encontrados_df['VENDA_FORMATADA'] = nao_encontrados_df['VENDA'].apply(lambda x: f'R$ {x:,.2f}')
+                
+                nao_encontrados_html = nao_encontrados_df[['ITENS', 'VENDA_FORMATADA']].to_html(
+                    index=False,
+                    classes="table table-striped table-sm table-danger"
+                )
+            else:
+                vendas_nao_encontradas = 0
+                nao_encontrados_html = "<div class='alert alert-success'>Todos os produtos foram encontrados!</div>"
+
+            # --------- Métricas de Match ----------
+            itens_total = df['ITENS'].nunique()
+            itens_casados = df.dropna(subset=['FABRICANTE_FINAL'])['ITENS'].nunique()
+            match_rate = (itens_casados / itens_total * 100) if itens_total else 0
+            
+            vendas_total = df['VENDA'].sum()
+            vendas_casadas = df.dropna(subset=['FABRICANTE_FINAL'])['VENDA'].sum()
+            vendas_match_rate = (vendas_casadas / vendas_total * 100) if vendas_total else 0
+
+            # Renderiza o template com todos os dados
+            return render_template('dashboard.html',
+                                   grafico_top_itens=fig_top_itens.to_html(full_html=False),
+                                   grafico_fabricantes=grafico_fabricantes_html,
+                                   tabela_conferencia=tabela_conf_html,
+                                   produtos_nao_encontrados=nao_encontrados_html,
+                                   itens_total=itens_total,
+                                   itens_casados=itens_casados,
+                                   match_rate=round(match_rate, 1),
+                                   vendas_total=f'R$ {vendas_total:,.2f}',
+                                   vendas_casadas=f'R$ {vendas_casadas:,.2f}',
+                                   vendas_match_rate=round(vendas_match_rate, 1),
+                                   vendas_nao_encontradas=f'R$ {vendas_nao_encontradas:,.2f}',
+                                   threshold_usado=threshold)
 
         except Exception as e:
             flash(f'Erro ao processar arquivo: {str(e)}')
