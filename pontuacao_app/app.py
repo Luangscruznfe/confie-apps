@@ -1202,12 +1202,11 @@ def ping():
 
 @app.route('/admin/trigger-backup', methods=['POST'])
 def trigger_backup():
-    url = fazer_backup_e_enviar()
+    url = fazer_backup_e_enviar()  # garantir que seja importável
     if url:
         return {"ok": True, "url": url}, 200
     return {"ok": False, "error": "Falha no upload. Veja logs."}, 500
 
-
-
+# só deixar app.run para testes locais
 if __name__ == '__main__':
-        app.run(debug=True)
+    app.run(debug=True)
