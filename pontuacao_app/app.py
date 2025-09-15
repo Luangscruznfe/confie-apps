@@ -1200,7 +1200,8 @@ def deletar():
 def ping():
     return "OK", 200
 
-@app.route('/admin/trigger-backup', methods=['POST'])
+
+@app.route('/admin/trigger-backup', methods=['GET', 'POST'])
 def trigger_backup():
     url = fazer_backup_e_enviar()  # garantir que seja importável
     if url:
