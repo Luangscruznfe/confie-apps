@@ -6,6 +6,7 @@ from decimal import Decimal, ROUND_HALF_UP
 import psycopg2
 import os
 import re
+import logging
 import cloudinary
 import cloudinary.uploader
 import tempfile
@@ -16,6 +17,11 @@ import io
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Border, Side, Alignment
 DELETE_PASSWORD = 'confie123'
+
+#logs
+logger = logging.getLogger(__name__)
+if not logger.handlers:
+    logging.basicConfig(level=logging.INFO)
 
 
 # --- Responsáveis por critério (A–E) por setor/tabela ---
@@ -149,7 +155,10 @@ def init_db():
     conn.commit()
     conn.close()
 
+cloudinary.config()
+
 def fazer_backup_e_enviar():
+    conn = None
     try:
         conn = get_db_connection()
         c = conn.cursor()
@@ -158,41 +167,68 @@ def fazer_backup_e_enviar():
         arquivos_csv = []
 
         with tempfile.TemporaryDirectory() as tmpdirname:
+            logger.info(f"[Backup] Pasta temporária criada: {tmpdirname}")
+
             for tabela in tabelas:
                 c.execute(f"SELECT * FROM {tabela}")
                 rows = c.fetchall()
                 colnames = [desc[0] for desc in c.description]
 
                 if not rows:
+                    logger.info(f"[Backup] tabela '{tabela}' vazia — pulando")
                     continue
 
-                # Salva CSV temporário
                 df = pd.DataFrame(rows, columns=colnames)
                 caminho_csv = os.path.join(tmpdirname, f"{tabela}.csv")
                 df.to_csv(caminho_csv, index=False)
                 arquivos_csv.append(caminho_csv)
+                logger.info(f"[Backup] gerado CSV: {caminho_csv} ({len(rows)} linhas)")
 
-            # Compactar todos os arquivos em um ZIP
+            if not arquivos_csv:
+                logger.info("[Backup] Nenhuma tabela com dados — nada para enviar")
+                return None
+
             caminho_zip = os.path.join(tmpdirname, f"backup_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.zip")
             with zipfile.ZipFile(caminho_zip, 'w') as zipf:
                 for file in arquivos_csv:
                     zipf.write(file, os.path.basename(file))
+            logger.info(f"[Backup] ZIP criado em: {caminho_zip} ({os.path.getsize(caminho_zip)} bytes)")
 
-            # Enviar para o Cloudinary
-            resultado = cloudinary.uploader.upload(
-                caminho_zip,
-                resource_type='raw',
-                folder='backups_pontuacao',
-                use_filename=True,
-                unique_filename=False,
-                overwrite=False
-            )
+            public_id = f"pontuacao_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+            max_retries = 3
+            attempt = 0
+            last_exc = None
 
-            return resultado['secure_url']
+            while attempt < max_retries:
+                attempt += 1
+                try:
+                    logger.info(f"[Backup] Iniciando upload (attempt {attempt}) public_id={public_id}")
+                    resultado = cloudinary.uploader.upload(
+                        caminho_zip,
+                        resource_type='raw',
+                        folder='backups_pontuacao',
+                        use_filename=True,
+                        unique_filename=True,   # evita conflito de nomes
+                        overwrite=False,
+                        public_id=public_id
+                    )
+                    logger.info(f"[Backup] Upload OK: {resultado.get('secure_url')} (public_id={resultado.get('public_id')})")
+                    return resultado.get('secure_url')
+                except Exception as e:
+                    last_exc = e
+                    logger.exception(f"[Backup] Erro no upload attempt={attempt}: {e}")
+            logger.error(f"[Backup] Falhou após {max_retries} tentativas. Erro final: {last_exc}")
+            return None
 
     except Exception as e:
-        print("Erro ao fazer backup automático:", e)
+        logger.exception("Erro ao fazer backup automático (outer): %s", e)
         return None
+    finally:
+        try:
+            if conn:
+                conn.close()
+        except Exception:
+            pass
 
 # Conversor de data (dd/mm/aaaa ou yyyy-mm-dd → yyyy-mm-dd)
 def norm_date_to_iso(s):
@@ -1163,6 +1199,13 @@ def deletar():
 @app.route('/ping')
 def ping():
     return "OK", 200
+
+@app.route('/admin/trigger-backup', methods=['POST'])
+def trigger_backup():
+    url = fazer_backup_e_enviar()
+    if url:
+        return {"ok": True, "url": url}, 200
+    return {"ok": False, "error": "Falha no upload. Veja logs."}, 500
 
 
 
