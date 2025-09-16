@@ -242,10 +242,19 @@ def norm_date_to_iso(s):
 
 @app.template_filter('datetimeformat')
 def datetimeformat(value, format='%d/%m/%Y'):
-    try:
-        return datetime.strptime(value, "%Y-%m-%d").strftime(format)
-    except:
-        return value
+    # Se o valor já for um objeto de data, apenas o formate.
+    if isinstance(value, (date, datetime)):
+        return value.strftime(format)
+    
+    # Se for uma string (texto), tente converter.
+    if isinstance(value, str):
+        try:
+            return datetime.strptime(value, "%Y-%m-%d").strftime(format)
+        except ValueError:
+            return value # Retorna o valor original se a conversão falhar
+    
+    # Para qualquer outro tipo, retorne como está.
+    return value
 
 @app.route('/', endpoint='home_pontuacao')
 def home():
