@@ -1,7 +1,7 @@
 # sistema_pontuacao_flask.py
 
 from flask import Flask, render_template, request, redirect, flash, url_for
-from datetime import datetime
+from datetime import datetime, date
 from decimal import Decimal, ROUND_HALF_UP
 import psycopg2
 import os
@@ -139,7 +139,7 @@ def init_db():
     c.execute('''
         CREATE TABLE IF NOT EXISTS comercial (
             id SERIAL PRIMARY KEY,
-            data TEXT,
+            data DATE,
             vendedor TEXT,
             A INTEGER,
             B INTEGER,
