@@ -96,33 +96,29 @@
       </thead>
 
       <tbody>
-        {% set ns = namespace(total_geral=0) %}
         {% for r in registros %}
-          {% set extras = r[8].split(',') if r[8] else [] %}
-          {% set total_parcial = (r[3]|int) + (r[4]|int) + (r[5]|int) + (r[6]|int) + (r[7]|int) %}
-          {% if 'meta' in extras %} {% set total_parcial = total_parcial + 2 %} {% endif %}
-          {% if 'equipe90' in extras and vendedor == 'EQUIPE' %} {% set total_parcial = total_parcial + 1 %} {% endif %}
-          {% set ns.total_geral = ns.total_geral + total_parcial %}
           <tr>
             <td>{{ r[0] }}</td>
             <td>{{ r[1]|datetimeformat }}</td>
-            <td>{{ r[2] }}</td>
+            <td>{{ r[2] }}</td> {# O vendedor da linha é r[2] #}
             <td>{{ r[3] }}</td>
             <td>{{ r[4] }}</td>
             <td>{{ r[5] }}</td>
             <td>{{ r[6] }}</td>
             <td>{{ r[7] }}</td>
             <td>
+              {# Lógica de extras corrigida #}
+              {% set extras = r[8].split(',') if r[8] else [] %}
               {% for extra in extras %}
                 {% if extra == 'meta' %}
                   ⭐ Meta individual batida (+2)<br>
-                {% elif extra == 'equipe90' and vendedor == 'EQUIPE' %}
+                {% elif extra == 'equipe90' and r[2] == 'EQUIPE' %} {# CORREÇÃO AQUI: usa r[2] #}
                   🤝 Equipe chegou a 90% (+1)<br>
                 {% endif %}
               {% endfor %}
             </td>
             <td>{{ r[9] if r[9] and r[9]|string|lower != 'nan' else '' }}</td>
-            <td>{{ total_parcial }}</td>
+            <td>{{ r[10] }}</td> {# Usa o total que já veio do banco de dados #}
           </tr>
         {% endfor %}
       </tbody>
