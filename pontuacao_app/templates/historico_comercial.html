@@ -97,41 +97,40 @@
 
       <tbody>
         {% for r in registros %}
-          <tr>
-            <td>{{ r[0] }}</td>
-            <td>{{ r[1]|datetimeformat }}</td>
-            <td>{{ r[2] }}</td> {# O vendedor da linha é r[2] #}
-            <td>{{ r[3] }}</td>
-            <td>{{ r[4] }}</td>
-            <td>{{ r[5] }}</td>
-            <td>{{ r[6] }}</td>
-            <td>{{ r[7] }}</td>
-            <td>
-              {# Lógica de extras corrigida #}
-              {% set extras = r[8].split(',') if r[8] else [] %}
-              {% for extra in extras %}
-                {% if extra == 'meta' %}
-                  ⭐ Meta individual batida (+2)<br>
-                {% elif extra == 'equipe90' and r[2] == 'EQUIPE' %} {# CORREÇÃO AQUI: usa r[2] #}
-                  🤝 Equipe chegou a 90% (+1)<br>
-                {% endif %}
-              {% endfor %}
-            </td>
-            <td>{{ r[9] if r[9] and r[9]|string|lower != 'nan' else '' }}</td>
-            <td>{{ r[10] }}</td> {# Usa o total que já veio do banco de dados #}
-          </tr>
+        <tr>
+          <td>{{ r[0] }}</td>
+          <td>{{ r[1]|datetimeformat }}</td>
+          <td>{{ r[2] }}</td>
+          <td>{{ r[3] }}</td>
+          <td>{{ r[4] }}</td>
+          <td>{{ r[5] }}</td>
+          <td>{{ r[6] }}</td>
+          <td>{{ r[7] }}</td>
+          <td>
+            {% set extras = r[8].split(',') if r[8] else [] %}
+            {% for extra in extras %}
+              {% if extra == 'meta' %}
+                ⭐ Meta individual batida (+2)<br>
+              {% elif extra == 'equipe90' and r[2] == 'EQUIPE' %}
+                🤝 Equipe chegou a 90% (+1)<br>
+              {% endif %}
+            {% endfor %}
+          </td>
+          <td>{{ r[9] if r[9] and r[9]|string|lower != 'nan' else '' }}</td>
+          <td>{{ r[10] }}</td>
+        </tr>
         {% endfor %}
       </tbody>
 
       <tfoot class="table-dark">
         <tr>
-          <td colspan="10" class="text-end fw-bold">Total Geral:</td>
-          <td class="fw-bold {% if ns.total_geral >= 0 %}text-success{% else %}text-danger{% endif %}">
-            {{ ns.total_geral }}
+          <td colspan="10" class="text-end fw-bold">Total Geral (Filtro):</td>
+          <td class="fw-bold {% if total_geral >= 0 %}text-success{% else %}text-danger{% endif %}">
+            {{ total_geral }}
           </td>
         </tr>
         <tr>
-          <td colspan="10" class="text-end fw-bold">Média:</td>
+          <td colspan="10" class="text-end fw-bold">Média (Filtro):</td>
           <td class="fw-bold text-info">{{ media }}</td>
         </tr>
       </tfoot>
