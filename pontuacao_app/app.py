@@ -909,105 +909,64 @@ def comercial():
     return render_template('comercial.html', vendedores=vendedores)
 
 
+# Substitua sua função antiga por esta versão limpa
 @app.route('/historico_comercial')
-
 def historico_comercial():
+    vendedor = request.args.get('vendedor', '').strip()
+    responsavel = request.args.get('responsavel', '').strip()
+    inicio = request.args.get('inicio', '').strip()
+    fim = request.args.get('fim', '').strip()
 
-    vendedor    = request.args.get('vendedor', '').strip()
+    conn = get_db_connection()
+    c = conn.cursor()
 
-    responsavel = request.args.get('responsavel', '').strip()
+    lista_vendedores = ['EVERTON', 'MARCELO', 'PEDRO', 'SILVANA', 'TIAGO', 'RODOLFO', 'MARCOS', 'THYAGO', 'EQUIPE']
+    where, params = [], []
 
-    inicio      = request.args.get('inicio', '').strip()
+    if vendedor:
+        where.append("vendedor = %s")
+        params.append(vendedor)
+    if inicio:
+        iso = norm_date_to_iso(inicio)
+        if iso:
+            where.append("data >= %s")
+            params.append(iso)
+    if fim:
+        iso = norm_date_to_iso(fim)
+        if iso:
+            where.append("data <= %s")
+            params.append(iso)
 
-    fim         = request.args.get('fim', '').strip()
+    sql_resp, p_resp = _filtro_responsavel_sql('comercial', responsavel)
+    if sql_resp:
+        where.append(sql_resp)
+        params += p_resp
 
+    where_sql = (" WHERE " + " AND ".join(where)) if where else ""
+    
+    query_completa = f"SELECT * FROM comercial{where_sql} ORDER BY data DESC"
+    c.execute(query_completa, params)
+    registros = c.fetchall()
 
+    total_geral = sum([r[10] for r in registros]) if registros else 0
+    from decimal import Decimal, ROUND_HALF_UP
 
-    conn = get_db_connection()
+    if registros:
+        media = (Decimal(total_geral) / Decimal(len(registros))).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+    else:
+        media = Decimal('0.00')
 
-    c = conn.cursor()
+    conn.close()
 
-
-
-    lista_vendedores = ['EVERTON', 'MARCELO', 'PEDRO', 'SILVANA', 'TIAGO', 'RODOLFO', 'MARCOS', 'THYAGO', 'EQUIPE']
-
-
-
-    where, params = [], []
-
-
-
-    if vendedor:
-
-        where.append("vendedor = %s"); params.append(vendedor)
-
-
-
-    if inicio:
-
-        iso = norm_date_to_iso(inicio)
-
-        if iso: where.append("data >= %s"); params.append(iso)
-
-    if fim:
-
-        iso = norm_date_to_iso(fim)
-
-        if iso: where.append("data <= %s"); params.append(iso)
-
-
-
-    sql_resp, p_resp = _filtro_responsavel_sql('comercial', responsavel)
-
-    if sql_resp:
-
-        where.append(sql_resp)
-
-        params += p_resp
-
-
-
-    where_sql = (" WHERE " + " AND ".join(where)) if where else ""
-
-    c.execute(f"""
-
-        SELECT * FROM comercial{where_sql} ORDER BY data DESC
-
-    """, params)
-
-    registros = c.fetchall()
-
-
-
-    total_geral = sum([r[10] for r in registros]) if registros else 0
-
-    from decimal import Decimal, ROUND_HALF_UP
-
-    media = Decimal(total_geral / 8).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP) if registros else Decimal('0.00')
-
-
-
-    conn.close()
-
-
-
-    return render_template('historico_comercial.html',
-
-                           registros=registros,
-
-                           total_geral=total_geral,
-
-                           media=media,
-
-                           vendedores=lista_vendedores,
-
-                           vendedor=vendedor,
-
-                           responsavel=responsavel,
-
-                           inicio=inicio,
-
-                           fim=fim)
+    return render_template('historico_comercial.html',
+                           registros=registros,
+                           total_geral=total_geral,
+                           media=media,
+                           vendedores=lista_vendedores,
+                           vendedor=vendedor,
+                           responsavel=responsavel,
+                           inicio=inicio,
+                           fim=fim)
 
 
 
