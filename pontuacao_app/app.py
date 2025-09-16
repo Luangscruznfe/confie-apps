@@ -835,7 +835,7 @@ def comercial():
     c.execute('''
         CREATE TABLE IF NOT EXISTS comercial (
             id SERIAL PRIMARY KEY,
-            data DATE,                      # MUDANÇA AQUI (de TEXT para DATE)
+            data DATE,
             vendedor TEXT,
             A INTEGER,
             B INTEGER,
