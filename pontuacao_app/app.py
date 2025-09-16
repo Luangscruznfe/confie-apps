@@ -909,7 +909,8 @@ def comercial():
     return render_template('comercial.html', vendedores=vendedores)
 
 
-@app.route('/pontuacao/historico_comercial')
+# CORRIJA A ROTA AQUI:
+@app.route('/historico_comercial')
 def historico_comercial():
     vendedor    = request.args.get('vendedor', '').strip()
     responsavel = request.args.get('responsavel', '').strip()
