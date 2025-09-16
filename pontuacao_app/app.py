@@ -909,8 +909,7 @@ def comercial():
     return render_template('comercial.html', vendedores=vendedores)
 
 
-
-@app.route('/historico_comercial')
+@app.route('/pontuacao/historico_comercial')
 def historico_comercial():
     vendedor    = request.args.get('vendedor', '').strip()
     responsavel = request.args.get('responsavel', '').strip()
@@ -940,10 +939,21 @@ def historico_comercial():
         params += p_resp
 
     where_sql = (" WHERE " + " AND ".join(where)) if where else ""
-    c.execute(f"""
-        SELECT * FROM comercial{where_sql} ORDER BY data DESC
-    """, params)
+    
+    # --- INÍCIO DO CÓDIGO DE DEBUG ---
+    query_completa = f"SELECT * FROM comercial{where_sql} ORDER BY data DESC"
+    print("--- DEBUG HISTÓRICO COMERCIAL ---")
+    print(f"QUERY EXECUTADA: {query_completa}")
+    print(f"PARÂMETROS USADOS: {params}")
+    # --- FIM DO CÓDIGO DE DEBUG ---
+    
+    c.execute(query_completa, params)
     registros = c.fetchall()
+
+    # --- INÍCIO DO CÓDIGO DE DEBUG ---
+    print(f"REGISTROS ENCONTRADOS: {len(registros)}")
+    print("---------------------------------")
+    # --- FIM DO CÓDIGO DE DEBUG ---
 
     total_geral = sum([r[10] for r in registros]) if registros else 0
     from decimal import Decimal, ROUND_HALF_UP
