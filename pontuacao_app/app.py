@@ -826,7 +826,7 @@ def comercial():
     c.execute('''
         CREATE TABLE IF NOT EXISTS comercial (
             id SERIAL PRIMARY KEY,
-            data TEXT,
+            data DATE,                      # MUDANÇA AQUI (de TEXT para DATE)
             vendedor TEXT,
             A INTEGER,
             B INTEGER,
@@ -842,7 +842,17 @@ def comercial():
     vendedores = ['EVERTON', 'MARCELO', 'PEDRO', 'SILVANA', 'TIAGO', 'RODOLFO', 'MARCOS', 'THYAGO', 'EQUIPE']
 
     if request.method == 'POST':
-        data = request.form['data']
+        # --- INÍCIO DAS MUDANÇAS PARA CORRIGIR A DATA ---
+        data_str = request.form.get('data', '').strip()
+        data = norm_date_to_iso(data_str)  # Converte para o formato YYYY-MM-DD
+
+        # Adiciona uma validação para garantir que a data é válida
+        if not data:
+            flash("❌ Formato de data inválido. Use dd/mm/aaaa.", "danger")
+            conn.close() # Fecha a conexão antes de redirecionar
+            return redirect(url_for('comercial'))
+        # --- FIM DAS MUDANÇAS ---
+
         vendedor = request.form['vendedor']
         A = safe_int(request.form.get('A'))
         # B pode ter pontos customizados via campo B_valor
