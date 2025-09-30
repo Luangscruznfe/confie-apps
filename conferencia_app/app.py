@@ -1,6 +1,6 @@
-# =================================================================
+# ==================================================================
 # 1. IMPORTAÇÕES
-# =================================================================
+# ==================================================================
 from flask import Flask, jsonify, render_template, abort, request, Response, url_for, flash
 import cloudinary, cloudinary.uploader, cloudinary.api
 import psycopg2, psycopg2.extras
