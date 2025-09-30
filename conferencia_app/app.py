@@ -187,12 +187,18 @@ def extrair_dados_do_pdf(stream, nome_da_carga, nome_arquivo):
                     product_chunks.append(palavras_linha)
 
                 for chunk in product_chunks:
+                    barcode_parts = []      # <-- MUDANÇA 1: Adicionamos uma lista para o código de barras
                     nome_produto_parts = []
                     quantidade_parts = []
                     valores_parts = []
 
                     for x0, y0, x1, y1, palavra, *_ in chunk:
-                        if x0 < 340:
+                        # Esta é a alteração principal. Interceptamos o código de barras
+                        # baseado em sua posição horizontal (coordenada x0).
+                        # O valor 40 a 100 é uma estimativa e pode precisar de ajuste fino.
+                        if 40 < x0 < 100:   # <-- MUDANÇA 2: Adicionamos este "elif" para capturar o barcode
+                             barcode_parts.append(palavra)
+                        elif x0 < 340:
                             nome_produto_parts.append(palavra)
                         elif x0 < 450:
                             quantidade_parts.append(palavra)
@@ -201,6 +207,9 @@ def extrair_dados_do_pdf(stream, nome_da_carga, nome_arquivo):
 
                     if not nome_produto_parts:
                         continue
+                    
+                    # Une as partes do código de barras em uma string única
+                    codigo_barras_final = "".join(barcode_parts)
 
                     if (
                         len(nome_produto_parts) > 2
@@ -227,12 +236,13 @@ def extrair_dados_do_pdf(stream, nome_da_carga, nome_arquivo):
                     if nome_produto_final and quantidade_completa_str:
                         produtos_finais.append({
                             "produto_nome": nome_produto_final,
+                            "codigo_barras": codigo_barras_final, # <-- MUDANÇA 3: Adicionamos o campo ao resultado
                             "quantidade_pedida": quantidade_completa_str,
                             "quantidade_entregue": None,
                             "status": "Pendente",
                             "valor_total_item": valor_total_item.replace(',', '.'),
                             "unidades_pacote": unidades_pacote,
-                            "forced_confirmed": False  # NOVO: começa falso
+                            "forced_confirmed": False
                         })
 
         documento.close()
@@ -1031,6 +1041,48 @@ def mapa_detalhe_print(numero_carga):
     
     # Renderiza o novo template de impressão
     return render_template('mapa_detalhe_print.html', numero_carga=numero_carga, nome_mapa=nome_mapa)
+
+# Adicione esta nova rota em app.py
+
+@app.route('/api/pedido/<pedido_id>/buscar-por-barcode', methods=['POST'])
+def api_pedido_buscar_por_barcode(pedido_id):
+    """
+    Dentro de um pedido específico, busca um produto pelo seu código de barras.
+    """
+    data = request.json or {}
+    barcode = data.get('barcode')
+
+    if not barcode:
+        return jsonify({"ok": False, "erro": "Código de barras não fornecido"}), 400
+
+    conn = None
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+
+        cur.execute("SELECT produtos FROM pedidos WHERE numero_pedido = %s;", (pedido_id,))
+        pedido = cur.fetchone()
+
+        if not pedido or not pedido['produtos']:
+            return jsonify({"ok": False, "erro": "Pedido não encontrado ou sem produtos."}), 404
+
+        # Itera pela lista de produtos dentro do JSON do pedido
+        for produto in pedido['produtos']:
+            if produto.get('codigo_barras') == barcode:
+                # Encontrou o produto!
+                return jsonify({"ok": True, "produto": produto})
+
+        # Se o loop terminar e não encontrar, retorna erro
+        return jsonify({"ok": False, "erro": "Produto com este código de barras não encontrado neste pedido."}), 404
+
+    except Exception as e:
+        app.logger.error(f"Erro ao buscar produto por barcode no pedido: {e}", exc_info=True)
+        return jsonify({"ok": False, "erro": "Erro interno no servidor"}), 500
+    finally:
+        if conn:
+            if 'cur' in locals() and cur:
+                cur.close()
+            conn.close()
 
 
 
