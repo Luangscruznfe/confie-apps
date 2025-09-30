@@ -1,0 +1,1364 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard de Vendas Interativo</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Tom Select CSS for multi-select -->
+    <link href="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/css/tom-select.css" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .chart-container {
+            position: relative;
+            height: 40vh;
+            width: 100%;
+            transition: height 0.3s ease-in-out;
+        }
+        #loader {
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid #3498db;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            margin-left: -25px;
+            margin-top: -25px;
+            z-index: 10;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        /* Custom styles for Tom Select */
+        .ts-control {
+            border-radius: 0.375rem;
+            border-color: #d1d5db;
+        }
+        .ts-control .item {
+            background-color: #3b82f6;
+            color: white;
+            border-radius: 0.25rem;
+        }
+        .file-input {
+            display: block;
+            width: 100%;
+            font-size: 0.875rem;
+            color: #6b7280;
+            file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100;
+        }
+        .file-name-display {
+            margin-top: 0.5rem;
+            font-size: 0.875rem;
+            color: #4b5563;
+            truncate: true;
+        }
+        /* Modal Styles */
+        #chart-modal {
+            background-color: rgba(0,0,0,0.5);
+        }
+        .modal-content {
+            height: 85vh;
+            width: 90vw;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800">
+
+    <!-- Painel Lateral de Upload -->
+    <div id="overlay" class="fixed inset-0 bg-black bg-opacity-50 z-40 hidden"></div>
+    <div id="upload-panel" class="fixed top-0 right-0 h-full w-full max-w-sm bg-white shadow-lg p-8 z-50 transform translate-x-full transition-transform duration-300 ease-in-out">
+        <button id="close-upload-btn" class="absolute top-4 right-4 text-gray-500 hover:text-gray-700">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+        </button>
+        <h2 class="text-2xl font-bold mb-6 text-gray-800">Carregar Arquivos</h2>
+        <div class="space-y-6">
+            <div>
+                <label for="salesFile" class="block text-sm font-medium text-gray-700 mb-2">1. Selecione o Relatório de Vendas (.csv, .xlsx):</label>
+                <input type="file" id="salesFile" accept=".csv, .xlsx, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel" class="file-input">
+                <p id="sales-file-name" class="file-name-display"></p>
+            </div>
+            <div>
+                <label for="portfolioFile" class="block text-sm font-medium text-gray-700 mb-2">2. Selecione a Carteira de Clientes (.csv, .xlsx):</label>
+                <input type="file" id="portfolioFile" accept=".csv, .xlsx, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel" class="file-input">
+                <p id="portfolio-file-name" class="file-name-display"></p>
+                <p class="mt-1 text-xs text-gray-500">Formato: `Vendedor`, `Total Clientes`, `Total Produtos`, `Meta faturamento`</p>
+            </div>
+            <button id="process-button" class="w-full px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-opacity-75 disabled:bg-gray-400 disabled:cursor-not-allowed" disabled>
+                Processar Arquivos
+            </button>
+            <div id="warning-message" class="mt-2 text-sm text-yellow-600 font-medium hidden"></div>
+            <div id="error-message" class="mt-2 text-sm text-red-600 font-medium hidden"></div>
+        </div>
+    </div>
+
+    <div id="app" class="p-4 md:p-8 max-w-7xl mx-auto">
+
+        <!-- Cabeçalho -->
+        <header class="mb-8">
+            <div class="flex justify-between items-center relative">
+                <div class="absolute left-0">
+                    <!-- Espaço reservado para alinhar o título, se necessário -->
+                </div>
+                <div class="flex-grow text-center">
+                    <img src="logotipo 1.jpg" alt="Logotipo da Empresa" class="h-20 mx-auto mb-4">
+                    <h1 class="text-3xl font-bold text-gray-900">Dashboard de Análise de Vendas</h1>
+                </div>
+                <button id="hamburger-btn" class="p-2 rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-400">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+                    </svg>
+                </button>
+            </div>
+        </header>
+
+        <!-- Container principal do Dashboard -->
+        <main id="dashboard-content" class="hidden">
+
+            <!-- Filtros -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+                <div class="bg-white p-4 rounded-lg shadow-md">
+                    <label for="periodo-filter" class="block text-sm font-medium text-gray-700">Período</label>
+                    <input type="month" id="periodo-filter" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50">
+                </div>
+                <div class="bg-white p-4 rounded-lg shadow-md">
+                    <label for="vendedor-filter" class="block text-sm font-medium text-gray-700">Vendedores</label>
+                    <select id="vendedor-filter" multiple placeholder="Selecione um ou mais..."></select>
+                </div>
+                <div class="bg-white p-4 rounded-lg shadow-md">
+                    <label for="fabricante-filter" class="block text-sm font-medium text-gray-700">Fabricantes</label>
+                    <select id="fabricante-filter" multiple placeholder="Selecione um ou mais..."></select>
+                </div>
+            </div>
+             <button id="clear-filters" class="mb-4 px-4 py-2 bg-red-500 text-white rounded-lg shadow hover:bg-red-600 transition-colors">Limpar Filtros</button>
+
+
+            <!-- Indicadores Chave (Cards) -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6 mb-8">
+                <div class="bg-white p-6 rounded-lg shadow-md flex flex-col justify-between">
+                    <h3 class="text-sm font-medium text-gray-500">Faturamento Total</h3>
+                    <p id="faturamento-total" class="text-3xl font-semibold text-gray-900 mt-1">R$ 0,00</p>
+                </div>
+                <div class="bg-white p-6 rounded-lg shadow-md flex flex-col justify-between">
+                    <h3 class="text-sm font-medium text-gray-500">Total de Vendas</h3>
+                    <p id="total-vendas" class="text-3xl font-semibold text-gray-900 mt-1">0</p>
+                </div>
+                 <div class="bg-white p-6 rounded-lg shadow-md flex flex-col justify-between">
+                    <h3 class="text-sm font-medium text-gray-500">Clientes Atendidos</h3>
+                    <p id="clientes-atendidos" class="text-3xl font-semibold text-gray-900 mt-1">0</p>
+                </div>
+                 <div class="bg-white p-6 rounded-lg shadow-md flex flex-col justify-between">
+                    <h3 class="text-sm font-medium text-gray-500">Ticket Médio</h3>
+                    <p id="ticket-medio" class="text-3xl font-semibold text-gray-900 mt-1">R$ 0,00</p>
+                </div>
+                 <div class="bg-white p-6 rounded-lg shadow-md flex flex-col justify-between bg-blue-50">
+                    <h3 class="text-sm font-medium text-blue-800">Positivação Média</h3>
+                    <p id="positivacao-media" class="text-3xl font-semibold text-blue-900 mt-1">0%</p>
+                </div>
+                <div class="bg-white p-6 rounded-lg shadow-md flex flex-col justify-between bg-green-50">
+                    <h3 class="text-sm font-medium text-green-800">Projeção Faturamento</h3>
+                    <p id="projecao-faturamento" class="text-3xl font-semibold text-green-900 mt-1">R$ 0,00</p>
+                </div>
+            </div>
+
+            <!-- Gráficos -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <!-- Faturamento por Período -->
+                <div class="bg-white p-6 rounded-lg shadow-md">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-lg font-semibold">Faturamento por Período</h3>
+                        <button class="expand-chart-btn" data-chart-id="faturamento-periodo-chart">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-500 hover:text-gray-800" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5v-4m0 0h-4m4 0l-5-5" /></svg>
+                        </button>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="faturamento-periodo-chart"></canvas>
+                    </div>
+                </div>
+                <!-- Faturamento por Vendedor -->
+                <div class="bg-white p-6 rounded-lg shadow-md">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-lg font-semibold">Faturamento por Vendedor</h3>
+                        <button class="expand-chart-btn" data-chart-id="faturamento-vendedor-chart">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-500 hover:text-gray-800" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5v-4m0 0h-4m4 0l-5-5" /></svg>
+                        </button>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="faturamento-vendedor-chart"></canvas>
+                    </div>
+                </div>
+                <!-- Positivação por Vendedor -->
+                 <div class="bg-white p-6 rounded-lg shadow-md">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-lg font-semibold">Positivação de Clientes por Vendedor</h3>
+                        <button class="expand-chart-btn" data-chart-id="positivacao-chart">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-500 hover:text-gray-800" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5v-4m0 0h-4m4 0l-5-5" /></svg>
+                        </button>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="positivacao-chart"></canvas>
+                    </div>
+                </div>
+                <!-- Top 5 Produtos (Geral) -->
+                <div class="bg-white p-6 rounded-lg shadow-md">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-lg font-semibold">Top 5 Produtos por Faturamento</h3>
+                        <button class="expand-chart-btn" data-chart-id="top-produtos-geral-chart">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-500 hover:text-gray-800" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5v-4m0 0h-4m4 0l-5-5" /></svg>
+                        </button>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="top-produtos-geral-chart"></canvas>
+                    </div>
+                </div>
+                <!-- Mix de Produtos por Vendedor -->
+                <div class="bg-white p-6 rounded-lg shadow-md">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-lg font-semibold">Mix de Produtos por Vendedor</h3>
+                        <button class="expand-chart-btn" data-chart-id="mix-produtos-chart">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-500 hover:text-gray-800" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5v-4m0 0h-4m4 0l-5-5" /></svg>
+                        </button>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="mix-produtos-chart"></canvas>
+                    </div>
+                </div>
+                <!-- Item de Maior Faturamento por Vendedor -->
+                <div class="bg-white p-6 rounded-lg shadow-md">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-lg font-semibold">Item de Maior Faturamento por Vendedor</h3>
+                        <button class="expand-chart-btn" data-chart-id="top-item-vendedor-chart">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-500 hover:text-gray-800" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5v-4m0 0h-4m4 0l-5-5" /></svg>
+                        </button>
+                    </div>
+                    <div id="top-item-chart-container" class="chart-container">
+                         <canvas id="top-item-vendedor-chart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+             <!-- Gráfico de Fabricantes Foco -->
+            <div class="mt-8 bg-white p-6 rounded-lg shadow-md">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-lg font-semibold">Faturamento Fabricantes Foco</h3>
+                     <div>
+                        <label for="focus-vendor-filter" class="text-sm font-medium text-gray-700 mr-2">Filtrar Vendedor:</label>
+                        <select id="focus-vendor-filter" class="rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"></select>
+                         <button class="expand-chart-btn inline-flex items-center ml-2" data-chart-id="focus-manufacturers-chart">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-500 hover:text-gray-800" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5v-4m0 0h-4m4 0l-5-5" /></svg>
+                        </button>
+                    </div>
+                </div>
+                <div class="chart-container" style="height: 50vh;">
+                    <canvas id="focus-manufacturers-chart"></canvas>
+                </div>
+            </div>
+
+            <!-- Acompanhamento de Metas -->
+            <div id="goal-tracking-container" class="mt-8 bg-white p-6 rounded-lg shadow-md hidden">
+                <h3 class="text-lg font-semibold mb-4">Acompanhamento de Metas (Vendedores com Meta Definida)</h3>
+                <div class="overflow-x-auto">
+                    <div id="goal-tracking-table"></div>
+                </div>
+            </div>
+        </main>
+        
+        <!-- Mensagem inicial -->
+        <div id="initial-message" class="text-center py-16">
+            <p class="text-gray-500">Aguardando arquivos CSV ou XLSX para gerar o dashboard...</p>
+        </div>
+        
+        <!-- Loader -->
+        <div id="loader" class="hidden"></div>
+    </div>
+    
+    <!-- Chart Modal -->
+    <div id="chart-modal" class="fixed inset-0 z-50 flex items-center justify-center hidden">
+        <div class="modal-content bg-white p-6 rounded-lg shadow-xl relative">
+            <button id="close-modal-btn" class="absolute top-2 right-2 text-gray-500 hover:text-gray-800">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+            </button>
+            <canvas id="modal-chart"></canvas>
+        </div>
+    </div>
+
+
+    <!-- Bibliotecas JS -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/papaparse@5.3.2/papaparse.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dayjs@1/dayjs.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dayjs@1/plugin/customParseFormat.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/js/tom-select.complete.min.js"></script>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            Chart.register(ChartDataLabels);
+
+            dayjs.extend(dayjs_plugin_customParseFormat);
+            // Elementos do painel de upload
+            const hamburgerBtn = document.getElementById('hamburger-btn');
+            const uploadPanel = document.getElementById('upload-panel');
+            const closeUploadBtn = document.getElementById('close-upload-btn');
+            const overlay = document.getElementById('overlay');
+
+            const salesFileInput = document.getElementById('salesFile');
+            const portfolioFileInput = document.getElementById('portfolioFile');
+            const processButton = document.getElementById('process-button');
+            const salesFileNameDisplay = document.getElementById('sales-file-name');
+            const portfolioFileNameDisplay = document.getElementById('portfolio-file-name');
+            const dashboardContent = document.getElementById('dashboard-content');
+            const initialMessage = document.getElementById('initial-message');
+            const loader = document.getElementById('loader');
+            const errorMessageDiv = document.getElementById('error-message');
+            const warningMessageDiv = document.getElementById('warning-message');
+            const periodoFilter = document.getElementById('periodo-filter');
+            const clearFiltersButton = document.getElementById('clear-filters');
+            const modal = document.getElementById('chart-modal');
+            const closeModalBtn = document.getElementById('close-modal-btn');
+            
+            let originalData = [];
+            let portfolioDataMap = new Map();
+            let charts = {};
+            let modalChart;
+            let vendedorSelect, fabricanteSelect;
+            let globallyFilteredData = [];
+            let focusChartBaseData = [];
+
+            // Lógica para abrir/fechar o painel de upload
+            const openUploadPanel = () => {
+                uploadPanel.classList.remove('translate-x-full');
+                overlay.classList.remove('hidden');
+            };
+
+            const closeUploadPanel = () => {
+                uploadPanel.classList.add('translate-x-full');
+                overlay.classList.add('hidden');
+            };
+
+            hamburgerBtn.addEventListener('click', openUploadPanel);
+            closeUploadBtn.addEventListener('click', closeUploadPanel);
+            overlay.addEventListener('click', closeUploadPanel);
+
+
+            function checkFiles() {
+                if (salesFileInput.files.length > 0 && portfolioFileInput.files.length > 0) {
+                    processButton.disabled = false;
+                } else {
+                    processButton.disabled = true;
+                }
+            }
+            
+            salesFileInput.addEventListener('change', () => {
+                 salesFileNameDisplay.textContent = salesFileInput.files.length > 0 ? `Arquivo: ${salesFileInput.files[0].name}`: '';
+                 checkFiles();
+            });
+
+            portfolioFileInput.addEventListener('change', () => {
+                 portfolioFileNameDisplay.textContent = portfolioFileInput.files.length > 0 ? `Arquivo: ${portfolioFileInput.files[0].name}`: '';
+                 checkFiles();
+            });
+
+            processButton.addEventListener('click', () => {
+                closeUploadPanel();
+                handleFileProcessing();
+            });
+
+            function parseFile(file) {
+                return new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    const fileExtension = file.name.split('.').pop().toLowerCase();
+
+                    reader.onload = event => {
+                        try {
+                            if (fileExtension === 'csv') {
+                                const fileText = event.target.result;
+                                Papa.parse(fileText, {
+                                    header: true,
+                                    skipEmptyLines: true,
+                                    complete: resolve,
+                                    error: reject
+                                });
+                            } else if (fileExtension === 'xlsx') {
+                                const workbook = XLSX.read(event.target.result, { type: 'array' });
+                                const sheetName = workbook.SheetNames[0];
+                                const worksheet = workbook.Sheets[sheetName];
+                                const data = XLSX.utils.sheet_to_json(worksheet);
+                                resolve({ data: data, errors: [], meta: {fields: data.length > 0 ? Object.keys(data[0]) : []} });
+                            } else {
+                                reject(new Error("Formato de arquivo não suportado. Use .csv ou .xlsx"));
+                            }
+                        } catch (error) {
+                            reject(error);
+                        }
+                    };
+
+                    reader.onerror = error => reject(error);
+
+                    if (fileExtension === 'csv') {
+                        reader.readAsText(file, 'ISO-8851-1');
+                    } else if (fileExtension === 'xlsx') {
+                        reader.readAsArrayBuffer(file);
+                    } else {
+                        reject(new Error("Formato de arquivo não suportado."));
+                    }
+                });
+            }
+
+            function findKey(obj, possibleKeys) {
+                for (const key of possibleKeys) {
+                    const objKey = Object.keys(obj).find(k => k.toLowerCase().trim() === key.toLowerCase());
+                    if (objKey) return objKey;
+                }
+                return null;
+            }
+
+            async function handleFileProcessing() {
+                errorMessageDiv.classList.add('hidden');
+                warningMessageDiv.classList.add('hidden');
+                loader.classList.remove('hidden');
+                initialMessage.classList.add('hidden');
+                dashboardContent.classList.add('hidden');
+
+                try {
+                    const [salesResults, portfolioResults] = await Promise.all([
+                        parseFile(salesFileInput.files[0]),
+                        parseFile(portfolioFileInput.files[0])
+                    ]);
+
+                    // Process Portfolio Data
+                    if (portfolioResults.errors && portfolioResults.errors.length > 0) {
+                        const isJustDelimiterWarning = portfolioResults.errors.every(e => e.code === 'TooManyFields');
+                        if (!isJustDelimiterWarning) {
+                            throw new Error("Erro ao ler o arquivo de carteira de clientes: " + portfolioResults.errors.map(e => e.message).join(', '));
+                        }
+                    }
+                    if (!portfolioResults.data || portfolioResults.data.length === 0) {
+                        throw new Error("Arquivo de carteira de clientes está vazio ou em formato inválido.");
+                    }
+
+                    portfolioDataMap.clear();
+                    const headers = portfolioResults.meta.fields;
+                    const malformedHeader = headers.find(h => h.toLowerCase().includes('vendedor') && h.toLowerCase().includes('total clientes'));
+
+                    portfolioResults.data.forEach(row => {
+                        let vendor, totalClientes;
+                        if (malformedHeader && row[malformedHeader]) {
+                            const parts = String(row[malformedHeader]).split(';');
+                            vendor = parts[0];
+                            totalClientes = parts[1];
+                        } else {
+                            const vendorKey = findKey(row, ['vendedor']);
+                            vendor = vendorKey ? row[vendorKey] : null;
+                            const totalClientesKey = findKey(row, ['total clientes']);
+                            totalClientes = totalClientesKey ? row[totalClientesKey] : null;
+                        }
+                        const totalProdutosKey = findKey(row, ['total produtos']);
+                        const metaKey = findKey(row, ['meta faturamento']);
+
+                        const totalProdutos = totalProdutosKey ? row[totalProdutosKey] : null;
+                        const meta = metaKey ? row[metaKey] : null;
+                        
+                        if (vendor && totalClientes && totalProdutos) {
+                            const vendorName = String(vendor).trim();
+                            const numClientes = parseInt(totalClientes, 10);
+                            const numProdutos = parseInt(totalProdutos, 10);
+                            const metaNum = parseFloat(String(meta || '0').replace(/\./g, '').replace(',', '.'));
+
+                            if (vendorName && !isNaN(numClientes) && !isNaN(numProdutos)) {
+                                portfolioDataMap.set(vendorName, {
+                                    totalClientes: numClientes,
+                                    totalProdutos: numProdutos,
+                                    meta: isNaN(metaNum) ? 0 : metaNum
+                                });
+                            }
+                        }
+                    });
+
+                    if(portfolioDataMap.size === 0) throw new Error("Arquivo de carteira não tem as colunas 'Vendedor', 'Total Clientes' e 'Total Produtos' ou está vazio.");
+
+                    // Process Sales Data
+                    if (salesResults.errors.length) throw new Error("Erro ao ler o arquivo de vendas.");
+                    
+                    const firstRow = salesResults.data[0];
+                    const dateKey = findKey(firstRow, ['data faturamento', 'data']);
+                    const valueKey = findKey(firstRow, ['valor total item', 'valor total', 'valor']);
+                    const vendorKey = findKey(firstRow, ['vendedor']);
+                    const manufacturerKey = findKey(firstRow, ['fabricante']);
+                    const clientKey = findKey(firstRow, ['nome fantasia', 'cliente']);
+                    const productKey = findKey(firstRow, ['descricao produto']);
+                    const quantityKey = findKey(firstRow, ['quantidade vendida']);
+
+                     if (!dateKey || !valueKey || !vendorKey || !manufacturerKey || !clientKey || !productKey || !quantityKey) {
+                         throw new Error("Colunas essenciais não encontradas. Verifique se o arquivo de vendas contém: Data, Valor Total Item, Vendedor, Fabricante, Nome Fantasia, Descricao Produto, Quantidade Vendida.");
+                    }
+
+                    let invalidRows = 0;
+                    const processedData = salesResults.data.map(row => {
+                        const rawValue = row[valueKey];
+                        let valorNum;
+
+                        if (typeof rawValue === 'number') {
+                            valorNum = rawValue;
+                        } else {
+                            let valorStr = String(rawValue || '0').replace('R$', '').trim();
+                            const hasDot = valorStr.includes('.');
+                            const hasComma = valorStr.includes(',');
+
+                            if (hasDot && hasComma) {
+                                if (valorStr.lastIndexOf(',') > valorStr.lastIndexOf('.')) {
+                                    valorStr = valorStr.replace(/\./g, '').replace(',', '.');
+                                } else {
+                                    valorStr = valorStr.replace(/,/g, '');
+                                }
+                            } else if (hasComma) {
+                                valorStr = valorStr.replace(/\./g, '').replace(',', '.');
+                            }
+                            
+                            valorNum = parseFloat(valorStr);
+                        }
+                        
+                        let dataObj;
+                        if (typeof row[dateKey] === 'number') {
+                            const excelSerialDate = row[dateKey];
+                            const utcDate = new Date(Math.round((excelSerialDate - 25569) * 86400 * 1000));
+                            const timezoneOffset = utcDate.getTimezoneOffset() * 60 * 1000;
+                            dataObj = dayjs(new Date(utcDate.getTime() + timezoneOffset));
+                        } else {
+                            dataObj = dayjs(String(row[dateKey]), ['DD/MM/YYYY', 'YYYY-MM-DD'], true);
+                        }
+
+                        const qtdNum = parseInt(row[quantityKey] || '0', 10);
+
+                        if (!dataObj.isValid() || isNaN(valorNum) || isNaN(qtdNum)) {
+                            invalidRows++;
+                            return null;
+                        }
+
+                        return {
+                            Data: row[dateKey],
+                            Vendedor: row[vendorKey],
+                            Fabricante: row[manufacturerKey],
+                            Cliente: row[clientKey],
+                            Produto: row[productKey],
+                            Quantidade: qtdNum,
+                            Valor: valorNum,
+                            DataObj: dataObj
+                        }
+                    }).filter(row => row !== null);
+                    
+                    if (invalidRows > 0) {
+                        warningMessageDiv.textContent = `Aviso: ${invalidRows} linha(s) do relatório de vendas foram ignoradas devido a formato inválido de data, valor ou quantidade.`;
+                        warningMessageDiv.classList.remove('hidden');
+                    }
+
+                    originalData = processedData;
+                    if (originalData.length === 0) throw new Error("Nenhuma linha de dados de venda válida foi encontrada.");
+                    
+                    originalData.sort((a, b) => a.DataObj.valueOf() - b.DataObj.valueOf());
+
+                    setupFilters();
+                    applyFilters();
+                    dashboardContent.classList.remove('hidden');
+
+                } catch (error) {
+                    errorMessageDiv.textContent = `Erro: ${error.message}`;
+                    errorMessageDiv.classList.remove('hidden');
+                    initialMessage.classList.remove('hidden');
+                } finally {
+                    loader.classList.add('hidden');
+                }
+            }
+
+
+            function setupFilters() {
+    const vendedores = [...new Set(originalData.map(item => item.Vendedor))].sort();
+    const fabricantes = [...new Set(originalData.map(item => item.Fabricante))].sort();
+
+    if (vendedorSelect) vendedorSelect.destroy();
+    const vendedorFilterEl = document.getElementById('vendedor-filter');
+    vendedorFilterEl.innerHTML = '';
+    vendedores.forEach(v => {
+        vendedorFilterEl.innerHTML += `<option value="${v}">${v}</option>`;
+    });
+    vendedorSelect = new TomSelect(vendedorFilterEl, { 
+        plugins: ['remove_button'], 
+        onChange: applyFilters 
+    });
+    
+    // Lista de vendedores padrão
+    const vendedoresPadrao = [
+        'EVERTON', 'MARCOS', 'THYAGO', 'TIAGO', 
+        'SILVANA', 'PEDRO', 'RODOLFO', 'TONINHO', 'MARCELO'
+    ];
+
+
+    // Filtra apenas os que realmente existem nos dados
+    const vendedoresPadraoExistentes = vendedoresPadrao.filter(v => vendedores.includes(v));
+    
+    // Seleciona os vendedores padrão ao iniciar
+    vendedorSelect.off("change", applyFilters); // desliga evento para não aplicar filtro agora
+    vendedorSelect.setValue(vendedoresPadraoExistentes);
+    vendedorSelect.on("change", applyFilters);  // religa evento
+
+    if (fabricanteSelect) fabricanteSelect.destroy();
+    const fabricanteFilterEl = document.getElementById('fabricante-filter');
+    fabricanteFilterEl.innerHTML = '';
+    fabricantes.forEach(f => {
+        fabricanteFilterEl.innerHTML += `<option value="${f}">${f}</option>`;
+    });
+    fabricanteSelect = new TomSelect(fabricanteFilterEl, { plugins: ['remove_button'], onChange: applyFilters });
+    
+    periodoFilter.addEventListener('change', applyFilters);
+    clearFiltersButton.addEventListener('click', resetFilters);
+
+    if (originalData.length > 0) {
+        const firstDate = originalData[0].DataObj.format('YYYY-MM');
+        const lastDate = originalData[originalData.length - 1].DataObj.format('YYYY-MM');
+        periodoFilter.min = firstDate;
+        periodoFilter.max = lastDate;
+    }
+
+    // Setup for focus chart filter
+    const focusVendorFilter = document.getElementById('focus-vendor-filter');
+    focusVendorFilter.innerHTML = '<option value="all">Todos os Vendedores</option>';
+    vendedores.forEach(v => {
+        focusVendorFilter.innerHTML += `<option value="${v}">${v}</option>`;
+    });
+    focusVendorFilter.addEventListener('change', () => {
+        createOrUpdateFocusChart(focusChartBaseData)
+    });
+}
+
+            
+            function resetFilters() {
+                periodoFilter.value = '';
+                vendedorSelect.clear();
+                fabricanteSelect.clear();
+                document.getElementById('focus-vendor-filter').value = 'all';
+                applyFilters();
+            }
+
+            function applyFilters() {
+                globallyFilteredData = [...originalData]; // for main charts
+                focusChartBaseData = [...originalData]; // for focus chart
+
+                const periodo = periodoFilter.value;
+                const vendedores = vendedorSelect.getValue();
+                const fabricantes = fabricanteSelect.getValue();
+
+                // Apply period filter to both datasets
+                if (periodo) {
+                    globallyFilteredData = globallyFilteredData.filter(item => item.DataObj.format('YYYY-MM') === periodo);
+                    focusChartBaseData = focusChartBaseData.filter(item => item.DataObj.format('YYYY-MM') === periodo);
+                }
+
+                // Apply vendor and manufacturer filters only to the main dataset
+                if (vendedores.length > 0) {
+                    globallyFilteredData = globallyFilteredData.filter(item => vendedores.includes(item.Vendedor));
+                }
+                if (fabricantes.length > 0) {
+                    globallyFilteredData = globallyFilteredData.filter(item => fabricantes.includes(item.Fabricante));
+                }
+                
+                updateDashboard(globallyFilteredData);
+            }
+
+            function updateDashboard(data) {
+                updateCards(data);
+                createOrUpdateCharts(data);
+                updateGoalTrackingTable(data);
+            }
+            
+            function formatCurrency(value) {
+                const numberValue = Number(value) || 0;
+                const roundedValue = Math.round(numberValue * 100) / 100;
+
+                return roundedValue.toLocaleString('pt-BR', { 
+                    style: 'currency', 
+                    currency: 'BRL' 
+                });
+            }
+
+            function countBusinessDays(startDate, endDate) {
+                let count = 0;
+                let currentDate = startDate.clone();
+                while (currentDate.isBefore(endDate) || currentDate.isSame(endDate, 'day')) {
+                    const dayOfWeek = currentDate.day();
+                    if (dayOfWeek > 0 && dayOfWeek < 6) { // 0=Sun, 6=Sat
+                        count++;
+                    }
+                    currentDate = currentDate.add(1, 'day');
+                }
+                return count;
+            }
+
+            function updateCards(data) {
+                const faturamentoTotal = data.reduce((sum, item) => sum + item.Valor, 0);
+                const totalVendas = data.length;
+                const clientesAtendidos = new Set(data.map(item => item.Cliente)).size;
+                const ticketMedio = totalVendas > 0 ? faturamentoTotal / totalVendas : 0;
+                document.getElementById('faturamento-total').textContent = formatCurrency(faturamentoTotal);
+                document.getElementById('total-vendas').textContent = totalVendas;
+                document.getElementById('clientes-atendidos').textContent = clientesAtendidos;
+                document.getElementById('ticket-medio').textContent = formatCurrency(ticketMedio);
+
+                const positivacaoData = calculatePositivation(data);
+                const totalPositivacao = positivacaoData.reduce((acc, curr) => acc + curr.percentage, 0);
+                const mediaPositivacao = positivacaoData.length > 0 ? totalPositivacao / positivacaoData.length : 0;
+                document.getElementById('positivacao-media').textContent = `${mediaPositivacao.toFixed(1)}%`;
+                
+                const periodo = periodoFilter.value;
+                const projecaoFaturamentoEl = document.getElementById('projecao-faturamento');
+
+                if (periodo && data.length > 0) {
+                    const anoMes = dayjs(periodo);
+                    const inicioMes = anoMes.startOf('month');
+                    const fimMes = anoMes.endOf('month');
+
+                    const ultimaVendaData = data.reduce((max, p) => p.DataObj.isAfter(max) ? p.DataObj : max, data[0].DataObj);
+
+                    const diasUteisTotal = countBusinessDays(inicioMes, fimMes);
+                    const diasUteisCorridos = countBusinessDays(inicioMes, ultimaVendaData);
+                    
+                    if (diasUteisCorridos > 0) {
+                        const mediaDiaria = faturamentoTotal / diasUteisCorridos;
+                        const projecao = mediaDiaria * diasUteisTotal;
+                        projecaoFaturamentoEl.textContent = formatCurrency(projecao);
+                    } else {
+                        projecaoFaturamentoEl.textContent = formatCurrency(0);
+                    }
+                } else {
+                    projecaoFaturamentoEl.textContent = "Selecione Mês";
+                }
+            }
+            
+            function createOrUpdateChart(chartId, type, data, options) {
+                const ctx = document.getElementById(chartId).getContext('2d');
+                if (charts[chartId]) charts[chartId].destroy();
+                charts[chartId] = new Chart(ctx, { type, data, options });
+            }
+            
+            const chartOptions = {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'top' },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                let label = context.dataset.label || '';
+                                if (label) label += ': ';
+                                if (context.parsed.y !== null) label += formatCurrency(context.parsed.y);
+                                return label;
+                            }
+                        }
+                    },
+                    datalabels: {
+                        anchor: 'end',
+                        align: 'top',
+                        formatter: (value) => {
+                            if (value > 999) {
+                                return 'R$' + (value / 1000).toFixed(1).replace('.', ',') + 'k';
+                            }
+                            return null;
+                        },
+                        font: { weight: 'bold', size: 10 },
+                        color: '#374151'
+                    }
+                },
+                scales: { y: { beginAtZero: true, ticks: { callback: value => formatCurrency(value) } } }
+            };
+
+            function calculatePositivation(data) {
+                 const clientesPorVendedor = data.reduce((acc, sale) => {
+                    if (!acc[sale.Vendedor]) acc[sale.Vendedor] = new Set();
+                    acc[sale.Vendedor].add(sale.Cliente);
+                    return acc;
+                }, {});
+
+                const result = [];
+                for (const vendedor in clientesPorVendedor) {
+                    const portfolioInfo = portfolioDataMap.get(vendedor.trim());
+                    if (portfolioInfo && portfolioInfo.totalClientes > 0) {
+                        const clientesPositivados = clientesPorVendedor[vendedor].size;
+                        const percentage = (clientesPositivados / portfolioInfo.totalClientes) * 100;
+                        result.push({ vendedor, percentage });
+                    }
+                }
+                return result.sort((a, b) => b.percentage - a.percentage);
+            }
+
+            function calculateProductMix(data) {
+                const produtosPorVendedor = data.reduce((acc, sale) => {
+                    if (!acc[sale.Vendedor]) {
+                        acc[sale.Vendedor] = new Set();
+                    }
+                    acc[sale.Vendedor].add(sale.Produto);
+                    return acc;
+                }, {});
+
+                const result = [];
+                for (const vendedor in produtosPorVendedor) {
+                    const portfolioInfo = portfolioDataMap.get(vendedor.trim());
+                    if (portfolioInfo && portfolioInfo.totalProdutos > 0) {
+                        const uniqueProductsCount = produtosPorVendedor[vendedor].size;
+                        const percentage = (uniqueProductsCount / portfolioInfo.totalProdutos) * 100;
+                        result.push({ 
+                            vendedor, 
+                            percentage, 
+                            uniqueProductsCount, 
+                            totalProdutos: portfolioInfo.totalProdutos 
+                        });
+                    }
+                }
+                return result.sort((a, b) => b.percentage - a.percentage);
+            }
+            
+            function updateGoalTrackingTable(data) {
+                const goalContainer = document.getElementById('goal-tracking-container');
+                const goalTableDiv = document.getElementById('goal-tracking-table');
+                const periodo = periodoFilter.value;
+
+                if (!periodo || data.length === 0) {
+                    goalContainer.classList.add('hidden');
+                    return;
+                }
+                goalContainer.classList.remove('hidden');
+
+                const faturamentoPorVendedor = data.reduce((acc, sale) => {
+                    acc[sale.Vendedor] = (acc[sale.Vendedor] || 0) + sale.Valor;
+                    return acc;
+                }, {});
+
+                const anoMes = dayjs(periodo);
+                const inicioMes = anoMes.startOf('month');
+                const fimMes = anoMes.endOf('month');
+                const hoje = dayjs();
+
+                const ultimaDataVendas = hoje.isAfter(fimMes) ? fimMes : hoje;
+                
+                const diasUteisTotal = countBusinessDays(inicioMes, fimMes);
+                const diasUteisCorridos = countBusinessDays(inicioMes, ultimaDataVendas < data[data.length -1].DataObj ? ultimaDataVendas : data[data.length -1].DataObj);
+                
+                let diasUteisRestantes = countBusinessDays(hoje.add(1, 'day'), fimMes);
+                if (hoje.day() > 0 && hoje.day() < 6 && hoje.isAfter(inicioMes) && hoje.isBefore(fimMes)) {
+                   diasUteisRestantes +=1;
+                }
+                
+                 if (diasUteisRestantes <= 0) diasUteisRestantes = 1;
+
+
+                const tableData = [];
+                portfolioDataMap.forEach((portfolio, vendedor) => {
+                    if (portfolio.meta > 0) {
+                        const faturamentoAtual = faturamentoPorVendedor[vendedor] || 0;
+                        const atingidoPercent = (faturamentoAtual / portfolio.meta) * 100;
+                        
+                        const mediaDiaria = diasUteisCorridos > 0 ? faturamentoAtual / diasUteisCorridos : 0;
+                        const projecao = mediaDiaria * diasUteisTotal;
+                        
+                        const valorFaltante = portfolio.meta - faturamentoAtual;
+                        const vendaDiariaNecessaria = valorFaltante > 0 ? valorFaltante / diasUteisRestantes : 0;
+
+                        tableData.push({
+                            vendedor,
+                            meta: portfolio.meta,
+                            faturamentoAtual,
+                            atingidoPercent,
+                            projecao,
+                            vendaDiariaNecessaria
+                        });
+                    }
+                });
+
+                tableData.sort((a, b) => b.atingidoPercent - a.atingidoPercent);
+
+                let tableHTML = `
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Vendedor</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Meta</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Faturamento</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">% Atingido</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Projeção</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Venda Diária Necessária</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+                `;
+                
+                tableData.forEach(item => {
+                    tableHTML += `
+                        <tr>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${item.vendedor}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${formatCurrency(item.meta)}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${formatCurrency(item.faturamentoAtual)}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${item.atingidoPercent.toFixed(1)}%</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${formatCurrency(item.projecao)}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-semibold ${item.vendaDiariaNecessaria > 0 ? 'text-red-600' : 'text-green-600'}">${formatCurrency(item.vendaDiariaNecessaria)}</td>
+                        </tr>
+                    `;
+                });
+
+                tableHTML += `</tbody></table>`;
+                goalTableDiv.innerHTML = tableHTML;
+            }
+
+             function createOrUpdateFocusChart(data) {
+                const focusManufacturers = ['Consabor', 'Kellanova', 'RICLAN', 'Goldko', 'Selmi', 'Lucky', 'Bela vista', 'Tampico', 'Tec polpa', 'Tecpolpa', 'Yaí', 'Yai'].map(f => f.toLowerCase());
+                
+                const selectedVendor = document.getElementById('focus-vendor-filter').value;
+
+                let chartData = data.filter(item => {
+                    const manufacturerName = (item.Fabricante || '').toLowerCase().trim().replace(/\s/g, '');
+                    return focusManufacturers.includes(manufacturerName);
+                });
+
+                
+                if (selectedVendor !== 'all') {
+                    chartData = chartData.filter(item => item.Vendedor === selectedVendor);
+                }
+
+                const faturamentoPorFabricante = chartData.reduce((acc, sale) => {
+                    acc[sale.Fabricante] = (acc[sale.Fabricante] || 0) + sale.Valor;
+                    return acc;
+                }, {});
+
+                const sortedFabricantes = Object.entries(faturamentoPorFabricante).sort((a, b) => b[1] - a[1]);
+                const focusData = sortedFabricantes.map(f => f[1]);
+                const maxFocusValue = focusData.length > 0 ? Math.max(...focusData) : 0;
+
+                const focusChartOptions = {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    indexAxis: 'y',
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return `Faturamento: ${formatCurrency(context.parsed.x)}`;
+                                }
+                            }
+                        },
+                        datalabels: {
+                            anchor: 'end',
+                            align: 'end',
+                             formatter: (value) => {
+                                if (value > 999) {
+                                    return 'R$' + (value / 1000).toFixed(1).replace('.', ',') + 'k';
+                                }
+                                return formatCurrency(value);
+                            },
+                            font: { weight: 'bold' },
+                            color: '#374151'
+                        }
+                    },
+                     scales: {
+                        x: {
+                            beginAtZero: true,
+                            suggestedMax: maxFocusValue * 1.25,
+                            ticks: {
+                                callback: value => {
+                                    if (value >= 1000) return 'R$' + (value / 1000) + 'k';
+                                    return formatCurrency(value);
+                                }
+                            }
+                        }
+                    }
+                };
+
+                createOrUpdateChart('focus-manufacturers-chart', 'bar', {
+                    labels: sortedFabricantes.map(f => f[0]),
+                    datasets: [{
+                        label: 'Faturamento',
+                        data: focusData,
+                        backgroundColor: 'rgba(255, 99, 132, 0.6)',
+                        borderColor: 'rgba(255, 99, 132, 1)',
+                        borderWidth: 1
+                    }]
+                }, focusChartOptions);
+            }
+
+            function createOrUpdateCharts(data) {
+                // Faturamento por período
+                const faturamentoPorMes = data.reduce((acc, sale) => {
+                    const month = sale.DataObj.format('YYYY-MM');
+                    acc[month] = (acc[month] || 0) + sale.Valor;
+                    return acc;
+                }, {});
+                const sortedMonths = Object.keys(faturamentoPorMes).sort();
+                const faturamentoPeriodoData = sortedMonths.map(m => faturamentoPorMes[m]);
+                const maxFaturamentoPeriodo = faturamentoPeriodoData.length > 0 ? Math.max(...faturamentoPeriodoData) : 0;
+                
+                const faturamentoPeriodoOptions = {
+                    ...JSON.parse(JSON.stringify(chartOptions)), // Deep copy base options
+                    scales: {
+                        y: {
+                            ...chartOptions.scales.y,
+                            suggestedMax: maxFaturamentoPeriodo * 1.25
+                        }
+                    },
+                    plugins: {
+                        ...chartOptions.plugins,
+                        datalabels: {
+                            display: false
+                        }
+                    }
+                };
+                
+                createOrUpdateChart('faturamento-periodo-chart', 'line', {
+                    labels: sortedMonths.map(m => dayjs(m).format('MMM/YY')),
+                    datasets: [{ label: 'Faturamento Mensal', data: faturamentoPeriodoData, borderColor: 'rgb(75, 192, 192)', tension: 0.1, fill: false }]
+                }, faturamentoPeriodoOptions);
+
+                // Faturamento por Vendedor
+                const faturamentoPorVendedor = data.reduce((acc, sale) => {
+                    acc[sale.Vendedor] = (acc[sale.Vendedor] || 0) + sale.Valor;
+                    return acc;
+                }, {});
+                const sortedVendedores = Object.entries(faturamentoPorVendedor).sort((a, b) => b[1] - a[1]);
+                const faturamentoData = sortedVendedores.map(v => v[1]);
+                const maxValueFaturamento = faturamentoData.length > 0 ? Math.max(...faturamentoData) : 0;
+                
+                const faturamentoVendedorOptions = {
+                    ...JSON.parse(JSON.stringify(chartOptions)),
+                    scales: {
+                        y: {
+                           ...chartOptions.scales.y,
+                           suggestedMax: maxValueFaturamento * 1.25,
+                        }
+                    },
+                    plugins: {
+                        ...chartOptions.plugins, 
+                        datalabels: {
+                            anchor: 'end',
+                            align: 'top',
+                            color: '#374151',
+                            font: { weight: 'bold', size: 10 },
+                            formatter: (value) => {
+                                if (value >= 1000) {
+                                    return (value / 1000).toFixed(1) + 'k';
+                                }
+                                return null;
+                            }
+                        }
+                    }
+                };
+
+                createOrUpdateChart('faturamento-vendedor-chart', 'bar', {
+                    labels: sortedVendedores.map(v => v[0]),
+                    datasets: [{ 
+                        label: 'Faturamento', 
+                        data: faturamentoData, 
+                        backgroundColor: 'rgba(54, 162, 235, 0.6)', 
+                        borderColor: 'rgba(54, 162, 235, 1)', 
+                        borderWidth: 1,
+                        barPercentage: 1.0,
+                        categoryPercentage: 0.8
+                    }]
+                }, faturamentoVendedorOptions);
+
+                // Positivação por Vendedor Chart
+                const positivacaoData = calculatePositivation(data);
+                const positivacaoOptions = {
+                    ...chartOptions,
+                    scales: { y: { beginAtZero: true, max: 100, suggestedMax: 125, ticks: { callback: value => `${value}%` } } },
+                    plugins: {
+                        ...chartOptions.plugins,
+                        tooltip: { callbacks: { label: (context) => `${context.dataset.label}: ${context.parsed.y.toFixed(1)}%` } },
+                        datalabels: {
+                            anchor: 'end',
+                            align: 'top',
+                            color: '#374151',
+                            font: { weight: 'bold', size: 10 },
+                            formatter: (value) => `${parseFloat(value).toFixed(1)}%`
+                        }
+                    }
+                };
+                createOrUpdateChart('positivacao-chart', 'bar', {
+                    labels: positivacaoData.map(p => p.vendedor),
+                    datasets: [{ 
+                        label: 'Positivação', 
+                        data: positivacaoData.map(p => p.percentage), 
+                        backgroundColor: 'rgba(75, 192, 192, 0.6)', 
+                        borderColor: 'rgba(75, 192, 192, 1)', 
+                        borderWidth: 1,
+                        barPercentage: 1.0,
+                        categoryPercentage: 0.8
+                    }]
+                }, positivacaoOptions);
+
+                // Top 5 Produtos por Faturamento (Geral)
+                const faturamentoPorProduto = data.reduce((acc, sale) => {
+                    acc[sale.Produto] = (acc[sale.Produto] || 0) + sale.Valor;
+                    return acc;
+                }, {});
+
+                const sortedProdutos = Object.entries(faturamentoPorProduto)
+                    .sort(([, a], [, b]) => b - a)
+                    .slice(0, 5);
+                const topProdutosData = sortedProdutos.map(p => p[1]);
+                const maxTopProdutoValue = topProdutosData.length > 0 ? Math.max(...topProdutosData) : 0;
+
+                const topProdutosOptions = {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    indexAxis: 'y', // Gráfico de barras horizontal
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return `Faturamento: ${formatCurrency(context.parsed.x)}`;
+                                }
+                            }
+                        },
+                        datalabels: {
+                            anchor: 'end',
+                            align: 'end',
+                            offset: 4,
+                            color: '#374151',
+                            font: { weight: 'bold' },
+                            formatter: (value) => {
+                                if (value > 999) {
+                                    return 'R$' + (value / 1000).toFixed(1).replace('.', ',') + 'k';
+                                }
+                                return formatCurrency(value);
+                            },
+                        }
+                    },
+                    scales: {
+                        x: {
+                            beginAtZero: true,
+                            suggestedMax: maxTopProdutoValue * 1.25,
+                            ticks: {
+                                callback: value => {
+                                    if (value >= 1000) return 'R$' + (value / 1000) + 'k';
+                                    return formatCurrency(value);
+                                }
+                            }
+                        },
+                        y: {
+                             ticks: {
+                                callback: function(value) {
+                                    const label = this.getLabelForValue(value);
+                                    if (label.length > 35) {
+                                        return label.substring(0, 35) + '...';
+                                    }
+                                    return label;
+                                }
+                            }
+                        }
+                    }
+                };
+
+                createOrUpdateChart('top-produtos-geral-chart', 'bar', {
+                    labels: sortedProdutos.map(p => p[0]),
+                    datasets: [{
+                        label: 'Faturamento',
+                        data: topProdutosData,
+                        backgroundColor: 'rgba(153, 102, 255, 0.6)',
+                        borderColor: 'rgba(153, 102, 255, 1)',
+                        borderWidth: 1
+                    }]
+                }, topProdutosOptions);
+
+                // Mix de Produtos por Vendedor Chart
+                const mixData = calculateProductMix(data);
+                const mixOptions = {
+                    ...chartOptions,
+                    scales: { y: { beginAtZero: true, max: 100, suggestedMax: 125, ticks: { callback: value => `${value}%` } } },
+                    plugins: {
+                        ...chartOptions.plugins,
+                        tooltip: {
+                            callbacks: {
+                                label: (context) => {
+                                    const item = mixData[context.dataIndex];
+                                    return ` ${item.uniqueProductsCount} / ${item.totalProdutos} produtos (${item.percentage.toFixed(1)}%)`;
+                                }
+                            }
+                        },
+                        datalabels: {
+                            anchor: 'end',
+                            align: 'top',
+                            color: '#374151',
+                            font: { weight: 'bold', size: 10 },
+                            formatter: (value) => `${parseFloat(value).toFixed(1)}%`
+                        }
+                    }
+                };
+                createOrUpdateChart('mix-produtos-chart', 'bar', {
+                    labels: mixData.map(p => p.vendedor),
+                    datasets: [{
+                        label: 'Mix de Produtos',
+                        data: mixData.map(p => p.percentage),
+                        backgroundColor: 'rgba(255, 99, 132, 0.6)',
+                        borderColor: 'rgba(255, 99, 132, 1)',
+                        borderWidth: 1,
+                        barPercentage: 1.0,
+                        categoryPercentage: 0.8
+                    }]
+                }, mixOptions);
+
+                // Item de Maior Faturamento por Vendedor
+                const salesByVendorProductValue = data.reduce((acc, sale) => {
+                    const vendedor = sale.Vendedor;
+                    const produto = sale.Produto;
+                    const valor = sale.Valor;
+
+                    if (!acc[vendedor]) acc[vendedor] = {};
+                    acc[vendedor][produto] = (acc[vendedor][produto] || 0) + valor;
+                    return acc;
+                }, {});
+
+                const topItemsByValue = Object.entries(salesByVendorProductValue).map(([vendedor, products]) => {
+                    if (!products || Object.keys(products).length === 0) {
+                        return { vendedor, produto: 'Nenhuma venda', valor: 0 };
+                    }
+                    const topProduct = Object.entries(products).sort((a, b) => b[1] - a[1])[0];
+                    return { vendedor, produto: topProduct[0], valor: topProduct[1] };
+                }).sort((a, b) => a.vendedor.localeCompare(b.vendedor));
+
+                const topItemChartContainer = document.getElementById('top-item-chart-container');
+                const newHeight = Math.max(40, topItemsByValue.length * 6) + 'vh';
+                topItemChartContainer.style.height = newHeight;
+                
+                const topItemsData = topItemsByValue.map(item => item.valor);
+                const maxValue = topItemsData.length > 0 ? Math.max(...topItemsData) : 0;
+
+                const topItemValueOptions = {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    indexAxis: 'y',
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const item = topItemsByValue[context.dataIndex];
+                                    return `${item.produto}: ${formatCurrency(item.valor)}`;
+                                }
+                            }
+                        },
+                        datalabels: {
+                            align: (context) => {
+                                const currentValue = context.dataset.data[context.dataIndex];
+                                if (maxValue === 0) return 'end';
+                                return currentValue < maxValue * 0.4 ? 'end' : 'start';
+                            },
+                            anchor: 'end',
+                            offset: 6,
+                            color: (context) => {
+                                const currentValue = context.dataset.data[context.dataIndex];
+                                if (maxValue === 0) return '#374151';
+                                return currentValue < maxValue * 0.4 ? '#374151' : 'white';
+                            },
+                            font: { 
+                                weight: 'bold', 
+                                size: 11
+                            },
+                            formatter: (value, context) => {
+                                const item = topItemsByValue[context.dataIndex];
+                                const maxLength = 30;
+                                if (item.produto.length > maxLength) {
+                                    return item.produto.substring(0, maxLength - 3) + '...';
+                                }
+                                return item.produto;
+                            }
+                        }
+                    },
+                    scales: { 
+                        x: { 
+                            beginAtZero: true,
+                            suggestedMax: maxValue * 1.4, 
+                            ticks: { 
+                                callback: value => {
+                                    if (value >= 1000) return 'R$' + (value / 1000) + 'k';
+                                    return formatCurrency(value);
+                                }
+                            } 
+                        } 
+                    }
+                };
+
+                createOrUpdateChart('top-item-vendedor-chart', 'bar', {
+                    labels: topItemsByValue.map(item => item.vendedor),
+                    datasets: [{
+                        label: 'Faturamento do Item',
+                        data: topItemsData,
+                        backgroundColor: 'rgba(255, 159, 64, 0.6)',
+                        borderColor: 'rgba(255, 159, 64, 1)',
+                        borderWidth: 1
+                    }]
+                }, topItemValueOptions);
+
+                createOrUpdateFocusChart(focusChartBaseData);
+            }
+
+            // Modal Logic
+            dashboardContent.addEventListener('click', (e) => {
+                const expandButton = e.target.closest('.expand-chart-btn');
+                if (!expandButton) return;
+
+                const chartId = expandButton.dataset.chartId;
+                const originalChart = charts[chartId];
+                if (!originalChart) return;
+                
+                const modalCanvas = document.getElementById('modal-chart');
+                const ctx = modalCanvas.getContext('2d');
+                
+                if(modalChart) {
+                    modalChart.destroy();
+                }
+
+                const originalConfig = originalChart.config;
+                const modalConfig = {
+                    type: originalConfig.type,
+                    data: originalConfig.data,
+                    options: {
+                        ...originalConfig.options,
+                        maintainAspectRatio: false
+                    }
+                };
+
+                modalChart = new Chart(ctx, modalConfig);
+                
+                modal.style.display = 'flex';
+            });
+
+            closeModalBtn.addEventListener('click', () => {
+                modal.style.display = 'none';
+                if(modalChart) {
+                    modalChart.destroy();
+                }
+            });
+
+             modal.addEventListener('click', (e) => {
+                 if(e.target === modal) {
+                    modal.style.display = 'none';
+                    if(modalChart) {
+                        modalChart.destroy();
+                    }
+                 }
+            });
+
+        });
+    </script>a
+
+</body>
+</html>
+
+"
+
