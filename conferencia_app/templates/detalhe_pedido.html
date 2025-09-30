@@ -196,17 +196,21 @@
             id="item-{{ loop.index0 }}">
             
             <div>
-                <h5>{{ produto.produto_nome or "[Nome do Produto em Falta]" }}</h5>
-                <p class="mb-1"><strong>Qtd. Pedida:</strong> {{ produto.quantidade_pedida }}</p>
-                
-                {% if produto.status != 'Pendente' %}
-                    <p class="mb-1 qtd-entregue"><strong>Qtd. Entregue:</strong> {{ produto.quantidade_entregue }}</p>
-                    <p class="mb-1 status-produto"><strong>Status:</strong> <span class="fw-bold">{{ produto.status }}</span></p>
-                    {% if produto.observacao %}
-                    <p class="mb-0 observacao-produto"><strong class="text-muted">Observação:</strong> <span class="fst-italic">{{ produto.observacao }}</span></p>
-                    {% endif %}
-                {% endif %}
-            </div>
+    		<h5>{{ produto.produto_nome or "[Nome do Produto em Falta]" }}</h5>
+    		<p class="mb-1"><strong>Qtd. Pedida:</strong> {{ produto.quantidade_pedida }}</p>
+
+    		{% if produto.codigo_barras %}
+                    <p class="mb-1 text-muted"><small><strong>Cód. Barras:</strong> {{ produto.codigo_barras }}</small></p>
+    		{% endif %}
+    
+    		{% if produto.status != 'Pendente' %}
+        	    <p class="mb-1 qtd-entregue"><strong>Qtd. Entregue:</strong> {{ produto.quantidade_entregue }}</p>
+        	    <p class="mb-1 status-produto"><strong>Status:</strong> <span class="fw-bold">{{ produto.status }}</span></p>
+        	    {% if produto.observacao %}
+            	        <p class="mb-0 observacao-produto"><strong class="text-muted">Observação:</strong> <span class="fst-italic">{{ produto.observacao }}</span></p>
+        	    {% endif %}
+   	     	{% endif %}
+	    </div>
 
             <div class="ms-3">
                 <div class="d-grid gap-2">
