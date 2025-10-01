@@ -7,7 +7,7 @@ import io
 from psycopg2.extras import execute_values
 
 # --- INICIALIZAÇÃO EXPLÍCITA DO FLASK ---
-app = Flask(__name__, template_folder='templates')
+app = Flask(__name__, template_folder='templates', static_folder='../static')
 
 # =================================================================
 # 1. FUNÇÕES DE INICIALIZAÇÃO E CONEXÃO COM A BASE DE DADOS
@@ -135,17 +135,17 @@ def upload_sales():
         df = df[required_cols]
         df['data_venda'] = pd.to_datetime(df['data_venda'], errors='coerce')
         df.dropna(subset=['data_venda'], inplace=True)
-        df.dropna(subset=required_cols, how='all', inplace=True)
+        # Converte colunas numéricas, forçando erros para NaN, depois preenche NaN com 0
+        for col in ['quantidade', 'valor']:
+            df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
         
         conn = get_db_connection()
         with conn.cursor() as cur:
             if not df.empty:
-                # OTIMIZAÇÃO: Usa BULK INSERT para velocidade máxima
                 first_date_str = df['data_venda'].dropna().astype(str).iloc[0]
                 first_date = pd.to_datetime(first_date_str).strftime('%Y-%m-01')
                 cur.execute("DELETE FROM public.vendas WHERE data_venda >= %s AND data_venda < CAST(%s AS DATE) + INTERVAL '1 month'", (first_date, first_date))
                 
-                # Prepara os dados para o bulk insert
                 data_tuples = [tuple(x) for x in df.to_numpy()]
                 
                 execute_values(cur, 
@@ -220,7 +220,6 @@ def upload_portfolio():
 
         conn = get_db_connection()
         with conn.cursor() as cur:
-            # OTIMIZAÇÃO: Usa BULK INSERT com ON CONFLICT para velocidade máxima
             data_tuples = [tuple(x) for x in df.to_numpy()]
             
             execute_values(cur, 
