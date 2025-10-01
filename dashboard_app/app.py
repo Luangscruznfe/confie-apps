@@ -153,17 +153,19 @@ def upload_sales():
     try:
         df = pd.read_excel(file, engine='openpyxl', skiprows=8)
 
+        # CORREÇÃO: Lógica de renomeação mais robusta e insensível a maiúsculas/minúsculas
         column_map = {
-            'Data Faturamento': 'data_venda', 'data': 'data_venda',
-            'Vendedor': 'vendedor',
-            'Fabricante': 'fabricante',
-            'Nome Fantasia': 'cliente', 'cliente': 'cliente',
-            'Descricao Produto': 'produto',
-            'Quantidade Vendida': 'quantidade',
-            'Valor Total Item': 'valor', 'valor total': 'valor', 'valor': 'valor'
+            'data faturamento': 'data_venda', 'data': 'data_venda',
+            'vendedor': 'vendedor',
+            'fabricante': 'fabricante',
+            'nome fantasia': 'cliente', 'cliente': 'cliente',
+            'descricao produto': 'produto',
+            'quantidade vendida': 'quantidade',
+            'valor total item': 'valor', 'valor total': 'valor', 'valor': 'valor'
         }
         
-        df.rename(columns={col: column_map.get(col.strip()) for col in df.columns if col.strip() in column_map}, inplace=True)
+        df.rename(columns=lambda c: c.strip().lower(), inplace=True)
+        df.rename(columns=column_map, inplace=True)
         
         required_cols = ['data_venda', 'vendedor', 'fabricante', 'cliente', 'produto', 'quantidade', 'valor']
         
@@ -181,6 +183,7 @@ def upload_sales():
         return jsonify({"message": "Ficheiro de vendas recebido. O processamento foi iniciado em segundo plano."}), 202
 
     except Exception as e:
+        app.logger.error(f"Erro ao processar ficheiro de vendas: {e}")
         return jsonify({"message": f"Erro ao iniciar o processamento do ficheiro: {str(e)}"}), 500
 
 
@@ -197,13 +200,15 @@ def upload_portfolio():
     try:
         df = pd.read_excel(file, engine='openpyxl')
 
+        # CORREÇÃO: Lógica de renomeação mais robusta e insensível a maiúsculas/minúsculas
         column_map = {
-            'Vendedor': 'vendedor',
-            'Total Clientes': 'total_clientes',
-            'Total Produtos': 'total_produtos',
-            'Meta faturamento': 'meta_faturamento'
+            'vendedor': 'vendedor',
+            'total clientes': 'total_clientes',
+            'total produtos': 'total_produtos',
+            'meta faturamento': 'meta_faturamento'
         }
-        df.rename(columns={col: column_map.get(col.strip()) for col in df.columns if col.strip() in column_map}, inplace=True)
+        df.rename(columns=lambda c: c.strip().lower(), inplace=True)
+        df.rename(columns=column_map, inplace=True)
 
         required_cols = ['vendedor', 'total_clientes', 'total_produtos']
         if not all(col in df.columns for col in required_cols):
@@ -224,6 +229,7 @@ def upload_portfolio():
         return jsonify({"message": "Ficheiro de carteira recebido. O processamento foi iniciado em segundo plano."}), 202
 
     except Exception as e:
+        app.logger.error(f"Erro ao processar ficheiro de carteira: {e}")
         return jsonify({"message": f"Erro ao iniciar o processamento do ficheiro: {str(e)}"}), 500
 
 
