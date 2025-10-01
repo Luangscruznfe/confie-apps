@@ -1,6 +1,7 @@
 import os
 import psycopg2
 import pandas as pd
+import threading
 from flask import Flask, jsonify, render_template, request
 
 # --- INICIALIZAÇÃO EXPLÍCITA DO FLASK ---
@@ -16,7 +17,60 @@ def get_db_connection():
     return conn
 
 # =================================================================
-# 2. ROTAS DE PÁGINA E API
+# 2. FUNÇÕES DE PROCESSAMENTO EM SEGUNDO PLANO
+# =================================================================
+
+def process_sales_in_background(df):
+    """Lê o DataFrame de vendas e insere na base de dados."""
+    try:
+        conn = get_db_connection()
+        with conn.cursor() as cur:
+            cur.execute("SET search_path TO public;")
+            first_date = pd.to_datetime(df['data_venda'].iloc[0]).strftime('%Y-%m-01')
+            cur.execute("DELETE FROM vendas WHERE data_venda >= %s AND data_venda < CAST(%s AS DATE) + INTERVAL '1 month'", (first_date, first_date))
+
+            for index, row in df.iterrows():
+                cur.execute(
+                    "INSERT INTO vendas (data_venda, vendedor, fabricante, cliente, produto, quantidade, valor) VALUES (%s, %s, %s, %s, %s, %s, %s)",
+                    (row['data_venda'], row['vendedor'], row['fabricante'], row['cliente'], row['produto'], row['quantidade'], row['valor'])
+                )
+        conn.commit()
+    except Exception as e:
+        app.logger.error(f"Erro no processamento em segundo plano (vendas): {e}")
+    finally:
+        if conn:
+            conn.close()
+    app.logger.info("Processamento em segundo plano (vendas) concluído.")
+
+def process_portfolio_in_background(df):
+    """Lê o DataFrame da carteira e insere/atualiza na base de dados."""
+    try:
+        conn = get_db_connection()
+        with conn.cursor() as cur:
+            cur.execute("SET search_path TO public;")
+            for index, row in df.iterrows():
+                cur.execute(
+                    """
+                    INSERT INTO carteira (vendedor, total_clientes, total_produtos, meta_faturamento) 
+                    VALUES (%s, %s, %s, %s)
+                    ON CONFLICT (vendedor) 
+                    DO UPDATE SET 
+                        total_clientes = EXCLUDED.total_clientes, 
+                        total_produtos = EXCLUDED.total_produtos,
+                        meta_faturamento = EXCLUDED.meta_faturamento;
+                    """,
+                    (row['vendedor'], row['total_clientes'], row['total_produtos'], row['meta_faturamento'])
+                )
+        conn.commit()
+    except Exception as e:
+        app.logger.error(f"Erro no processamento em segundo plano (carteira): {e}")
+    finally:
+        if conn:
+            conn.close()
+    app.logger.info("Processamento em segundo plano (carteira) concluído.")
+
+# =================================================================
+# 3. ROTAS DE PÁGINA E API
 # =================================================================
 
 @app.route("/")
@@ -30,19 +84,15 @@ def get_data():
     conn = get_db_connection()
     try:
         with conn.cursor() as cur:
-            # CORREÇÃO: Define o search_path para esta transação específica.
             cur.execute("SET search_path TO public;")
             
-            # Busca dados de vendas
             cur.execute("SELECT TO_CHAR(data_venda, 'YYYY-MM-DD') as \"Data\", vendedor as \"Vendedor\", fabricante as \"Fabricante\", cliente as \"Cliente\", produto as \"Produto\", quantidade as \"Quantidade\", valor as \"Valor\" FROM vendas")
             sales_data = cur.fetchall()
             sales_columns = [desc[0] for desc in cur.description]
             sales_list = [dict(zip(sales_columns, row)) for row in sales_data]
 
-            # Busca dados da carteira
             cur.execute("SELECT vendedor, total_clientes, total_produtos, meta_faturamento FROM carteira")
             portfolio_data = cur.fetchall()
-            # Converte para o formato [vendedor, {dados}] que o frontend espera
             portfolio_list = [[row[0], {"totalClientes": row[1], "totalProdutos": row[2], "meta": float(row[3]) if row[3] is not None else 0}] for row in portfolio_data]
 
             if not sales_list and not portfolio_list:
@@ -58,7 +108,7 @@ def get_data():
 
 @app.route('/api/upload/vendas', methods=['POST'])
 def upload_sales():
-    """Processa o upload do ficheiro de vendas e insere na base de dados."""
+    """Recebe o ficheiro de vendas e inicia o processamento em segundo plano."""
     if 'salesFile' not in request.files:
         return jsonify({"message": "Nenhum ficheiro de vendas enviado"}), 400
     
@@ -69,7 +119,6 @@ def upload_sales():
     try:
         df = pd.read_excel(file, engine='openpyxl', skiprows=8)
 
-        # Mapeamento robusto de colunas
         column_map = {
             'Data Faturamento': 'data_venda', 'data': 'data_venda',
             'Vendedor': 'vendedor',
@@ -90,30 +139,20 @@ def upload_sales():
 
         df = df[required_cols]
         df.dropna(subset=required_cols, inplace=True)
-
-        conn = get_db_connection()
-        with conn.cursor() as cur:
-            cur.execute("SET search_path TO public;")
-            first_date = pd.to_datetime(df['data_venda'].iloc[0]).strftime('%Y-%m-01')
-            cur.execute("DELETE FROM vendas WHERE data_venda >= %s AND data_venda < CAST(%s AS DATE) + INTERVAL '1 month'", (first_date, first_date))
-
-            for index, row in df.iterrows():
-                cur.execute(
-                    "INSERT INTO vendas (data_venda, vendedor, fabricante, cliente, produto, quantidade, valor) VALUES (%s, %s, %s, %s, %s, %s, %s)",
-                    (row['data_venda'], row['vendedor'], row['fabricante'], row['cliente'], row['produto'], row['quantidade'], row['valor'])
-                )
-        conn.commit()
-        conn.close()
         
-        return jsonify({"message": "Ficheiro de vendas processado com sucesso"}), 200
+        # Inicia a thread para processamento em segundo plano
+        thread = threading.Thread(target=process_sales_in_background, args=(df,))
+        thread.start()
+        
+        return jsonify({"message": "Ficheiro de vendas recebido. O processamento foi iniciado em segundo plano."}), 202
 
     except Exception as e:
-        return jsonify({"message": f"Erro ao processar o ficheiro: {str(e)}"}), 500
+        return jsonify({"message": f"Erro ao iniciar o processamento do ficheiro: {str(e)}"}), 500
 
 
 @app.route('/api/upload/carteira', methods=['POST'])
 def upload_portfolio():
-    """Processa o upload da carteira e atualiza/insere na base de dados."""
+    """Recebe o ficheiro da carteira e inicia o processamento em segundo plano."""
     if 'portfolioFile' not in request.files:
         return jsonify({"message": "Nenhum ficheiro de carteira enviado"}), 400
     
@@ -144,35 +183,19 @@ def upload_portfolio():
         df.dropna(subset=required_cols, inplace=True)
         df['meta_faturamento'] = pd.to_numeric(df['meta_faturamento'].astype(str).str.replace(r'[R$.]', '', regex=True).str.replace(',', '.'), errors='coerce').fillna(0)
 
+        # Inicia a thread para processamento em segundo plano
+        thread = threading.Thread(target=process_portfolio_in_background, args=(df,))
+        thread.start()
 
-        conn = get_db_connection()
-        with conn.cursor() as cur:
-            cur.execute("SET search_path TO public;")
-            for index, row in df.iterrows():
-                cur.execute(
-                    """
-                    INSERT INTO carteira (vendedor, total_clientes, total_produtos, meta_faturamento) 
-                    VALUES (%s, %s, %s, %s)
-                    ON CONFLICT (vendedor) 
-                    DO UPDATE SET 
-                        total_clientes = EXCLUDED.total_clientes, 
-                        total_produtos = EXCLUDED.total_produtos,
-                        meta_faturamento = EXCLUDED.meta_faturamento;
-                    """,
-                    (row['vendedor'], row['total_clientes'], row['total_produtos'], row['meta_faturamento'])
-                )
-        conn.commit()
-        conn.close()
-
-        return jsonify({"message": "Ficheiro de carteira processado com sucesso"}), 200
+        return jsonify({"message": "Ficheiro de carteira recebido. O processamento foi iniciado em segundo plano."}), 202
 
     except Exception as e:
-        return jsonify({"message": f"Erro ao processar o ficheiro: {str(e)}"}), 500
+        return jsonify({"message": f"Erro ao iniciar o processamento do ficheiro: {str(e)}"}), 500
 
 
 @app.route("/api/dados", methods=['DELETE'])
 def delete_data():
-    """Apaga todos os dados das tabelas de vendas and carteira."""
+    """Apaga todos os dados das tabelas de vendas e carteira."""
     conn = get_db_connection()
     try:
         with conn.cursor() as cur:
