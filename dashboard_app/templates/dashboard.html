@@ -110,8 +110,7 @@
                     </button>
                 </div>
                 <div class="flex-grow text-center">
-                    <!-- CORREÇÃO: Usa url_for para encontrar a imagem na pasta static -->
-                    <img src="{{ url_for('static', filename='logotipo 1.jpg') }}" alt="Logotipo da Empresa" class="h-20 mx-auto mb-4">
+                    <img src="/static/logotipo 1.jpg" alt="Logotipo da Empresa" class="h-20 mx-auto mb-4">
                     <h1 class="text-3xl font-bold text-gray-900">Dashboard de Análise de Vendas</h1>
                 </div>
                 <button id="hamburger-btn" class="p-2 rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-400">
@@ -359,14 +358,18 @@
 
             processButton.addEventListener('click', handleFileUpload);
             
-            // CORREÇÃO: O event listener para o botão de apagar foi comentado para diagnóstico.
-            /*
+            // ALTERAÇÃO: O event listener agora usa a rota segura e pode ser reativado.
             clearDatabaseBtn.addEventListener('click', async () => {
                 const userConfirmed = window.confirm("Tem a certeza de que deseja apagar TODOS os dados da base de dados? Esta ação não pode ser desfeita.");
                 if (userConfirmed) {
                     loader.classList.remove('hidden');
                     try {
-                        const response = await fetch('api/dados', { method: 'DELETE' });
+                        // Usa o novo endpoint seguro com método POST e corpo de confirmação
+                        const response = await fetch('/api/delete-all-data', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ confirm: true })
+                        });
                         if (!response.ok) throw new Error('Falha ao limpar a base de dados.');
                         alert('Base de dados limpa com sucesso!');
                         window.location.reload();
@@ -377,7 +380,6 @@
                     }
                 }
             });
-            */
 
             // --- FUNÇÕES ---
 
@@ -392,9 +394,9 @@
                 dashboardContent.classList.add('hidden');
 
                 try {
-                    const response = await fetch('api/dados');
+                    const response = await fetch('/api/dados'); // Rota de busca permanece a mesma
                     if (!response.ok) {
-                        if (response.status === 404) { // Assume que 404 significa 'sem dados'
+                        if (response.status === 404) {
                              initialMessage.innerHTML = '<p class="text-gray-600">Nenhum dado encontrado no servidor.<br>Use o menu para carregar os seus ficheiros de vendas e carteira.</p>';
                             return;
                         }
@@ -411,7 +413,6 @@
                     originalData = data.salesData;
                     portfolioDataMap = new Map(data.portfolioData);
 
-                    // Re-hidrata os objetos Day.js que são perdidos na serialização JSON
                     originalData.forEach(item => item.DataObj = dayjs(item.Data));
                     
                     initialMessage.classList.add('hidden');
@@ -448,18 +449,17 @@
                     if (salesFileInput.files.length > 0) {
                         const salesFormData = new FormData();
                         salesFormData.append('salesFile', salesFileInput.files[0]);
-                        uploadPromises.push(fetch('api/upload/vendas', { method: 'POST', body: salesFormData }));
+                        uploadPromises.push(fetch('/api/upload/vendas', { method: 'POST', body: salesFormData }));
                     }
 
                     if (portfolioFileInput.files.length > 0) {
                         const portfolioFormData = new FormData();
                         portfolioFormData.append('portfolioFile', portfolioFileInput.files[0]);
-                        uploadPromises.push(fetch('api/upload/carteira', { method: 'POST', body: portfolioFormData }));
+                        uploadPromises.push(fetch('/api/upload/carteira', { method: 'POST', body: portfolioFormData }));
                     }
 
                     const responses = await Promise.all(uploadPromises);
 
-                    // Verifica se todas as respostas foram bem-sucedidas
                     for (const response of responses) {
                         if (!response.ok) {
                             const errorData = await response.json();
@@ -470,7 +470,6 @@
                     uploadStatusDiv.textContent = 'Sucesso! A atualizar o dashboard...';
                     uploadStatusDiv.className = 'mt-2 text-sm text-center font-medium text-green-600';
 
-                    // Aguarda um momento e recarrega os dados
                     setTimeout(() => {
                         closeUploadPanel();
                         loadDataFromAPI();
@@ -517,13 +516,14 @@
                 clearFiltersButton.addEventListener('click', resetFilters);
 
                 if (originalData.length > 0) {
+                    // Ordena os dados por data para garantir que min e max estão corretos
+                    originalData.sort((a, b) => a.DataObj - b.DataObj);
                     const firstDate = originalData[0].DataObj.format('YYYY-MM');
                     const lastDate = originalData[originalData.length - 1].DataObj.format('YYYY-MM');
                     periodoFilter.min = firstDate;
                     periodoFilter.max = lastDate;
                 }
 
-                // Setup for focus chart filter
                 const focusVendorFilter = document.getElementById('focus-vendor-filter');
                 focusVendorFilter.innerHTML = '<option value="all">Todos os Vendedores</option>';
                 vendedores.forEach(v => {
@@ -544,22 +544,23 @@
                 if(originalData.length === 0) return;
 
                 globallyFilteredData = [...originalData];
-                focusChartBaseData = [...originalData];
+                focusChartBaseData = [...originalData]; // Base para o gráfico de foco não é filtrada por vendedor/fabricante
 
                 const periodo = periodoFilter.value;
                 const vendedores = vendedorSelect.getValue();
                 const fabricantes = fabricanteSelect.getValue();
 
                 if (periodo) {
-                    globallyFilteredData = globallyFilteredData.filter(item => item.DataObj.format('YYYY-MM') === periodo);
-                    focusChartBaseData = focusChartBaseData.filter(item => item.DataObj.format('YYYY-MM') === periodo);
+                    const filterFn = item => item.DataObj.format('YYYY-MM') === periodo;
+                    globallyFilteredData = globallyFilteredData.filter(filterFn);
+                    focusChartBaseData = focusChartBaseData.filter(filterFn);
                 }
 
                 if (vendedores.length > 0) {
-                    globallyFilteredData = globallyFilteredData.filter(item => vendedores.includes(item.Vendedor));
+                    globallyFilteredData = globallyFilteredData.filter(item => item.Vendedor && vendedores.includes(item.Vendedor.trim()));
                 }
                 if (fabricantes.length > 0) {
-                    globallyFilteredData = globallyFilteredData.filter(item => fabricantes.includes(item.Fabricante));
+                    globallyFilteredData = globallyFilteredData.filter(item => item.Fabricante && fabricantes.includes(item.Fabricante.trim()));
                 }
                 
                 updateDashboard(globallyFilteredData);
@@ -578,7 +579,7 @@
 
             function countBusinessDays(startDate, endDate) {
                 let count = 0;
-                let currentDate = startDate.clone();
+                let currentDate = dayjs(startDate).clone();
                 while (currentDate.isBefore(endDate) || currentDate.isSame(endDate, 'day')) {
                     const dayOfWeek = currentDate.day();
                     if (dayOfWeek > 0 && dayOfWeek < 6) count++;
@@ -591,7 +592,7 @@
                 const faturamentoTotal = data.reduce((sum, item) => sum + item.Valor, 0);
                 const totalVendas = data.length;
                 const clientesAtendidos = new Set(data.map(item => item.Cliente)).size;
-                const ticketMedio = totalVendas > 0 ? faturamentoTotal / totalVendas : 0;
+                const ticketMedio = clientesAtendidos > 0 ? faturamentoTotal / clientesAtendidos : 0;
                 document.getElementById('faturamento-total').textContent = formatCurrency(faturamentoTotal);
                 document.getElementById('total-vendas').textContent = totalVendas;
                 document.getElementById('clientes-atendidos').textContent = clientesAtendidos;
@@ -704,14 +705,11 @@
                 const inicioMes = anoMes.startOf('month');
                 const fimMes = anoMes.endOf('month');
                 const hoje = dayjs();
-                const ultimaDataVendas = hoje.isAfter(fimMes) ? fimMes : hoje;
+                const ultimaDataValida = hoje.isAfter(fimMes) ? fimMes : hoje;
+                
                 const diasUteisTotal = countBusinessDays(inicioMes, fimMes);
-                const diasUteisCorridos = countBusinessDays(inicioMes, ultimaDataVendas < data[data.length - 1].DataObj ? ultimaDataVendas : data[data.length - 1].DataObj);
-                let diasUteisRestantes = countBusinessDays(hoje.add(1, 'day'), fimMes);
-                if (hoje.day() > 0 && hoje.day() < 6 && hoje.isAfter(inicioMes) && hoje.isBefore(fimMes)) {
-                   diasUteisRestantes +=1;
-                }
-                if (diasUteisRestantes <= 0) diasUteisRestantes = 1;
+                const diasUteisCorridos = countBusinessDays(inicioMes, ultimaDataValida);
+                const diasUteisRestantes = Math.max(1, countBusinessDays(ultimaDataValida.add(1, 'day'), fimMes));
 
                 const tableData = [];
                 portfolioDataMap.forEach((portfolio, vendedor) => {
@@ -756,7 +754,8 @@
             function createOrUpdateFocusChart(data) {
                 const focusManufacturers = ['Consabor', 'Kellanova', 'RICLAN', 'Goldko', 'Selmi', 'Lucky', 'Bela vista', 'Tampico', 'Tec polpa', 'Tecpolpa', 'Yaí', 'Yai'].map(f => f.toLowerCase());
                 const selectedVendor = document.getElementById('focus-vendor-filter').value;
-                let chartData = data.filter(item => focusManufacturers.includes((item.Fabricante || '').toLowerCase().trim().replace(/\s/g, '')));
+                let chartData = data.filter(item => item.Fabricante && focusManufacturers.includes(item.Fabricante.toLowerCase().trim()));
+                
                 if (selectedVendor !== 'all') {
                     chartData = chartData.filter(item => item.Vendedor === selectedVendor);
                 }
@@ -780,7 +779,7 @@
             }
 
             function createOrUpdateCharts(data) {
-                // Faturação por período (Gráfico Inteligente: Mensal vs Diário)
+                // Faturação por período
                 const uniqueMonths = new Set(data.map(item => item.DataObj.format('YYYY-MM')));
                 let chartType, labels, dataPoints, chartLabel, datasetOptions;
                 if (uniqueMonths.size > 1) {
@@ -831,7 +830,7 @@
                 createOrUpdateChart('positivacao-chart', 'bar', {
                     labels: positivacaoData.map(p => p.vendedor),
                     datasets: [{ label: 'Positivação', data: positivacaoData.map(p => p.percentage), backgroundColor: 'rgba(75, 192, 192, 0.6)', borderColor: 'rgba(75, 192, 192, 1)', borderWidth: 1 }]
-                }, { ...chartOptions, scales: { y: { beginAtZero: true, max: 100, suggestedMax: 125, ticks: { callback: value => `${value}%` } } }, plugins: { ...chartOptions.plugins, tooltip: { callbacks: { label: (ctx) => `${ctx.dataset.label}: ${ctx.parsed.y.toFixed(1)}%` } }, datalabels: { ...chartOptions.plugins.datalabels, formatter: (v) => `${parseFloat(v).toFixed(1)}%` } } });
+                }, { ...chartOptions, scales: { y: { beginAtZero: true, max: 100, ticks: { callback: value => `${value}%` } } }, plugins: { ...chartOptions.plugins, tooltip: { callbacks: { label: (ctx) => `${ctx.dataset.label}: ${ctx.parsed.y.toFixed(1)}%` } }, datalabels: { ...chartOptions.plugins.datalabels, formatter: (v) => `${parseFloat(v).toFixed(1)}%` } } });
 
                 // Top 5 Produtos
                 const faturamentoPorProduto = data.reduce((acc, sale) => {
@@ -851,7 +850,7 @@
                 createOrUpdateChart('mix-produtos-chart', 'bar', {
                     labels: mixData.map(p => p.vendedor),
                     datasets: [{ label: 'Mix de Produtos', data: mixData.map(p => p.percentage), backgroundColor: 'rgba(255, 99, 132, 0.6)', borderColor: 'rgba(255, 99, 132, 1)', borderWidth: 1 }]
-                }, { ...chartOptions, scales: { y: { beginAtZero: true, max: 100, suggestedMax: 125, ticks: { callback: v => `${v}%` } } }, plugins: { ...chartOptions.plugins, tooltip: { callbacks: { label: (ctx) => ` ${mixData[ctx.dataIndex].uniqueProductsCount} / ${mixData[ctx.dataIndex].totalProdutos} produtos (${mixData[ctx.dataIndex].percentage.toFixed(1)}%)` } }, datalabels: { ...chartOptions.plugins.datalabels, formatter: (v) => `${parseFloat(v).toFixed(1)}%` } } });
+                }, { ...chartOptions, scales: { y: { beginAtZero: true, max: 100, ticks: { callback: v => `${v}%` } } }, plugins: { ...chartOptions.plugins, tooltip: { callbacks: { label: (ctx) => ` ${mixData[ctx.dataIndex].uniqueProductsCount} / ${mixData[ctx.dataIndex].totalProdutos} produtos (${mixData[ctx.dataIndex].percentage.toFixed(1)}%)` } }, datalabels: { ...chartOptions.plugins.datalabels, formatter: (v) => `${parseFloat(v).toFixed(1)}%` } } });
 
                 // Item de Maior Faturação por Vendedor
                 const salesByVendorProductValue = data.reduce((acc, sale) => {
@@ -897,4 +896,3 @@
 
 </body>
 </html>
-

@@ -9,7 +9,7 @@ from decimal import Decimal
 
 # --- INICIALIZAÇÃO EXPLÍCITA DO FLASK ---
 # Corrigido para apontar para a pasta estática na raiz do projeto
-app = Flask(__name__, template_folder='templates', static_folder='../static')
+app = Flask(__name__, template_folder='templates', static_folder='static')
 
 # =================================================================
 # 1. FUNÇÕES DE INICIALIZAÇÃO E CONEXÃO COM A BASE DE DADOS
@@ -61,6 +61,7 @@ def get_db_connection():
 @app.route("/")
 def index():
     """Serve a página principal do dashboard."""
+    # CORREÇÃO: Usa o novo nome do template
     return render_template('dashboard.html')
 
 @app.route("/api/dados", methods=['GET'])
@@ -73,7 +74,6 @@ def get_data():
             sales_data = cur.fetchall()
             sales_columns = [desc[0] for desc in cur.description]
             
-            # CORREÇÃO: Converte Decimal para float e garante tipos numéricos corretos
             sales_list = []
             for row in sales_data:
                 row_dict = dict(zip(sales_columns, row))
@@ -146,7 +146,7 @@ def upload_sales():
         df = df[required_cols]
         df['data_venda'] = pd.to_datetime(df['data_venda'], errors='coerce')
         df.dropna(subset=['data_venda'], inplace=True)
-        # Converte colunas numéricas, forçando erros para NaN, depois preenche NaN com 0
+        
         for col in ['quantidade', 'valor']:
             df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
         
@@ -256,9 +256,14 @@ def upload_portfolio():
             conn.close()
 
 
-@app.route("/api/dados", methods=['DELETE'])
-def delete_data():
-    """Apaga todos os dados das tabelas de vendas e carteira."""
+# ALTERAÇÃO: Rota de exclusão alterada para ser mais específica e segura.
+@app.route("/api/delete-all-data", methods=['POST'])
+def delete_all_data():
+    """Apaga todos os dados das tabelas de vendas e carteira com confirmação."""
+    # Camada extra de segurança: exige uma confirmação no corpo da requisição
+    if not request.json or request.json.get('confirm') is not True:
+        return jsonify({"message": "Confirmação necessária para apagar os dados."}), 400
+        
     conn = get_db_connection()
     try:
         with conn.cursor() as cur:
@@ -266,6 +271,7 @@ def delete_data():
         conn.commit()
         return jsonify({"message": "Todos os dados foram apagados com sucesso."}), 200
     except Exception as e:
+        app.logger.error(f"Erro ao apagar dados: {e}", exc_info=True)
         return jsonify({"message": f"Erro ao apagar dados: {str(e)}"}), 500
     finally:
         if conn:
@@ -273,4 +279,3 @@ def delete_data():
 
 # --- INICIALIZA A BASE DE DADOS NA ARRANCADA DA APLICAÇÃO ---
 init_db()
-
