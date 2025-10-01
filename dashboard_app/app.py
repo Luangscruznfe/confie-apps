@@ -22,16 +22,18 @@ def get_db_connection():
 
 def process_sales_in_background(df):
     """Lê o DataFrame de vendas e insere na base de dados."""
+    conn = None
     try:
         conn = get_db_connection()
         with conn.cursor() as cur:
-            cur.execute("SET search_path TO public;")
             first_date = pd.to_datetime(df['data_venda'].iloc[0]).strftime('%Y-%m-01')
-            cur.execute("DELETE FROM vendas WHERE data_venda >= %s AND data_venda < CAST(%s AS DATE) + INTERVAL '1 month'", (first_date, first_date))
+            # CORREÇÃO: Especifica o esquema 'public'
+            cur.execute("DELETE FROM public.vendas WHERE data_venda >= %s AND data_venda < CAST(%s AS DATE) + INTERVAL '1 month'", (first_date, first_date))
 
             for index, row in df.iterrows():
+                # CORREÇÃO: Especifica o esquema 'public'
                 cur.execute(
-                    "INSERT INTO vendas (data_venda, vendedor, fabricante, cliente, produto, quantidade, valor) VALUES (%s, %s, %s, %s, %s, %s, %s)",
+                    "INSERT INTO public.vendas (data_venda, vendedor, fabricante, cliente, produto, quantidade, valor) VALUES (%s, %s, %s, %s, %s, %s, %s)",
                     (row['data_venda'], row['vendedor'], row['fabricante'], row['cliente'], row['produto'], row['quantidade'], row['valor'])
                 )
         conn.commit()
@@ -44,14 +46,15 @@ def process_sales_in_background(df):
 
 def process_portfolio_in_background(df):
     """Lê o DataFrame da carteira e insere/atualiza na base de dados."""
+    conn = None
     try:
         conn = get_db_connection()
         with conn.cursor() as cur:
-            cur.execute("SET search_path TO public;")
             for index, row in df.iterrows():
+                # CORREÇÃO: Especifica o esquema 'public'
                 cur.execute(
                     """
-                    INSERT INTO carteira (vendedor, total_clientes, total_produtos, meta_faturamento) 
+                    INSERT INTO public.carteira (vendedor, total_clientes, total_produtos, meta_faturamento) 
                     VALUES (%s, %s, %s, %s)
                     ON CONFLICT (vendedor) 
                     DO UPDATE SET 
@@ -84,14 +87,14 @@ def get_data():
     conn = get_db_connection()
     try:
         with conn.cursor() as cur:
-            cur.execute("SET search_path TO public;")
-            
-            cur.execute("SELECT TO_CHAR(data_venda, 'YYYY-MM-DD') as \"Data\", vendedor as \"Vendedor\", fabricante as \"Fabricante\", cliente as \"Cliente\", produto as \"Produto\", quantidade as \"Quantidade\", valor as \"Valor\" FROM vendas")
+            # CORREÇÃO: Especifica o esquema 'public'
+            cur.execute("SELECT TO_CHAR(data_venda, 'YYYY-MM-DD') as \"Data\", vendedor as \"Vendedor\", fabricante as \"Fabricante\", cliente as \"Cliente\", produto as \"Produto\", quantidade as \"Quantidade\", valor as \"Valor\" FROM public.vendas")
             sales_data = cur.fetchall()
             sales_columns = [desc[0] for desc in cur.description]
             sales_list = [dict(zip(sales_columns, row)) for row in sales_data]
 
-            cur.execute("SELECT vendedor, total_clientes, total_produtos, meta_faturamento FROM carteira")
+            # CORREÇÃO: Especifica o esquema 'public'
+            cur.execute("SELECT vendedor, total_clientes, total_produtos, meta_faturamento FROM public.carteira")
             portfolio_data = cur.fetchall()
             portfolio_list = [[row[0], {"totalClientes": row[1], "totalProdutos": row[2], "meta": float(row[3]) if row[3] is not None else 0}] for row in portfolio_data]
 
@@ -199,8 +202,8 @@ def delete_data():
     conn = get_db_connection()
     try:
         with conn.cursor() as cur:
-            cur.execute("SET search_path TO public;")
-            cur.execute("TRUNCATE TABLE vendas, carteira RESTART IDENTITY;")
+            # CORREÇÃO: Especifica o esquema 'public'
+            cur.execute("TRUNCATE TABLE public.vendas, public.carteira RESTART IDENTITY;")
         conn.commit()
         return jsonify({"message": "Todos os dados foram apagados com sucesso."}), 200
     except Exception as e:
