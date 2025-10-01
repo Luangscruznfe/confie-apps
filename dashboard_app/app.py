@@ -13,10 +13,6 @@ app = Flask(__name__, template_folder='templates')
 def get_db_connection():
     """Cria e retorna uma nova conexão com a base de dados."""
     conn = psycopg2.connect(os.environ.get('DATABASE_URL'))
-    # CORREÇÃO: Define o search_path após a conexão ser estabelecida.
-    # Isto é mais compatível com o connection pooler do Neon.
-    with conn.cursor() as cur:
-        cur.execute("SET search_path TO public;")
     return conn
 
 # =================================================================
@@ -34,6 +30,9 @@ def get_data():
     conn = get_db_connection()
     try:
         with conn.cursor() as cur:
+            # CORREÇÃO: Define o search_path para esta transação específica.
+            cur.execute("SET search_path TO public;")
+            
             # Busca dados de vendas
             cur.execute("SELECT TO_CHAR(data_venda, 'YYYY-MM-DD') as \"Data\", vendedor as \"Vendedor\", fabricante as \"Fabricante\", cliente as \"Cliente\", produto as \"Produto\", quantidade as \"Quantidade\", valor as \"Valor\" FROM vendas")
             sales_data = cur.fetchall()
@@ -46,7 +45,7 @@ def get_data():
             # Converte para o formato [vendedor, {dados}] que o frontend espera
             portfolio_list = [[row[0], {"totalClientes": row[1], "totalProdutos": row[2], "meta": float(row[3]) if row[3] is not None else 0}] for row in portfolio_data]
 
-            if not sales_list or not portfolio_list:
+            if not sales_list and not portfolio_list:
                 return jsonify({"message": "Nenhum dado encontrado"}), 404
 
             return jsonify({
@@ -94,6 +93,7 @@ def upload_sales():
 
         conn = get_db_connection()
         with conn.cursor() as cur:
+            cur.execute("SET search_path TO public;")
             first_date = pd.to_datetime(df['data_venda'].iloc[0]).strftime('%Y-%m-01')
             cur.execute("DELETE FROM vendas WHERE data_venda >= %s AND data_venda < CAST(%s AS DATE) + INTERVAL '1 month'", (first_date, first_date))
 
@@ -147,6 +147,7 @@ def upload_portfolio():
 
         conn = get_db_connection()
         with conn.cursor() as cur:
+            cur.execute("SET search_path TO public;")
             for index, row in df.iterrows():
                 cur.execute(
                     """
@@ -175,6 +176,7 @@ def delete_data():
     conn = get_db_connection()
     try:
         with conn.cursor() as cur:
+            cur.execute("SET search_path TO public;")
             cur.execute("TRUNCATE TABLE vendas, carteira RESTART IDENTITY;")
         conn.commit()
         return jsonify({"message": "Todos os dados foram apagados com sucesso."}), 200
