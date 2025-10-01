@@ -148,42 +148,52 @@ def get_data():
 def upload_sales():
     """Recebe o ficheiro de vendas e inicia o processamento em segundo plano."""
     if 'salesFile' not in request.files:
+        app.logger.error("API call missing 'salesFile' in request.files")
         return jsonify({"message": "Nenhum ficheiro de vendas enviado"}), 400
     
     file = request.files['salesFile']
     if file.filename == '':
+        app.logger.error("API call received 'salesFile' but filename is empty")
         return jsonify({"message": "Nenhum ficheiro selecionado"}), 400
+
+    app.logger.info(f"A processar o upload do ficheiro de vendas: {file.filename}")
 
     try:
         df = None
         file.seek(0)
         filename = file.filename.lower()
 
-        # CORREÇÃO: Lógica de leitura separada para XLSX e CSV
         if filename.endswith('.xlsx'):
-            df = pd.read_excel(file, engine='openpyxl', skiprows=8)
-            app.logger.info("Ficheiro de vendas lido como Excel (skiprows=8).")
+            app.logger.info("Ficheiro detetado como .xlsx. A tentar ler com skiprows=8...")
+            try:
+                df = pd.read_excel(file, engine='openpyxl', skiprows=8)
+                app.logger.info("Leitura de Excel (skiprows=8) bem-sucedida.")
+            except Exception as e:
+                app.logger.error(f"Falha ao ler como Excel (skiprows=8): {e}. A tentar ler sem skiprows...")
+                file.seek(0)
+                df = pd.read_excel(file, engine='openpyxl')
+                app.logger.info("Leitura de Excel (sem skiprows) bem-sucedida.")
         elif filename.endswith('.csv'):
-            # Tenta ler CSV com várias codificações, sem skiprows
+            app.logger.info("Ficheiro detetado como .csv. A tentar ler sem skiprows...")
             for encoding in ['utf-8', 'latin-1', 'iso-8859-1']:
                 try:
                     file.seek(0)
                     df = pd.read_csv(file, sep='[;,]', engine='python', on_bad_lines='skip', encoding=encoding)
                     app.logger.info(f"Ficheiro de vendas lido como CSV ({encoding}).")
-                    # Validação rápida para ver se a leitura funcionou
                     if df.shape[1] > 3:
-                        break # Leitura bem-sucedida, sai do loop
+                        break
                     else:
-                        df = None # Leitura falhou, tenta próxima codificação
+                        df = None
                 except Exception:
                     continue
         
         if df is None:
+            app.logger.error("Não foi possível ler o ficheiro como Excel ou CSV.")
             raise ValueError("O formato do ficheiro de vendas não é reconhecido ou está corrompido.")
 
-        app.logger.info(f"Colunas encontradas: {list(df.columns)}")
+        app.logger.info(f"DEBUG: Colunas originais encontradas: {list(df.columns)}")
+        app.logger.info(f"DEBUG: Primeiras 2 linhas do ficheiro:\n{df.head(2).to_string()}")
 
-        # Lógica de renomeação robusta
         column_map = {
             'data faturamento': 'data_venda', 'data': 'data_venda',
             'vendedor': 'vendedor',
@@ -195,27 +205,33 @@ def upload_sales():
         }
         
         df.rename(columns=lambda c: str(c).strip().lower(), inplace=True)
+        app.logger.info(f"DEBUG: Colunas após lower() e strip(): {list(df.columns)}")
+        
         df.rename(columns=column_map, inplace=True)
+        app.logger.info(f"DEBUG: Colunas após mapeamento final: {list(df.columns)}")
         
         required_cols = ['data_venda', 'vendedor', 'fabricante', 'cliente', 'produto', 'quantidade', 'valor']
         
         if not all(col in df.columns for col in required_cols):
              missing = [col for col in required_cols if col not in df.columns]
-             app.logger.error(f"Colunas em falta após renomeação: {missing}. Colunas disponíveis: {list(df.columns)}")
+             app.logger.error(f"ERRO CRÍTICO: Colunas em falta após renomeação: {missing}.")
+             app.logger.error(f"Colunas que a aplicação encontrou: {list(df.columns)}")
              return jsonify({"message": f"Colunas essenciais em falta no ficheiro de vendas: {', '.join(missing)}"}), 400
 
         df = df[required_cols]
         df['data_venda'] = pd.to_datetime(df['data_venda'], errors='coerce')
-        df.dropna(subset=required_cols, inplace=True)
+        df.dropna(subset=['data_venda'], inplace=True)
+        df.dropna(subset=required_cols, how='all', inplace=True)
         
-        # Inicia a thread para processamento em segundo plano
+        app.logger.info("Validação de colunas bem-sucedida. A iniciar o processamento em segundo plano.")
+        
         thread = threading.Thread(target=process_sales_in_background, args=(df,))
         thread.start()
         
         return jsonify({"message": "Ficheiro de vendas recebido. O processamento foi iniciado em segundo plano."}), 202
 
     except Exception as e:
-        app.logger.error(f"Erro ao processar ficheiro de vendas: {e}")
+        app.logger.error(f"Erro GERAL na função upload_sales: {e}", exc_info=True)
         return jsonify({"message": f"Erro ao iniciar o processamento do ficheiro: {str(e)}"}), 500
 
 
