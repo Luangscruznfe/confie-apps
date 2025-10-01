@@ -2,6 +2,8 @@ import os
 import psycopg2
 import pandas as pd
 import threading
+import csv
+import io
 from flask import Flask, jsonify, render_template, request
 
 # --- INICIALIZAÇÃO EXPLÍCITA DO FLASK ---
@@ -248,24 +250,49 @@ def upload_portfolio():
     try:
         df = None
         file.seek(0)
+        read_as = None
 
         # TENTATIVA 1: Ler como um ficheiro Excel genuíno
         try:
             df_excel = pd.read_excel(file, engine='openpyxl')
             temp_cols = [str(c).strip().lower() for c in df_excel.columns]
-            if 'total clientes' in temp_cols or 'total clentes' in temp_cols:
+            if 'vendedor' in temp_cols and ('total clientes' in temp_cols or 'total clentes' in temp_cols):
                 df = df_excel
+                read_as = 'excel'
                 app.logger.info("Ficheiro da carteira lido com sucesso como Excel.")
         except Exception:
-            pass # Ignora e tenta o próximo método
+            pass 
 
-        # TENTATIVA 2: Ler como um ficheiro CSV (se a primeira tentativa falhar)
+        # TENTATIVA 2: Ler como um ficheiro CSV
         if df is None:
             file.seek(0)
             try:
-                df_csv = pd.read_csv(file, sep='[;,]', engine='python', on_bad_lines='skip')
-                df = df_csv
-                app.logger.info("Ficheiro da carteira lido com sucesso como CSV.")
+                # CORREÇÃO: Lógica para lidar com cabeçalho CSV malformado
+                content = file.read().decode('utf-8')
+                file.seek(0)
+                sniffer = csv.Sniffer()
+                dialect = sniffer.sniff(content.splitlines()[0])
+                
+                # Se o cabeçalho for "Vendedor;Total Clientes";..., ele precisa de tratamento especial
+                if '"' in content.splitlines()[0] and ';' in content.splitlines()[0]:
+                     app.logger.info("CSV com cabeçalho malformado detetado. A processar manualmente...")
+                     reader = csv.reader(io.StringIO(content), delimiter=';', quotechar='"')
+                     rows = list(reader)
+                     header = rows[0]
+                     
+                     # Desmembra o cabeçalho e os dados
+                     fixed_header = header[0].split(';') + header[1:] if ';' in header[0] else header
+                     fixed_data = []
+                     for row in rows[1:]:
+                         fixed_row = row[0].split(';') + row[1:] if ';' in row[0] else row
+                         fixed_data.append(fixed_row)
+                     
+                     df = pd.DataFrame(fixed_data, columns=fixed_header)
+                     read_as = 'csv_manual'
+                else:
+                    df = pd.read_csv(file, sep=dialect.delimiter, engine='python', on_bad_lines='skip')
+                    read_as = 'csv_auto'
+                app.logger.info(f"Ficheiro da carteira lido com sucesso como CSV (método: {read_as}).")
             except Exception as e:
                  app.logger.error(f"Falha ao ler ficheiro da carteira como Excel e como CSV: {e}")
                  raise ValueError("Não foi possível ler o ficheiro da carteira. Verifique o formato.")
@@ -287,6 +314,7 @@ def upload_portfolio():
         required_cols = ['vendedor', 'total_clientes', 'total_produtos']
         if not all(col in df.columns for col in required_cols):
             missing = [col for col in required_cols if col not in df.columns]
+            app.logger.error(f"ERRO CRÍTICO: Colunas em falta no ficheiro da carteira: {missing}. Colunas encontradas: {list(df.columns)}")
             return jsonify({"message": f"Colunas essenciais em falta no ficheiro de carteira: {', '.join(missing)}"}), 400
         
         if 'meta_faturamento' not in df.columns:
@@ -294,6 +322,10 @@ def upload_portfolio():
 
         df = df[required_cols + ['meta_faturamento']]
         df.dropna(subset=required_cols, inplace=True)
+        
+        # Limpeza e conversão de tipos
+        df['total_clientes'] = pd.to_numeric(df['total_clientes'], errors='coerce').fillna(0).astype(int)
+        df['total_produtos'] = pd.to_numeric(df['total_produtos'], errors='coerce').fillna(0).astype(int)
         df['meta_faturamento'] = pd.to_numeric(df['meta_faturamento'].astype(str).str.replace(r'[R$.]', '', regex=True).str.replace(',', '.'), errors='coerce').fillna(0)
 
         thread = threading.Thread(target=process_portfolio_in_background, args=(df,))
@@ -302,7 +334,7 @@ def upload_portfolio():
         return jsonify({"message": "Ficheiro de carteira recebido. O processamento foi iniciado em segundo plano."}), 202
 
     except Exception as e:
-        app.logger.error(f"Erro ao processar ficheiro de carteira: {e}")
+        app.logger.error(f"Erro ao processar ficheiro de carteira: {e}", exc_info=True)
         return jsonify({"message": f"Erro ao iniciar o processamento do ficheiro: {str(e)}"}), 500
 
 
