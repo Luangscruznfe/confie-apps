@@ -198,18 +198,42 @@ def upload_portfolio():
         return jsonify({"message": "Nenhum ficheiro selecionado"}), 400
 
     try:
-        # CORREÇÃO: Usa read_csv para lidar com ficheiros de texto mal formatados como .xlsx
-        # O separador [;,] lida com ponto e vírgula e vírgulas como delimitadores.
-        df = pd.read_csv(file, sep='[;,]', engine='python', on_bad_lines='skip')
+        df = None
+        file.seek(0)
 
-        # Lógica de renomeação robusta
+        # TENTATIVA 1: Ler como um ficheiro Excel genuíno
+        try:
+            df_excel = pd.read_excel(file, engine='openpyxl')
+            temp_cols = [str(c).strip().lower() for c in df_excel.columns]
+            if 'total clientes' in temp_cols or 'total clentes' in temp_cols:
+                df = df_excel
+                app.logger.info("Ficheiro da carteira lido com sucesso como Excel.")
+        except Exception:
+            pass # Ignora e tenta o próximo método
+
+        # TENTATIVA 2: Ler como um ficheiro CSV (se a primeira tentativa falhar)
+        if df is None:
+            file.seek(0)
+            try:
+                df_csv = pd.read_csv(file, sep='[;,]', engine='python', on_bad_lines='skip')
+                df = df_csv
+                app.logger.info("Ficheiro da carteira lido com sucesso como CSV.")
+            except Exception as e:
+                 app.logger.error(f"Falha ao ler ficheiro da carteira como Excel e como CSV: {e}")
+                 raise ValueError("Não foi possível ler o ficheiro da carteira. Verifique o formato.")
+
+        if df is None:
+            raise ValueError("O formato do ficheiro da carteira não é reconhecido.")
+
+        # Processamento Comum
         column_map = {
             'vendedor': 'vendedor',
             'total clientes': 'total_clientes',
+            'total clentes': 'total_clientes', # Aceita erro de digitação
             'total produtos': 'total_produtos',
             'meta faturamento': 'meta_faturamento'
         }
-        df.rename(columns=lambda c: c.strip().lower(), inplace=True)
+        df.rename(columns=lambda c: str(c).strip().lower(), inplace=True)
         df.rename(columns=column_map, inplace=True)
 
         required_cols = ['vendedor', 'total_clientes', 'total_produtos']
@@ -224,7 +248,6 @@ def upload_portfolio():
         df.dropna(subset=required_cols, inplace=True)
         df['meta_faturamento'] = pd.to_numeric(df['meta_faturamento'].astype(str).str.replace(r'[R$.]', '', regex=True).str.replace(',', '.'), errors='coerce').fillna(0)
 
-        # Inicia a thread para processamento em segundo plano
         thread = threading.Thread(target=process_portfolio_in_background, args=(df,))
         thread.start()
 
