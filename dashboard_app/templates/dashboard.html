@@ -390,7 +390,7 @@
                 dashboardContent.classList.add('hidden');
 
                 try {
-                    const response = await fetch('api/dados');
+                    const response = await fetch('/dashboard/api/dados');
                     if (!response.ok) {
                         if (response.status === 404) { // Assume que 404 significa 'sem dados'
                              initialMessage.innerHTML = '<p class="text-gray-600">Nenhum dado encontrado no servidor.<br>Use o menu para carregar os seus ficheiros de vendas e carteira.</p>';
