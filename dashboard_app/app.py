@@ -153,7 +153,7 @@ def upload_sales():
     try:
         df = pd.read_excel(file, engine='openpyxl', skiprows=8)
 
-        # CORREÇÃO: Lógica de renomeação mais robusta e insensível a maiúsculas/minúsculas
+        # Lógica de renomeação robusta
         column_map = {
             'data faturamento': 'data_venda', 'data': 'data_venda',
             'vendedor': 'vendedor',
@@ -198,9 +198,11 @@ def upload_portfolio():
         return jsonify({"message": "Nenhum ficheiro selecionado"}), 400
 
     try:
-        df = pd.read_excel(file, engine='openpyxl')
+        # CORREÇÃO: Usa read_csv para lidar com ficheiros de texto mal formatados como .xlsx
+        # O separador [;,] lida com ponto e vírgula e vírgulas como delimitadores.
+        df = pd.read_csv(file, sep='[;,]', engine='python', on_bad_lines='skip')
 
-        # CORREÇÃO: Lógica de renomeação mais robusta e insensível a maiúsculas/minúsculas
+        # Lógica de renomeação robusta
         column_map = {
             'vendedor': 'vendedor',
             'total clientes': 'total_clientes',
