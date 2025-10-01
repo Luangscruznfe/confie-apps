@@ -151,7 +151,30 @@ def upload_sales():
         return jsonify({"message": "Nenhum ficheiro selecionado"}), 400
 
     try:
-        df = pd.read_excel(file, engine='openpyxl', skiprows=8)
+        df = None
+        file.seek(0)
+        
+        # TENTATIVA 1: Ler como um ficheiro Excel genuíno
+        try:
+            df_excel = pd.read_excel(file, engine='openpyxl', skiprows=8)
+            df = df_excel
+            app.logger.info("Ficheiro de vendas lido com sucesso como Excel.")
+        except Exception:
+            pass # Ignora e tenta o próximo método
+
+        # TENTATIVA 2: Ler como um ficheiro CSV (se a primeira tentativa falhar)
+        if df is None:
+            file.seek(0)
+            try:
+                df_csv = pd.read_csv(file, sep='[;,]', engine='python', on_bad_lines='skip', skiprows=8)
+                df = df_csv
+                app.logger.info("Ficheiro de vendas lido com sucesso como CSV.")
+            except Exception as e:
+                 app.logger.error(f"Falha ao ler ficheiro de vendas como Excel e como CSV: {e}")
+                 raise ValueError("Não foi possível ler o ficheiro de vendas. Verifique o formato.")
+        
+        if df is None:
+            raise ValueError("O formato do ficheiro de vendas não é reconhecido.")
 
         # Lógica de renomeação robusta
         column_map = {
