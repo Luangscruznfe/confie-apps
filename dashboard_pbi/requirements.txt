@@ -1,6 +1,0 @@
-# requirements.txt para a pasta dashboard_pbi
-
-Flask
-pandas
-plotly
-openpyxl
