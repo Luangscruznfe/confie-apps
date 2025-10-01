@@ -1,180 +1,189 @@
 import os
-import pandas as pd
-from flask import Flask, jsonify, request, render_template
 import psycopg2
-import psycopg2.extras
+import pandas as pd
+from flask import Flask, jsonify, render_template, request
 
-# O static_folder aponta para a pasta onde o dashboard.html está
-app = Flask(__name__, static_folder='../static', template_folder='../static')
+# --- INICIALIZAÇÃO EXPLÍCITA DO FLASK ---
+# A alteração principal está aqui. Estamos a dizer ao Flask para procurar
+# os ficheiros HTML numa pasta chamada 'templates' que está no mesmo nível deste ficheiro.
+app = Flask(__name__, template_folder='templates')
 
-#=================================
-# FUNÇÕES DE BANCO DE DADOS
-#=================================
+# =================================================================
+# 1. FUNÇÕES DE CONEXÃO COM A BASE DE DADOS
+# =================================================================
+
 def get_db_connection():
-    """Cria e retorna uma conexão com o banco de dados Neon."""
+    """Cria e retorna uma nova conexão com a base de dados."""
     conn = psycopg2.connect(os.environ.get('DATABASE_URL'))
     return conn
 
-#=================================
-# ROTAS DA APLICAÇÃO
-#=================================
-@app.route('/', methods=['GET'])
+# =================================================================
+# 2. ROTAS DE PÁGINA E API
+# =================================================================
+
+@app.route("/")
 def index():
-    """Serve o arquivo principal do dashboard (dashboard.html)."""
-    # Garante que o Flask procure o arquivo na pasta 'static'
+    """Serve a página principal do dashboard."""
+    # Esta função irá agora encontrar o 'dashboard.html' sem problemas.
     return render_template('dashboard.html')
 
-#=================================
-# ROTAS DE API (ENDPOINTS)
-#=================================
-
-@app.route('/api/dados', methods=['GET'])
+@app.route("/api/dados", methods=['GET'])
 def get_data():
-    """Busca todos os dados de vendas e carteira do banco de dados."""
-    conn = None
+    """Busca todos os dados de vendas e carteira da base de dados."""
+    conn = get_db_connection()
     try:
-        conn = get_db_connection()
-        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        with conn.cursor() as cur:
+            # Busca dados de vendas
+            cur.execute("SELECT TO_CHAR(data_venda, 'YYYY-MM-DD') as \"Data\", vendedor as \"Vendedor\", fabricante as \"Fabricante\", cliente as \"Cliente\", produto as \"Produto\", quantidade as \"Quantidade\", valor as \"Valor\" FROM vendas")
+            sales_data = cur.fetchall()
+            sales_columns = [desc[0] for desc in cur.description]
+            sales_list = [dict(zip(sales_columns, row)) for row in sales_data]
 
-        # Buscar dados de vendas
-        cur.execute("SELECT TO_CHAR(data_venda, 'YYYY-MM-DD') as \"Data\", vendedor as \"Vendedor\", fabricante as \"Fabricante\", cliente as \"Cliente\", produto as \"Produto\", quantidade as \"Quantidade\", valor as \"Valor\" FROM vendas ORDER BY data_venda ASC;")
-        sales_data = cur.fetchall()
+            # Busca dados da carteira
+            cur.execute("SELECT vendedor, total_clientes, total_produtos, meta_faturamento FROM carteira")
+            portfolio_data = cur.fetchall()
+            # Converte para o formato [vendedor, {dados}] que o frontend espera
+            portfolio_list = [[row[0], {"totalClientes": row[1], "totalProdutos": row[2], "meta": float(row[3]) if row[3] is not None else 0}] for row in portfolio_data]
 
-        # Buscar dados da carteira
-        cur.execute("SELECT vendedor, total_clientes, total_produtos, meta_faturamento FROM carteira;")
-        portfolio_rows = cur.fetchall()
-        
-        # Formata para o padrão que o frontend espera: [ [vendedor, {dados}], ... ]
-        portfolio_data = [[row['vendedor'], {'totalClientes': row['total_clientes'], 'totalProdutos': row['total_produtos'], 'meta': float(row['meta_faturamento'])}] for row in portfolio_rows]
+            if not sales_list or not portfolio_list:
+                return jsonify({"message": "Nenhum dado encontrado"}), 404
 
-        cur.close()
-
-        if not sales_data or not portfolio_data:
-            return jsonify({"message": "Nenhum dado encontrado"}), 404
-
-        return jsonify({ "salesData": sales_data, "portfolioData": portfolio_data })
-
-    except Exception as e:
-        print(f"Erro ao buscar dados: {e}")
-        return jsonify({"message": "Erro interno do servidor ao buscar dados"}), 500
+            return jsonify({
+                "salesData": sales_list,
+                "portfolioData": portfolio_list
+            })
     finally:
-        if conn: conn.close()
+        conn.close()
+
 
 @app.route('/api/upload/vendas', methods=['POST'])
-def upload_vendas():
-    """Recebe o arquivo de vendas, processa e salva no banco."""
+def upload_sales():
+    """Processa o upload do ficheiro de vendas e insere na base de dados."""
     if 'salesFile' not in request.files:
-        return jsonify({"message": "Nenhum arquivo de vendas enviado"}), 400
-
+        return jsonify({"message": "Nenhum ficheiro de vendas enviado"}), 400
+    
     file = request.files['salesFile']
     if file.filename == '':
-        return jsonify({"message": "Nenhum arquivo selecionado"}), 400
+        return jsonify({"message": "Nenhum ficheiro selecionado"}), 400
 
-    conn = None
     try:
-        df = pd.read_excel(file, skiprows=8)
+        df = pd.read_excel(file, engine='openpyxl', skiprows=8)
 
-        # Mapeia os nomes das colunas do Excel para os nomes do banco
+        # Mapeamento robusto de colunas
         column_map = {
-            'Data Faturamento': 'data_venda', 'Vendedor': 'vendedor',
-            'Fabricante': 'fabricante', 'Nome Fantasia': 'cliente',
-            'Descricao Produto': 'produto', 'Quantidade Vendida': 'quantidade',
-            'Valor Total Item': 'valor'
+            'Data Faturamento': 'data_venda', 'data': 'data_venda',
+            'Vendedor': 'vendedor',
+            'Fabricante': 'fabricante',
+            'Nome Fantasia': 'cliente', 'cliente': 'cliente',
+            'Descricao Produto': 'produto',
+            'Quantidade Vendida': 'quantidade',
+            'Valor Total Item': 'valor', 'valor total': 'valor', 'valor': 'valor'
         }
-        df.rename(columns=column_map, inplace=True)
         
-        # Filtra apenas as colunas necessárias
-        df = df[list(column_map.values())]
+        df.rename(columns={col: column_map.get(col.strip()) for col in df.columns if col.strip() in column_map}, inplace=True)
+        
+        required_cols = ['data_venda', 'vendedor', 'fabricante', 'cliente', 'produto', 'quantidade', 'valor']
+        
+        # Verifica se todas as colunas necessárias existem após o mapeamento
+        if not all(col in df.columns for col in required_cols):
+             missing = [col for col in required_cols if col not in df.columns]
+             return jsonify({"message": f"Colunas essenciais em falta no ficheiro de vendas: {', '.join(missing)}"}), 400
 
-        df.dropna(subset=['data_venda'], inplace=True)
-        df['data_venda'] = pd.to_datetime(df['data_venda']).dt.date
-        df['valor'] = pd.to_numeric(df['valor'], errors='coerce')
-        df['quantidade'] = pd.to_numeric(df['quantidade'], errors='coerce')
-        df.dropna(subset=['valor', 'quantidade'], inplace=True)
+        df = df[required_cols]
+        df.dropna(subset=required_cols, inplace=True)
 
-        if not df.empty:
-            primeiro_dia_mes = df['data_venda'].min().replace(day=1)
-            ultimo_dia_mes = pd.Period(primeiro_dia_mes, freq='M').end_time.date()
+        conn = get_db_connection()
+        with conn.cursor() as cur:
+            # Limpa os dados do mês que está a ser importado para evitar duplicados
+            first_date = pd.to_datetime(df['data_venda'].iloc[0]).strftime('%Y-%m-01')
+            cur.execute("DELETE FROM vendas WHERE data_venda >= %s AND data_venda < %s + INTERVAL '1 month'", (first_date, first_date))
 
-            conn = get_db_connection()
-            cur = conn.cursor()
-            
-            # Deleta os dados do mês que está sendo importado para evitar duplicatas
-            cur.execute("DELETE FROM vendas WHERE data_venda BETWEEN %s AND %s;", (primeiro_dia_mes, ultimo_dia_mes))
-
-            data_tuples = [tuple(x) for x in df.to_numpy()]
-            psycopg2.extras.execute_values(cur, "INSERT INTO vendas (data_venda, vendedor, fabricante, cliente, produto, quantidade, valor) VALUES %s", data_tuples)
-            
-            conn.commit()
-            cur.close()
-
-        return jsonify({"message": "Arquivo de vendas processado com sucesso!"}), 200
+            # Insere novos dados
+            for index, row in df.iterrows():
+                cur.execute(
+                    "INSERT INTO vendas (data_venda, vendedor, fabricante, cliente, produto, quantidade, valor) VALUES (%s, %s, %s, %s, %s, %s, %s)",
+                    (row['data_venda'], row['vendedor'], row['fabricante'], row['cliente'], row['produto'], row['quantidade'], row['valor'])
+                )
+        conn.commit()
+        conn.close()
+        
+        return jsonify({"message": "Ficheiro de vendas processado com sucesso"}), 200
 
     except Exception as e:
-        print(f"Erro ao processar arquivo de vendas: {e}")
-        return jsonify({"message": f"Erro ao processar arquivo: {e}"}), 500
-    finally:
-        if conn: conn.close()
+        return jsonify({"message": f"Erro ao processar o ficheiro: {str(e)}"}), 500
+
 
 @app.route('/api/upload/carteira', methods=['POST'])
-def upload_carteira():
-    """Recebe o arquivo da carteira, limpa a tabela antiga e insere os novos dados."""
+def upload_portfolio():
+    """Processa o upload da carteira e atualiza/insere na base de dados."""
     if 'portfolioFile' not in request.files:
-        return jsonify({"message": "Nenhum arquivo de carteira enviado"}), 400
+        return jsonify({"message": "Nenhum ficheiro de carteira enviado"}), 400
     
     file = request.files['portfolioFile']
     if file.filename == '':
-        return jsonify({"message": "Nenhum arquivo selecionado"}), 400
+        return jsonify({"message": "Nenhum ficheiro selecionado"}), 400
 
-    conn = None
     try:
-        df = pd.read_excel(file)
-        
+        df = pd.read_excel(file, engine='openpyxl')
+
         column_map = {
-            'Vendedor': 'vendedor', 'Total Clientes': 'total_clientes',
-            'Total Produtos': 'total_produtos', 'Meta faturamento': 'meta_faturamento'
+            'Vendedor': 'vendedor',
+            'Total Clientes': 'total_clientes',
+            'Total Produtos': 'total_produtos',
+            'Meta faturamento': 'meta_faturamento'
         }
-        df.rename(columns=column_map, inplace=True)
-        df = df[list(column_map.values())]
+        df.rename(columns={col: column_map.get(col.strip()) for col in df.columns if col.strip() in column_map}, inplace=True)
 
-        df['meta_faturamento'] = df['meta_faturamento'].astype(str).str.replace('.', '', regex=False).str.replace(',', '.', regex=False)
-        df['meta_faturamento'] = pd.to_numeric(df['meta_faturamento'], errors='coerce').fillna(0)
-        df.dropna(inplace=True)
+        required_cols = ['vendedor', 'total_clientes', 'total_produtos']
+        if not all(col in df.columns for col in required_cols):
+            missing = [col for col in required_cols if col not in df.columns]
+            return jsonify({"message": f"Colunas essenciais em falta no ficheiro de carteira: {', '.join(missing)}"}), 400
+        
+        # Garante que a coluna de meta existe, mesmo que vazia
+        if 'meta_faturamento' not in df.columns:
+            df['meta_faturamento'] = 0
+
+        df = df[required_cols + ['meta_faturamento']]
+        df.dropna(subset=required_cols, inplace=True)
+        df['meta_faturamento'] = pd.to_numeric(df['meta_faturamento'].astype(str).str.replace(r'[R$.]', '', regex=True).str.replace(',', '.'), errors='coerce').fillna(0)
+
 
         conn = get_db_connection()
-        cur = conn.cursor()
-
-        # Limpa a tabela antes de inserir, pois a carteira é sempre um espelho do último arquivo
-        cur.execute("TRUNCATE TABLE carteira;")
-        
-        data_tuples = [tuple(x) for x in df.to_numpy()]
-        psycopg2.extras.execute_values(cur, "INSERT INTO carteira (vendedor, total_clientes, total_produtos, meta_faturamento) VALUES %s", data_tuples)
-        
+        with conn.cursor() as cur:
+            for index, row in df.iterrows():
+                # Usa ON CONFLICT para atualizar se o vendedor já existir (UPSERT)
+                cur.execute(
+                    """
+                    INSERT INTO carteira (vendedor, total_clientes, total_produtos, meta_faturamento) 
+                    VALUES (%s, %s, %s, %s)
+                    ON CONFLICT (vendedor) 
+                    DO UPDATE SET 
+                        total_clientes = EXCLUDED.total_clientes, 
+                        total_produtos = EXCLUDED.total_produtos,
+                        meta_faturamento = EXCLUDED.meta_faturamento;
+                    """,
+                    (row['vendedor'], row['total_clientes'], row['total_produtos'], row['meta_faturamento'])
+                )
         conn.commit()
-        cur.close()
+        conn.close()
 
-        return jsonify({"message": "Arquivo de carteira processado com sucesso!"}), 200
-    
+        return jsonify({"message": "Ficheiro de carteira processado com sucesso"}), 200
+
     except Exception as e:
-        print(f"Erro ao processar arquivo de carteira: {e}")
-        return jsonify({"message": f"Erro ao processar arquivo: {e}"}), 500
-    finally:
-        if conn: conn.close()
+        return jsonify({"message": f"Erro ao processar o ficheiro: {str(e)}"}), 500
 
-@app.route('/api/dados', methods=['DELETE'])
+
+@app.route("/api/dados", methods=['DELETE'])
 def delete_data():
-    """Apaga TODOS os dados das tabelas de vendas e carteira."""
-    conn = None
+    """Apaga todos os dados das tabelas de vendas and carteira."""
+    conn = get_db_connection()
     try:
-        conn = get_db_connection()
-        cur = conn.cursor()
-        cur.execute("TRUNCATE TABLE vendas, carteira;")
+        with conn.cursor() as cur:
+            cur.execute("TRUNCATE TABLE vendas, carteira RESTART IDENTITY;")
         conn.commit()
-        cur.close()
         return jsonify({"message": "Todos os dados foram apagados com sucesso."}), 200
     except Exception as e:
-        print(f"Erro ao apagar dados: {e}")
-        return jsonify({"message": f"Erro ao apagar dados: {e}"}), 500
+        return jsonify({"message": f"Erro ao apagar dados: {str(e)}"}), 500
     finally:
-        if conn: conn.close()
+        conn.close()
 
