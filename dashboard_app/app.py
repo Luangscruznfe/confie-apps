@@ -62,8 +62,12 @@ def process_sales_in_background(df):
     try:
         conn = get_db_connection()
         with conn.cursor() as cur:
-            first_date = pd.to_datetime(df['data_venda'].iloc[0]).strftime('%Y-%m-01')
-            cur.execute("DELETE FROM public.vendas WHERE data_venda >= %s AND data_venda < CAST(%s AS DATE) + INTERVAL '1 month'", (first_date, first_date))
+            # Limpa os dados do mês que está a ser importado para evitar duplicados
+            if not df.empty and 'data_venda' in df.columns:
+                first_date_str = df['data_venda'].dropna().astype(str).iloc[0]
+                first_date = pd.to_datetime(first_date_str).strftime('%Y-%m-01')
+                cur.execute("DELETE FROM public.vendas WHERE data_venda >= %s AND data_venda < CAST(%s AS DATE) + INTERVAL '1 month'", (first_date, first_date))
+                app.logger.info(f"Registos de vendas antigos para o mês {first_date} foram apagados.")
 
             for index, row in df.iterrows():
                 cur.execute(
@@ -153,28 +157,31 @@ def upload_sales():
     try:
         df = None
         file.seek(0)
-        
-        # TENTATIVA 1: Ler como um ficheiro Excel genuíno
-        try:
-            df_excel = pd.read_excel(file, engine='openpyxl', skiprows=8)
-            df = df_excel
-            app.logger.info("Ficheiro de vendas lido com sucesso como Excel.")
-        except Exception:
-            pass # Ignora e tenta o próximo método
+        filename = file.filename.lower()
 
-        # TENTATIVA 2: Ler como um ficheiro CSV (se a primeira tentativa falhar)
-        if df is None:
-            file.seek(0)
-            try:
-                df_csv = pd.read_csv(file, sep='[;,]', engine='python', on_bad_lines='skip', skiprows=8)
-                df = df_csv
-                app.logger.info("Ficheiro de vendas lido com sucesso como CSV.")
-            except Exception as e:
-                 app.logger.error(f"Falha ao ler ficheiro de vendas como Excel e como CSV: {e}")
-                 raise ValueError("Não foi possível ler o ficheiro de vendas. Verifique o formato.")
+        # CORREÇÃO: Lógica de leitura separada para XLSX e CSV
+        if filename.endswith('.xlsx'):
+            df = pd.read_excel(file, engine='openpyxl', skiprows=8)
+            app.logger.info("Ficheiro de vendas lido como Excel (skiprows=8).")
+        elif filename.endswith('.csv'):
+            # Tenta ler CSV com várias codificações, sem skiprows
+            for encoding in ['utf-8', 'latin-1', 'iso-8859-1']:
+                try:
+                    file.seek(0)
+                    df = pd.read_csv(file, sep='[;,]', engine='python', on_bad_lines='skip', encoding=encoding)
+                    app.logger.info(f"Ficheiro de vendas lido como CSV ({encoding}).")
+                    # Validação rápida para ver se a leitura funcionou
+                    if df.shape[1] > 3:
+                        break # Leitura bem-sucedida, sai do loop
+                    else:
+                        df = None # Leitura falhou, tenta próxima codificação
+                except Exception:
+                    continue
         
         if df is None:
-            raise ValueError("O formato do ficheiro de vendas não é reconhecido.")
+            raise ValueError("O formato do ficheiro de vendas não é reconhecido ou está corrompido.")
+
+        app.logger.info(f"Colunas encontradas: {list(df.columns)}")
 
         # Lógica de renomeação robusta
         column_map = {
@@ -187,16 +194,18 @@ def upload_sales():
             'valor total item': 'valor', 'valor total': 'valor', 'valor': 'valor'
         }
         
-        df.rename(columns=lambda c: c.strip().lower(), inplace=True)
+        df.rename(columns=lambda c: str(c).strip().lower(), inplace=True)
         df.rename(columns=column_map, inplace=True)
         
         required_cols = ['data_venda', 'vendedor', 'fabricante', 'cliente', 'produto', 'quantidade', 'valor']
         
         if not all(col in df.columns for col in required_cols):
              missing = [col for col in required_cols if col not in df.columns]
+             app.logger.error(f"Colunas em falta após renomeação: {missing}. Colunas disponíveis: {list(df.columns)}")
              return jsonify({"message": f"Colunas essenciais em falta no ficheiro de vendas: {', '.join(missing)}"}), 400
 
         df = df[required_cols]
+        df['data_venda'] = pd.to_datetime(df['data_venda'], errors='coerce')
         df.dropna(subset=required_cols, inplace=True)
         
         # Inicia a thread para processamento em segundo plano
