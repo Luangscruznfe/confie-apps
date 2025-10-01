@@ -12,9 +12,11 @@ app = Flask(__name__, template_folder='templates')
 
 def get_db_connection():
     """Cria e retorna uma nova conexão com a base de dados."""
-    # CORREÇÃO: Adiciona a opção para definir o esquema padrão da base de dados.
-    # Isto força a conexão a procurar as tabelas no esquema 'public'.
-    conn = psycopg2.connect(os.environ.get('DATABASE_URL'), options="-c search_path=public")
+    conn = psycopg2.connect(os.environ.get('DATABASE_URL'))
+    # CORREÇÃO: Define o search_path após a conexão ser estabelecida.
+    # Isto é mais compatível com o connection pooler do Neon.
+    with conn.cursor() as cur:
+        cur.execute("SET search_path TO public;")
     return conn
 
 # =================================================================
