@@ -8,8 +8,44 @@ from flask import Flask, jsonify, render_template, request
 app = Flask(__name__, template_folder='templates')
 
 # =================================================================
-# 1. FUNÇÕES DE CONEXÃO COM A BASE DE DADOS
+# 1. FUNÇÕES DE INICIALIZAÇÃO E CONEXÃO COM A BASE DE DADOS
 # =================================================================
+
+def init_db():
+    """Verifica e cria as tabelas da base de dados, se não existirem."""
+    conn = None
+    try:
+        conn = psycopg2.connect(os.environ.get('DATABASE_URL'))
+        with conn.cursor() as cur:
+            # Cria a tabela de vendas se ela não existir
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS public.vendas (
+                    id SERIAL PRIMARY KEY,
+                    data_venda DATE NOT NULL,
+                    vendedor VARCHAR(255),
+                    fabricante VARCHAR(255),
+                    cliente VARCHAR(255),
+                    produto VARCHAR(255),
+                    quantidade INTEGER,
+                    valor NUMERIC(10, 2)
+                );
+            """)
+            # Cria a tabela de carteira se ela não existir
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS public.carteira (
+                    vendedor VARCHAR(255) PRIMARY KEY,
+                    total_clientes INTEGER,
+                    total_produtos INTEGER,
+                    meta_faturamento NUMERIC(12, 2)
+                );
+            """)
+        conn.commit()
+        app.logger.info("Base de dados inicializada com sucesso.")
+    except Exception as e:
+        app.logger.error(f"Erro ao inicializar a base de dados: {e}")
+    finally:
+        if conn:
+            conn.close()
 
 def get_db_connection():
     """Cria e retorna uma nova conexão com a base de dados."""
@@ -27,11 +63,9 @@ def process_sales_in_background(df):
         conn = get_db_connection()
         with conn.cursor() as cur:
             first_date = pd.to_datetime(df['data_venda'].iloc[0]).strftime('%Y-%m-01')
-            # CORREÇÃO: Especifica o esquema 'public'
             cur.execute("DELETE FROM public.vendas WHERE data_venda >= %s AND data_venda < CAST(%s AS DATE) + INTERVAL '1 month'", (first_date, first_date))
 
             for index, row in df.iterrows():
-                # CORREÇÃO: Especifica o esquema 'public'
                 cur.execute(
                     "INSERT INTO public.vendas (data_venda, vendedor, fabricante, cliente, produto, quantidade, valor) VALUES (%s, %s, %s, %s, %s, %s, %s)",
                     (row['data_venda'], row['vendedor'], row['fabricante'], row['cliente'], row['produto'], row['quantidade'], row['valor'])
@@ -51,7 +85,6 @@ def process_portfolio_in_background(df):
         conn = get_db_connection()
         with conn.cursor() as cur:
             for index, row in df.iterrows():
-                # CORREÇÃO: Especifica o esquema 'public'
                 cur.execute(
                     """
                     INSERT INTO public.carteira (vendedor, total_clientes, total_produtos, meta_faturamento) 
@@ -87,13 +120,11 @@ def get_data():
     conn = get_db_connection()
     try:
         with conn.cursor() as cur:
-            # CORREÇÃO: Especifica o esquema 'public'
             cur.execute("SELECT TO_CHAR(data_venda, 'YYYY-MM-DD') as \"Data\", vendedor as \"Vendedor\", fabricante as \"Fabricante\", cliente as \"Cliente\", produto as \"Produto\", quantidade as \"Quantidade\", valor as \"Valor\" FROM public.vendas")
             sales_data = cur.fetchall()
             sales_columns = [desc[0] for desc in cur.description]
             sales_list = [dict(zip(sales_columns, row)) for row in sales_data]
 
-            # CORREÇÃO: Especifica o esquema 'public'
             cur.execute("SELECT vendedor, total_clientes, total_produtos, meta_faturamento FROM public.carteira")
             portfolio_data = cur.fetchall()
             portfolio_list = [[row[0], {"totalClientes": row[1], "totalProdutos": row[2], "meta": float(row[3]) if row[3] is not None else 0}] for row in portfolio_data]
@@ -202,7 +233,6 @@ def delete_data():
     conn = get_db_connection()
     try:
         with conn.cursor() as cur:
-            # CORREÇÃO: Especifica o esquema 'public'
             cur.execute("TRUNCATE TABLE public.vendas, public.carteira RESTART IDENTITY;")
         conn.commit()
         return jsonify({"message": "Todos os dados foram apagados com sucesso."}), 200
@@ -210,4 +240,7 @@ def delete_data():
         return jsonify({"message": f"Erro ao apagar dados: {str(e)}"}), 500
     finally:
         conn.close()
+
+# --- INICIALIZA A BASE DE DADOS NA ARRANCADA DA APLICAÇÃO ---
+init_db()
 
