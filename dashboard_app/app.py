@@ -96,7 +96,8 @@ def upload_sales():
         with conn.cursor() as cur:
             # Limpa os dados do mês que está a ser importado para evitar duplicados
             first_date = pd.to_datetime(df['data_venda'].iloc[0]).strftime('%Y-%m-01')
-            cur.execute("DELETE FROM vendas WHERE data_venda >= %s AND data_venda < %s + INTERVAL '1 month'", (first_date, first_date))
+            # CORREÇÃO: Converte o parâmetro para DATE antes de somar o intervalo
+            cur.execute("DELETE FROM vendas WHERE data_venda >= %s AND data_venda < CAST(%s AS DATE) + INTERVAL '1 month'", (first_date, first_date))
 
             # Insere novos dados
             for index, row in df.iterrows():
