@@ -359,8 +359,9 @@
 
             processButton.addEventListener('click', handleFileUpload);
             
+            // CORREÇÃO: O event listener para o botão de apagar foi comentado para diagnóstico.
+            /*
             clearDatabaseBtn.addEventListener('click', async () => {
-                 // Substituir por um modal customizado se preferir
                 const userConfirmed = window.confirm("Tem a certeza de que deseja apagar TODOS os dados da base de dados? Esta ação não pode ser desfeita.");
                 if (userConfirmed) {
                     loader.classList.remove('hidden');
@@ -376,6 +377,7 @@
                     }
                 }
             });
+            */
 
             // --- FUNÇÕES ---
 
@@ -390,7 +392,7 @@
                 dashboardContent.classList.add('hidden');
 
                 try {
-                    const response = await fetch('/dashboard/api/dados');
+                    const response = await fetch('api/dados');
                     if (!response.ok) {
                         if (response.status === 404) { // Assume que 404 significa 'sem dados'
                              initialMessage.innerHTML = '<p class="text-gray-600">Nenhum dado encontrado no servidor.<br>Use o menu para carregar os seus ficheiros de vendas e carteira.</p>';
