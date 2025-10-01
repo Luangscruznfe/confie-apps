@@ -79,7 +79,7 @@
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
             </svg>
         </button>
-        <h2 class="text-2xl font-bold mb-6 text-gray-800">Carregar Arquivos</h2>
+        <h2 class="text-2xl font-bold mb-6 text-gray-800">Carregar Ficheiros</h2>
         <div class="space-y-6">
             <div>
                 <label for="salesFile" class="block text-sm font-medium text-gray-700 mb-2">1. Selecione o Relatório de Vendas (.xlsx):</label>
@@ -90,7 +90,7 @@
                 <label for="portfolioFile" class="block text-sm font-medium text-gray-700 mb-2">2. Selecione a Carteira de Clientes (.xlsx):</label>
                 <input type="file" id="portfolioFile" accept=".xlsx, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" class="file-input">
                 <p id="portfolio-file-name" class="file-name-display"></p>
-                 <p class="mt-1 text-xs text-green-600">Dica: A carteira só precisa ser enviada se for alterada.</p>
+                 <p class="mt-1 text-xs text-green-600">Dica: A carteira só precisa de ser enviada se for alterada.</p>
             </div>
             <button id="process-button" class="w-full px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-opacity-75 disabled:bg-gray-400" disabled>
                 Processar e Salvar
@@ -106,7 +106,7 @@
             <div class="flex justify-between items-center relative">
                  <div class="absolute left-0">
                     <button id="clear-database-btn" class="px-4 py-2 bg-red-600 text-white font-semibold rounded-lg shadow-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-400 focus:ring-opacity-75">
-                        Limpar Banco de Dados
+                        Limpar Base de Dados
                     </button>
                 </div>
                 <div class="flex-grow text-center">
@@ -147,7 +147,7 @@
             <!-- Indicadores Chave (Cards) -->
             <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6 mb-8">
                 <div class="bg-white p-6 rounded-lg shadow-md flex flex-col justify-between">
-                    <h3 class="text-sm font-medium text-gray-500">Faturamento Total</h3>
+                    <h3 class="text-sm font-medium text-gray-500">Faturação Total</h3>
                     <p id="faturamento-total" class="text-3xl font-semibold text-gray-900 mt-1">R$ 0,00</p>
                 </div>
                 <div class="bg-white p-6 rounded-lg shadow-md flex flex-col justify-between">
@@ -167,17 +167,17 @@
                     <p id="positivacao-media" class="text-3xl font-semibold text-blue-900 mt-1">0%</p>
                 </div>
                 <div class="bg-white p-6 rounded-lg shadow-md flex flex-col justify-between bg-green-50">
-                    <h3 class="text-sm font-medium text-green-800">Projeção Faturamento</h3>
+                    <h3 class="text-sm font-medium text-green-800">Projeção Faturação</h3>
                     <p id="projecao-faturamento" class="text-3xl font-semibold text-green-900 mt-1">R$ 0,00</p>
                 </div>
             </div>
 
             <!-- Gráficos -->
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                <!-- Faturamento por Período -->
+                <!-- Faturação por Período -->
                 <div class="bg-white p-6 rounded-lg shadow-md">
                     <div class="flex justify-between items-center mb-4">
-                        <h3 class="text-lg font-semibold">Faturamento por Período</h3>
+                        <h3 class="text-lg font-semibold">Faturação por Período</h3>
                         <button class="expand-chart-btn" data-chart-id="faturamento-periodo-chart">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-500 hover:text-gray-800" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5v-4m0 0h-4m4 0l-5-5" /></svg>
                         </button>
@@ -186,10 +186,10 @@
                         <canvas id="faturamento-periodo-chart"></canvas>
                     </div>
                 </div>
-                <!-- Faturamento por Vendedor -->
+                <!-- Faturação por Vendedor -->
                 <div class="bg-white p-6 rounded-lg shadow-md">
                     <div class="flex justify-between items-center mb-4">
-                        <h3 class="text-lg font-semibold">Faturamento por Vendedor</h3>
+                        <h3 class="text-lg font-semibold">Faturação por Vendedor</h3>
                         <button class="expand-chart-btn" data-chart-id="faturamento-vendedor-chart">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-500 hover:text-gray-800" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5v-4m0 0h-4m4 0l-5-5" /></svg>
                         </button>
@@ -213,7 +213,7 @@
                 <!-- Top 5 Produtos (Geral) -->
                 <div class="bg-white p-6 rounded-lg shadow-md">
                     <div class="flex justify-between items-center mb-4">
-                        <h3 class="text-lg font-semibold">Top 5 Produtos por Faturamento</h3>
+                        <h3 class="text-lg font-semibold">Top 5 Produtos por Faturação</h3>
                         <button class="expand-chart-btn" data-chart-id="top-produtos-geral-chart">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-500 hover:text-gray-800" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5v-4m0 0h-4m4 0l-5-5" /></svg>
                         </button>
@@ -234,10 +234,10 @@
                         <canvas id="mix-produtos-chart"></canvas>
                     </div>
                 </div>
-                <!-- Item de Maior Faturamento por Vendedor -->
+                <!-- Item de Maior Faturação por Vendedor -->
                 <div class="bg-white p-6 rounded-lg shadow-md">
                     <div class="flex justify-between items-center mb-4">
-                        <h3 class="text-lg font-semibold">Item de Maior Faturamento por Vendedor</h3>
+                        <h3 class="text-lg font-semibold">Item de Maior Faturação por Vendedor</h3>
                         <button class="expand-chart-btn" data-chart-id="top-item-vendedor-chart">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-500 hover:text-gray-800" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5v-4m0 0h-4m4 0l-5-5" /></svg>
                         </button>
@@ -251,7 +251,7 @@
              <!-- Gráfico de Fabricantes Foco -->
             <div class="mt-8 bg-white p-6 rounded-lg shadow-md">
                 <div class="flex justify-between items-center mb-4">
-                    <h3 class="text-lg font-semibold">Faturamento Fabricantes Foco</h3>
+                    <h3 class="text-lg font-semibold">Faturação Fabricantes Foco</h3>
                      <div>
                         <label for="focus-vendor-filter" class="text-sm font-medium text-gray-700 mr-2">Filtrar Vendedor:</label>
                         <select id="focus-vendor-filter" class="rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"></select>
@@ -276,7 +276,7 @@
         
         <!-- Mensagem inicial -->
         <div id="initial-message" class="text-center py-16">
-            <p class="text-gray-500">Buscando dados no servidor...</p>
+            <p class="text-gray-500">A buscar dados no servidor...</p>
         </div>
         
         <!-- Loader -->
@@ -347,12 +347,12 @@
             overlay.addEventListener('click', closeUploadPanel);
             
             salesFileInput.addEventListener('change', () => {
-                salesFileNameDisplay.textContent = salesFileInput.files.length > 0 ? `Arquivo: ${salesFileInput.files[0].name}` : '';
+                salesFileNameDisplay.textContent = salesFileInput.files.length > 0 ? `Ficheiro: ${salesFileInput.files[0].name}` : '';
                 checkFiles();
             });
 
             portfolioFileInput.addEventListener('change', () => {
-                portfolioFileNameDisplay.textContent = portfolioFileInput.files.length > 0 ? `Arquivo: ${portfolioFileInput.files[0].name}` : '';
+                portfolioFileNameDisplay.textContent = portfolioFileInput.files.length > 0 ? `Ficheiro: ${portfolioFileInput.files[0].name}` : '';
                 checkFiles();
             });
 
@@ -360,13 +360,13 @@
             
             clearDatabaseBtn.addEventListener('click', async () => {
                  // Substituir por um modal customizado se preferir
-                const userConfirmed = window.confirm("Tem certeza que deseja apagar TODOS os dados do banco de dados? Esta ação não pode ser desfeita.");
+                const userConfirmed = window.confirm("Tem a certeza de que deseja apagar TODOS os dados da base de dados? Esta ação não pode ser desfeita.");
                 if (userConfirmed) {
                     loader.classList.remove('hidden');
                     try {
-                        const response = await fetch('/api/dados', { method: 'DELETE' });
-                        if (!response.ok) throw new Error('Falha ao limpar o banco de dados.');
-                        alert('Banco de dados limpo com sucesso!');
+                        const response = await fetch('api/dados', { method: 'DELETE' });
+                        if (!response.ok) throw new Error('Falha ao limpar a base de dados.');
+                        alert('Base de dados limpa com sucesso!');
                         window.location.reload();
                     } catch (error) {
                         alert(`Erro: ${error.message}`);
@@ -389,10 +389,10 @@
                 dashboardContent.classList.add('hidden');
 
                 try {
-                    const response = await fetch('/api/dados');
+                    const response = await fetch('api/dados');
                     if (!response.ok) {
                         if (response.status === 404) { // Assume que 404 significa 'sem dados'
-                             initialMessage.innerHTML = '<p class="text-gray-600">Nenhum dado encontrado no servidor.<br>Use o menu para carregar seus arquivos de vendas e carteira.</p>';
+                             initialMessage.innerHTML = '<p class="text-gray-600">Nenhum dado encontrado no servidor.<br>Use o menu para carregar os seus ficheiros de vendas e carteira.</p>';
                             return;
                         }
                         throw new Error(`Erro no servidor: ${response.statusText}`);
@@ -401,7 +401,7 @@
                     const data = await response.json();
                     
                     if (!data.salesData || data.salesData.length === 0 || !data.portfolioData) {
-                        initialMessage.innerHTML = '<p class="text-gray-600">Dados incompletos no servidor.<br>Carregue os arquivos de vendas e carteira.</p>';
+                        initialMessage.innerHTML = '<p class="text-gray-600">Dados incompletos no servidor.<br>Carregue os ficheiros de vendas e carteira.</p>';
                         return;
                     }
 
@@ -417,7 +417,7 @@
                     applyFilters();
 
                 } catch (error) {
-                    initialMessage.innerHTML = `<p class="text-red-500">Falha ao buscar dados: ${error.message}<br>Verifique se sua aplicação backend está rodando.</p>`;
+                    initialMessage.innerHTML = `<p class="text-red-500">Falha ao buscar dados: ${error.message}<br>Verifique se a sua aplicação backend está a ser executada.</p>`;
                 } finally {
                     loader.classList.add('hidden');
                 }
@@ -429,13 +429,13 @@
 
             async function handleFileUpload() {
                 if (salesFileInput.files.length === 0 && portfolioFileInput.files.length === 0) {
-                    uploadStatusDiv.textContent = 'Nenhum arquivo selecionado.';
+                    uploadStatusDiv.textContent = 'Nenhum ficheiro selecionado.';
                     uploadStatusDiv.className = 'mt-2 text-sm text-center font-medium text-yellow-600';
                     return;
                 }
 
                 loader.classList.remove('hidden');
-                uploadStatusDiv.textContent = 'Enviando arquivos...';
+                uploadStatusDiv.textContent = 'A enviar ficheiros...';
                 uploadStatusDiv.className = 'mt-2 text-sm text-center font-medium text-blue-600';
 
                 try {
@@ -444,13 +444,13 @@
                     if (salesFileInput.files.length > 0) {
                         const salesFormData = new FormData();
                         salesFormData.append('salesFile', salesFileInput.files[0]);
-                        uploadPromises.push(fetch('/api/upload/vendas', { method: 'POST', body: salesFormData }));
+                        uploadPromises.push(fetch('api/upload/vendas', { method: 'POST', body: salesFormData }));
                     }
 
                     if (portfolioFileInput.files.length > 0) {
                         const portfolioFormData = new FormData();
                         portfolioFormData.append('portfolioFile', portfolioFileInput.files[0]);
-                        uploadPromises.push(fetch('/api/upload/carteira', { method: 'POST', body: portfolioFormData }));
+                        uploadPromises.push(fetch('api/upload/carteira', { method: 'POST', body: portfolioFormData }));
                     }
 
                     const responses = await Promise.all(uploadPromises);
@@ -463,7 +463,7 @@
                         }
                     }
 
-                    uploadStatusDiv.textContent = 'Sucesso! Atualizando dashboard...';
+                    uploadStatusDiv.textContent = 'Sucesso! A atualizar o dashboard...';
                     uploadStatusDiv.className = 'mt-2 text-sm text-center font-medium text-green-600';
 
                     // Aguarda um momento e recarrega os dados
@@ -729,7 +729,7 @@
                 let tableHTML = `<table class="min-w-full divide-y divide-gray-200"><thead class="bg-gray-50"><tr>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Vendedor</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Meta</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Faturamento</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Faturação</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">% Atingido</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Projeção</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Venda Diária Necessária</th>
@@ -764,22 +764,22 @@
                 const maxFocusValue = Math.max(...focusData, 0);
                 const focusChartOptions = {
                     responsive: true, maintainAspectRatio: false, indexAxis: 'y',
-                    plugins: { legend: { display: false }, tooltip: { callbacks: { label: (ctx) => `Faturamento: ${formatCurrency(ctx.parsed.x)}` } },
+                    plugins: { legend: { display: false }, tooltip: { callbacks: { label: (ctx) => `Faturação: ${formatCurrency(ctx.parsed.x)}` } },
                         datalabels: { anchor: 'end', align: 'end', formatter: (v) => v > 999 ? 'R$' + (v / 1000).toFixed(1).replace('.', ',') + 'k' : formatCurrency(v), font: { weight: 'bold' }, color: '#374151' } },
                     scales: { x: { beginAtZero: true, suggestedMax: maxFocusValue * 1.25, ticks: { callback: v => v >= 1000 ? 'R$' + (v / 1000) + 'k' : formatCurrency(v) } } }
                 };
                 createOrUpdateChart('focus-manufacturers-chart', 'bar', {
                     labels: sortedFabricantes.map(f => f[0]),
-                    datasets: [{ label: 'Faturamento', data: focusData, backgroundColor: 'rgba(255, 99, 132, 0.6)', borderColor: 'rgba(255, 99, 132, 1)', borderWidth: 1 }]
+                    datasets: [{ label: 'Faturação', data: focusData, backgroundColor: 'rgba(255, 99, 132, 0.6)', borderColor: 'rgba(255, 99, 132, 1)', borderWidth: 1 }]
                 }, focusChartOptions);
             }
 
             function createOrUpdateCharts(data) {
-                // Faturamento por período (Gráfico Inteligente: Mensal vs Diário)
+                // Faturação por período (Gráfico Inteligente: Mensal vs Diário)
                 const uniqueMonths = new Set(data.map(item => item.DataObj.format('YYYY-MM')));
                 let chartType, labels, dataPoints, chartLabel, datasetOptions;
                 if (uniqueMonths.size > 1) {
-                    chartType = 'line'; chartLabel = 'Faturamento Mensal';
+                    chartType = 'line'; chartLabel = 'Faturação Mensal';
                     const faturamentoPorMes = data.reduce((acc, sale) => {
                         const month = sale.DataObj.format('YYYY-MM');
                         acc[month] = (acc[month] || 0) + sale.Valor;
@@ -790,7 +790,7 @@
                     dataPoints = sortedMonths.map(m => faturamentoPorMes[m]);
                     datasetOptions = { label: chartLabel, data: dataPoints, borderColor: 'rgb(75, 192, 192)', tension: 0.1, fill: false };
                 } else {
-                    chartType = 'bar'; chartLabel = 'Faturamento Diário';
+                    chartType = 'bar'; chartLabel = 'Faturação Diária';
                     const faturamentoPorDia = data.reduce((acc, sale) => {
                         const day = sale.DataObj.format('YYYY-MM-DD');
                         acc[day] = (acc[day] || 0) + sale.Valor;
@@ -808,7 +808,7 @@
                 };
                 createOrUpdateChart('faturamento-periodo-chart', chartType, { labels: labels, datasets: [datasetOptions] }, faturamentoPeriodoOptions);
 
-                // Faturamento por Vendedor
+                // Faturação por Vendedor
                 const faturamentoPorVendedor = data.reduce((acc, sale) => {
                     acc[sale.Vendedor] = (acc[sale.Vendedor] || 0) + sale.Valor;
                     return acc;
@@ -818,7 +818,7 @@
                 const maxValueFaturamento = Math.max(...faturamentoData, 0);
                 createOrUpdateChart('faturamento-vendedor-chart', 'bar', {
                     labels: sortedVendedores.map(v => v[0]),
-                    datasets: [{ label: 'Faturamento', data: faturamentoData, backgroundColor: 'rgba(54, 162, 235, 0.6)', borderColor: 'rgba(54, 162, 235, 1)', borderWidth: 1 }]
+                    datasets: [{ label: 'Faturação', data: faturamentoData, backgroundColor: 'rgba(54, 162, 235, 0.6)', borderColor: 'rgba(54, 162, 235, 1)', borderWidth: 1 }]
                 }, { ...JSON.parse(JSON.stringify(chartOptions)), scales: { y: { ...chartOptions.scales.y, suggestedMax: maxValueFaturamento * 1.25 } } });
 
                 // Positivação por Vendedor
@@ -838,8 +838,8 @@
                 const maxTopProdutoValue = Math.max(...topProdutosData, 0);
                 createOrUpdateChart('top-produtos-geral-chart', 'bar', {
                     labels: sortedProdutos.map(p => p[0]),
-                    datasets: [{ label: 'Faturamento', data: topProdutosData, backgroundColor: 'rgba(153, 102, 255, 0.6)', borderColor: 'rgba(153, 102, 255, 1)', borderWidth: 1 }]
-                }, { responsive: true, maintainAspectRatio: false, indexAxis: 'y', plugins: { legend: { display: false }, tooltip: { callbacks: { label: (ctx) => `Faturamento: ${formatCurrency(ctx.parsed.x)}` } }, datalabels: { anchor: 'end', align: 'end', offset: 4, color: '#374151', font: { weight: 'bold' }, formatter: (v) => v > 999 ? 'R$' + (v/1000).toFixed(1).replace('.',',')+'k' : formatCurrency(v) } }, scales: { x: { beginAtZero: true, suggestedMax: maxTopProdutoValue * 1.25, ticks: { callback: v => v >= 1000 ? 'R$' + (v/1000)+'k' : formatCurrency(v) } }, y: { ticks: { callback: function(v) { const l = this.getLabelForValue(v); return l.length > 35 ? l.substring(0,35)+'...' : l; } } } } });
+                    datasets: [{ label: 'Faturação', data: topProdutosData, backgroundColor: 'rgba(153, 102, 255, 0.6)', borderColor: 'rgba(153, 102, 255, 1)', borderWidth: 1 }]
+                }, { responsive: true, maintainAspectRatio: false, indexAxis: 'y', plugins: { legend: { display: false }, tooltip: { callbacks: { label: (ctx) => `Faturação: ${formatCurrency(ctx.parsed.x)}` } }, datalabels: { anchor: 'end', align: 'end', offset: 4, color: '#374151', font: { weight: 'bold' }, formatter: (v) => v > 999 ? 'R$' + (v/1000).toFixed(1).replace('.',',')+'k' : formatCurrency(v) } }, scales: { x: { beginAtZero: true, suggestedMax: maxTopProdutoValue * 1.25, ticks: { callback: v => v >= 1000 ? 'R$' + (v/1000)+'k' : formatCurrency(v) } }, y: { ticks: { callback: function(v) { const l = this.getLabelForValue(v); return l.length > 35 ? l.substring(0,35)+'...' : l; } } } } });
 
                 // Mix de Produtos
                 const mixData = calculateProductMix(data);
@@ -848,7 +848,7 @@
                     datasets: [{ label: 'Mix de Produtos', data: mixData.map(p => p.percentage), backgroundColor: 'rgba(255, 99, 132, 0.6)', borderColor: 'rgba(255, 99, 132, 1)', borderWidth: 1 }]
                 }, { ...chartOptions, scales: { y: { beginAtZero: true, max: 100, suggestedMax: 125, ticks: { callback: v => `${v}%` } } }, plugins: { ...chartOptions.plugins, tooltip: { callbacks: { label: (ctx) => ` ${mixData[ctx.dataIndex].uniqueProductsCount} / ${mixData[ctx.dataIndex].totalProdutos} produtos (${mixData[ctx.dataIndex].percentage.toFixed(1)}%)` } }, datalabels: { ...chartOptions.plugins.datalabels, formatter: (v) => `${parseFloat(v).toFixed(1)}%` } } });
 
-                // Item de Maior Faturamento por Vendedor
+                // Item de Maior Faturação por Vendedor
                 const salesByVendorProductValue = data.reduce((acc, sale) => {
                     const vendedor = sale.Vendedor;
                     if (!acc[vendedor]) acc[vendedor] = {};
@@ -866,7 +866,7 @@
                 const maxValue = Math.max(...topItemsData, 0);
                 createOrUpdateChart('top-item-vendedor-chart', 'bar', {
                     labels: topItemsByValue.map(item => item.vendedor),
-                    datasets: [{ label: 'Faturamento do Item', data: topItemsData, backgroundColor: 'rgba(255, 159, 64, 0.6)', borderColor: 'rgba(255, 159, 64, 1)', borderWidth: 1 }]
+                    datasets: [{ label: 'Faturação do Item', data: topItemsData, backgroundColor: 'rgba(255, 159, 64, 0.6)', borderColor: 'rgba(255, 159, 64, 1)', borderWidth: 1 }]
                 }, { responsive: true, maintainAspectRatio: false, indexAxis: 'y', plugins: { legend: { display: false }, tooltip: { callbacks: { label: (ctx) => `${topItemsByValue[ctx.dataIndex].produto}: ${formatCurrency(topItemsByValue[ctx.dataIndex].valor)}` } }, datalabels: { align: 'end', anchor: 'end', offset: 8, color: '#374151', font: { weight: '500', size: 10 }, formatter: (v, ctx) => { const item = topItemsByValue[ctx.dataIndex]; return item.produto.length > 35 ? item.produto.substring(0, 32) + '...' : item.produto; } } }, scales: { x: { beginAtZero: true, suggestedMax: maxValue * 1.7, ticks: { callback: v => v >= 1000 ? 'R$' + (v / 1000) + 'k' : formatCurrency(v) } } } });
 
                 createOrUpdateFocusChart(focusChartBaseData);
@@ -892,4 +892,3 @@
 
 </body>
 </html>
-
