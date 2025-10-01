@@ -82,13 +82,13 @@
         <h2 class="text-2xl font-bold mb-6 text-gray-800">Carregar Ficheiros</h2>
         <div class="space-y-6">
             <div>
-                <label for="salesFile" class="block text-sm font-medium text-gray-700 mb-2">1. Selecione o Relatório de Vendas (.xlsx):</label>
-                <input type="file" id="salesFile" accept=".xlsx, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" class="file-input">
+                <label for="salesFile" class="block text-sm font-medium text-gray-700 mb-2">1. Selecione o Relatório de Vendas (.xlsx, .csv):</label>
+                <input type="file" id="salesFile" accept=".xlsx,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" class="file-input">
                 <p id="sales-file-name" class="file-name-display"></p>
             </div>
             <div>
-                <label for="portfolioFile" class="block text-sm font-medium text-gray-700 mb-2">2. Selecione a Carteira de Clientes (.xlsx):</label>
-                <input type="file" id="portfolioFile" accept=".xlsx, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" class="file-input">
+                <label for="portfolioFile" class="block text-sm font-medium text-gray-700 mb-2">2. Selecione a Carteira de Clientes (.xlsx, .csv):</label>
+                <input type="file" id="portfolioFile" accept=".xlsx,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" class="file-input">
                 <p id="portfolio-file-name" class="file-name-display"></p>
                  <p class="mt-1 text-xs text-green-600">Dica: A carteira só precisa de ser enviada se for alterada.</p>
             </div>
@@ -110,7 +110,8 @@
                     </button>
                 </div>
                 <div class="flex-grow text-center">
-                    <img src="logotipo 1.jpg" alt="Logotipo da Empresa" class="h-20 mx-auto mb-4">
+                    <!-- CORREÇÃO: Usa url_for para encontrar a imagem na pasta static -->
+                    <img src="{{ url_for('static', filename='logotipo 1.jpg') }}" alt="Logotipo da Empresa" class="h-20 mx-auto mb-4">
                     <h1 class="text-3xl font-bold text-gray-900">Dashboard de Análise de Vendas</h1>
                 </div>
                 <button id="hamburger-btn" class="p-2 rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-400">
@@ -435,8 +436,9 @@
                 }
 
                 loader.classList.remove('hidden');
-                uploadStatusDiv.textContent = 'A enviar ficheiros...';
+                uploadStatusDiv.textContent = 'A enviar ficheiros... Isto pode demorar um pouco.';
                 uploadStatusDiv.className = 'mt-2 text-sm text-center font-medium text-blue-600';
+                processButton.disabled = true;
 
                 try {
                     const uploadPromises = [];
@@ -477,6 +479,7 @@
                     uploadStatusDiv.className = 'mt-2 text-sm text-center font-medium text-red-600';
                 } finally {
                     loader.classList.add('hidden');
+                    processButton.disabled = false;
                 }
             }
 
@@ -892,3 +895,4 @@
 
 </body>
 </html>
+

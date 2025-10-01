@@ -5,8 +5,10 @@ from flask import Flask, jsonify, render_template, request
 import csv
 import io
 from psycopg2.extras import execute_values
+from decimal import Decimal
 
 # --- INICIALIZAÇÃO EXPLÍCITA DO FLASK ---
+# Corrigido para apontar para a pasta estática na raiz do projeto
 app = Flask(__name__, template_folder='templates', static_folder='../static')
 
 # =================================================================
@@ -70,7 +72,16 @@ def get_data():
             cur.execute("SELECT TO_CHAR(data_venda, 'YYYY-MM-DD') as \"Data\", vendedor as \"Vendedor\", fabricante as \"Fabricante\", cliente as \"Cliente\", produto as \"Produto\", quantidade as \"Quantidade\", valor as \"Valor\" FROM public.vendas")
             sales_data = cur.fetchall()
             sales_columns = [desc[0] for desc in cur.description]
-            sales_list = [dict(zip(sales_columns, row)) for row in sales_data]
+            
+            # CORREÇÃO: Converte Decimal para float e garante tipos numéricos corretos
+            sales_list = []
+            for row in sales_data:
+                row_dict = dict(zip(sales_columns, row))
+                if isinstance(row_dict.get('Valor'), Decimal):
+                    row_dict['Valor'] = float(row_dict['Valor'])
+                if isinstance(row_dict.get('Quantidade'), Decimal):
+                     row_dict['Quantidade'] = int(row_dict['Quantidade'])
+                sales_list.append(row_dict)
 
             cur.execute("SELECT vendedor, total_clientes, total_produtos, meta_faturamento FROM public.carteira")
             portfolio_data = cur.fetchall()
