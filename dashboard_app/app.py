@@ -4,6 +4,7 @@ import pandas as pd
 from flask import Flask, jsonify, render_template, request
 import csv
 import io
+from psycopg2.extras import execute_values
 
 # --- INICIALIZAÇÃO EXPLÍCITA DO FLASK ---
 app = Flask(__name__, template_folder='templates')
@@ -136,16 +137,20 @@ def upload_sales():
         df.dropna(subset=['data_venda'], inplace=True)
         df.dropna(subset=required_cols, how='all', inplace=True)
         
-        # Processamento direto na base de dados
         conn = get_db_connection()
         with conn.cursor() as cur:
-            if not df.empty and 'data_venda' in df.columns:
+            if not df.empty:
+                # OTIMIZAÇÃO: Usa BULK INSERT para velocidade máxima
                 first_date_str = df['data_venda'].dropna().astype(str).iloc[0]
                 first_date = pd.to_datetime(first_date_str).strftime('%Y-%m-01')
                 cur.execute("DELETE FROM public.vendas WHERE data_venda >= %s AND data_venda < CAST(%s AS DATE) + INTERVAL '1 month'", (first_date, first_date))
-            
-            for index, row in df.iterrows():
-                cur.execute("INSERT INTO public.vendas (data_venda, vendedor, fabricante, cliente, produto, quantidade, valor) VALUES (%s, %s, %s, %s, %s, %s, %s)", (row['data_venda'], row['vendedor'], row['fabricante'], row['cliente'], row['produto'], row['quantidade'], row['valor']))
+                
+                # Prepara os dados para o bulk insert
+                data_tuples = [tuple(x) for x in df.to_numpy()]
+                
+                execute_values(cur, 
+                    "INSERT INTO public.vendas (data_venda, vendedor, fabricante, cliente, produto, quantidade, valor) VALUES %s",
+                    data_tuples)
         conn.commit()
         
         return jsonify({"message": "Ficheiro de vendas processado com sucesso."}), 200
@@ -188,7 +193,7 @@ def upload_portfolio():
                      df = pd.DataFrame(fixed_data, columns=header)
                 else:
                     df = pd.read_csv(file, sep='[;,]', engine='python', on_bad_lines='skip')
-            except Exception as e:
+            except Exception:
                  raise ValueError("Não foi possível ler o ficheiro da carteira. Verifique o formato.")
 
         if df is None:
@@ -215,8 +220,20 @@ def upload_portfolio():
 
         conn = get_db_connection()
         with conn.cursor() as cur:
-            for index, row in df.iterrows():
-                cur.execute("INSERT INTO public.carteira (vendedor, total_clientes, total_produtos, meta_faturamento) VALUES (%s, %s, %s, %s) ON CONFLICT (vendedor) DO UPDATE SET total_clientes = EXCLUDED.total_clientes, total_produtos = EXCLUDED.total_produtos, meta_faturamento = EXCLUDED.meta_faturamento;", (row['vendedor'], row['total_clientes'], row['total_produtos'], row['meta_faturamento']))
+            # OTIMIZAÇÃO: Usa BULK INSERT com ON CONFLICT para velocidade máxima
+            data_tuples = [tuple(x) for x in df.to_numpy()]
+            
+            execute_values(cur, 
+                """
+                INSERT INTO public.carteira (vendedor, total_clientes, total_produtos, meta_faturamento) 
+                VALUES %s
+                ON CONFLICT (vendedor) 
+                DO UPDATE SET 
+                    total_clientes = EXCLUDED.total_clientes, 
+                    total_produtos = EXCLUDED.total_produtos,
+                    meta_faturamento = EXCLUDED.meta_faturamento;
+                """,
+                data_tuples)
         conn.commit()
         
         return jsonify({"message": "Ficheiro de carteira processado com sucesso."}), 200
@@ -241,7 +258,8 @@ def delete_data():
     except Exception as e:
         return jsonify({"message": f"Erro ao apagar dados: {str(e)}"}), 500
     finally:
-        conn.close()
+        if conn:
+            conn.close()
 
 # --- INICIALIZA A BASE DE DADOS NA ARRANCADA DA APLICAÇÃO ---
 init_db()
