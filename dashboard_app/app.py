@@ -4,8 +4,6 @@ import pandas as pd
 from flask import Flask, jsonify, render_template, request
 
 # --- INICIALIZAÇÃO EXPLÍCITA DO FLASK ---
-# A alteração principal está aqui. Estamos a dizer ao Flask para procurar
-# os ficheiros HTML numa pasta chamada 'templates' que está no mesmo nível deste ficheiro.
 app = Flask(__name__, template_folder='templates')
 
 # =================================================================
@@ -14,7 +12,9 @@ app = Flask(__name__, template_folder='templates')
 
 def get_db_connection():
     """Cria e retorna uma nova conexão com a base de dados."""
-    conn = psycopg2.connect(os.environ.get('DATABASE_URL'))
+    # CORREÇÃO: Adiciona a opção para definir o esquema padrão da base de dados.
+    # Isto força a conexão a procurar as tabelas no esquema 'public'.
+    conn = psycopg2.connect(os.environ.get('DATABASE_URL'), options="-c search_path=public")
     return conn
 
 # =================================================================
@@ -24,7 +24,6 @@ def get_db_connection():
 @app.route("/")
 def index():
     """Serve a página principal do dashboard."""
-    # Esta função irá agora encontrar o 'dashboard.html' sem problemas.
     return render_template('dashboard.html')
 
 @app.route("/api/dados", methods=['GET'])
@@ -84,7 +83,6 @@ def upload_sales():
         
         required_cols = ['data_venda', 'vendedor', 'fabricante', 'cliente', 'produto', 'quantidade', 'valor']
         
-        # Verifica se todas as colunas necessárias existem após o mapeamento
         if not all(col in df.columns for col in required_cols):
              missing = [col for col in required_cols if col not in df.columns]
              return jsonify({"message": f"Colunas essenciais em falta no ficheiro de vendas: {', '.join(missing)}"}), 400
@@ -94,12 +92,9 @@ def upload_sales():
 
         conn = get_db_connection()
         with conn.cursor() as cur:
-            # Limpa os dados do mês que está a ser importado para evitar duplicados
             first_date = pd.to_datetime(df['data_venda'].iloc[0]).strftime('%Y-%m-01')
-            # CORREÇÃO: Converte o parâmetro para DATE antes de somar o intervalo
             cur.execute("DELETE FROM vendas WHERE data_venda >= %s AND data_venda < CAST(%s AS DATE) + INTERVAL '1 month'", (first_date, first_date))
 
-            # Insere novos dados
             for index, row in df.iterrows():
                 cur.execute(
                     "INSERT INTO vendas (data_venda, vendedor, fabricante, cliente, produto, quantidade, valor) VALUES (%s, %s, %s, %s, %s, %s, %s)",
@@ -140,7 +135,6 @@ def upload_portfolio():
             missing = [col for col in required_cols if col not in df.columns]
             return jsonify({"message": f"Colunas essenciais em falta no ficheiro de carteira: {', '.join(missing)}"}), 400
         
-        # Garante que a coluna de meta existe, mesmo que vazia
         if 'meta_faturamento' not in df.columns:
             df['meta_faturamento'] = 0
 
@@ -152,7 +146,6 @@ def upload_portfolio():
         conn = get_db_connection()
         with conn.cursor() as cur:
             for index, row in df.iterrows():
-                # Usa ON CONFLICT para atualizar se o vendedor já existir (UPSERT)
                 cur.execute(
                     """
                     INSERT INTO carteira (vendedor, total_clientes, total_produtos, meta_faturamento) 
