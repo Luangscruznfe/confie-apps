@@ -8,7 +8,6 @@ from psycopg2.extras import execute_values
 from decimal import Decimal
 
 # --- INICIALIZAÇÃO EXPLÍCITA DO FLASK ---
-# Corrigido para apontar para a pasta estática na raiz do projeto
 app = Flask(__name__, template_folder='templates', static_folder='static')
 
 # =================================================================
@@ -61,7 +60,6 @@ def get_db_connection():
 @app.route("/")
 def index():
     """Serve a página principal do dashboard."""
-    # CORREÇÃO: Usa o novo nome do template
     return render_template('dashboard.html')
 
 @app.route("/api/dados", methods=['GET'])
@@ -101,11 +99,15 @@ def get_data():
 @app.route('/api/upload/vendas', methods=['POST'])
 def upload_sales():
     """Recebe o ficheiro de vendas e processa-o diretamente."""
+    app.logger.info(f"Recebida requisição POST em /api/upload/vendas. Keys em request.files: {list(request.files.keys())}")
+    
     if 'salesFile' not in request.files:
+        app.logger.warning("Chave 'salesFile' não encontrada em request.files.")
         return jsonify({"message": "Nenhum ficheiro de vendas enviado"}), 400
     
     file = request.files['salesFile']
-    if file.filename == '':
+    if not file or file.filename == '':
+        app.logger.warning("Ficheiro de vendas vazio ou sem nome de ficheiro.")
         return jsonify({"message": "Nenhum ficheiro selecionado"}), 400
 
     app.logger.info(f"A processar o upload do ficheiro de vendas: {file.filename}")
@@ -141,6 +143,7 @@ def upload_sales():
         
         if not all(col in df.columns for col in required_cols):
              missing = [col for col in required_cols if col not in df.columns]
+             app.logger.error(f"Colunas em falta no ficheiro de vendas: {', '.join(missing)}")
              return jsonify({"message": f"Colunas essenciais em falta no ficheiro de vendas: {', '.join(missing)}"}), 400
 
         df = df[required_cols]
@@ -177,13 +180,18 @@ def upload_sales():
 @app.route('/api/upload/carteira', methods=['POST'])
 def upload_portfolio():
     """Recebe o ficheiro da carteira e processa-o diretamente."""
+    app.logger.info(f"Recebida requisição POST em /api/upload/carteira. Keys em request.files: {list(request.files.keys())}")
+
     if 'portfolioFile' not in request.files:
+        app.logger.warning("Chave 'portfolioFile' não encontrada em request.files.")
         return jsonify({"message": "Nenhum ficheiro de carteira enviado"}), 400
     
     file = request.files['portfolioFile']
-    if file.filename == '':
+    if not file or file.filename == '':
+        app.logger.warning("Ficheiro de carteira vazio ou sem nome de ficheiro.")
         return jsonify({"message": "Nenhum ficheiro selecionado"}), 400
     
+    app.logger.info(f"A processar o upload do ficheiro de carteira: {file.filename}")
     conn = None
     try:
         df = None
@@ -217,6 +225,7 @@ def upload_portfolio():
         required_cols = ['vendedor', 'total_clientes', 'total_produtos']
         if not all(col in df.columns for col in required_cols):
             missing = [col for col in required_cols if col not in df.columns]
+            app.logger.error(f"Colunas em falta no ficheiro de carteira: {', '.join(missing)}")
             return jsonify({"message": f"Colunas essenciais em falta no ficheiro de carteira: {', '.join(missing)}"}), 400
         
         if 'meta_faturamento' not in df.columns:
@@ -256,12 +265,12 @@ def upload_portfolio():
             conn.close()
 
 
-# ALTERAÇÃO: Rota de exclusão alterada para ser mais específica e segura.
 @app.route("/api/delete-all-data", methods=['POST'])
 def delete_all_data():
     """Apaga todos os dados das tabelas de vendas e carteira com confirmação."""
-    # Camada extra de segurança: exige uma confirmação no corpo da requisição
+    app.logger.info("Recebida requisição POST para apagar todos os dados.")
     if not request.json or request.json.get('confirm') is not True:
+        app.logger.warning("Tentativa de apagar dados falhou por falta de confirmação.")
         return jsonify({"message": "Confirmação necessária para apagar os dados."}), 400
         
     conn = get_db_connection()
@@ -269,6 +278,7 @@ def delete_all_data():
         with conn.cursor() as cur:
             cur.execute("TRUNCATE TABLE public.vendas, public.carteira RESTART IDENTITY;")
         conn.commit()
+        app.logger.info("Todos os dados foram apagados com sucesso.")
         return jsonify({"message": "Todos os dados foram apagados com sucesso."}), 200
     except Exception as e:
         app.logger.error(f"Erro ao apagar dados: {e}", exc_info=True)
@@ -279,3 +289,4 @@ def delete_all_data():
 
 # --- INICIALIZA A BASE DE DADOS NA ARRANCADA DA APLICAÇÃO ---
 init_db()
+
