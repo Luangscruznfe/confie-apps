@@ -501,12 +501,14 @@
                     if (salesFileInput.files.length > 0) {
                         const salesFormData = new FormData();
                         salesFormData.append('salesFile', salesFileInput.files[0]);
+                        // CORREÇÃO: Usar caminho absoluto
                         uploadPromises.push(fetch('/api/upload/vendas', { method: 'POST', body: salesFormData }));
                     }
 
                     if (portfolioFileInput.files.length > 0) {
                         const portfolioFormData = new FormData();
                         portfolioFormData.append('portfolioFile', portfolioFileInput.files[0]);
+                        // CORREÇÃO: Usar caminho absoluto
                         uploadPromises.push(fetch('/api/upload/carteira', { method: 'POST', body: portfolioFormData }));
                     }
 
