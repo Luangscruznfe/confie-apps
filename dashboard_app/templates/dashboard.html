@@ -501,14 +501,12 @@
                     if (salesFileInput.files.length > 0) {
                         const salesFormData = new FormData();
                         salesFormData.append('salesFile', salesFileInput.files[0]);
-                        // CORREÇÃO: Usar caminho absoluto
                         uploadPromises.push(fetch('/api/upload/vendas', { method: 'POST', body: salesFormData }));
                     }
 
                     if (portfolioFileInput.files.length > 0) {
                         const portfolioFormData = new FormData();
                         portfolioFormData.append('portfolioFile', portfolioFileInput.files[0]);
-                        // CORREÇÃO: Usar caminho absoluto
                         uploadPromises.push(fetch('/api/upload/carteira', { method: 'POST', body: portfolioFormData }));
                     }
 
@@ -516,8 +514,19 @@
 
                     for (const response of responses) {
                         if (!response.ok) {
-                            const errorData = await response.json();
-                            throw new Error(errorData.message || `Falha no upload - Status: ${response.status}`);
+                            // APRIMORAMENTO: Tenta ler a mensagem de erro específica do backend
+                            let serverMessage = `Falha no upload - Status: ${response.status}`;
+                            try {
+                                const errorData = await response.json();
+                                if (errorData && errorData.message) {
+                                    serverMessage = errorData.message; // Usa a mensagem do servidor se existir
+                                }
+                            } catch (jsonError) {
+                                // Se o backend não enviar um JSON válido (ex: erro de proxy), mostra o texto bruto
+                                console.error('Erro ao analisar JSON da resposta de erro:', jsonError);
+                                serverMessage = await response.text();
+                            }
+                            throw new Error(serverMessage);
                         }
                     }
 
