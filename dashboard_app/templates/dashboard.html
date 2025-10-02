@@ -60,12 +60,16 @@
             truncate: true;
         }
         /* Modal Styles */
-        #chart-modal {
+        #chart-modal, #confirm-modal {
             background-color: rgba(0,0,0,0.5);
         }
         .modal-content {
             height: 85vh;
             width: 90vw;
+        }
+        /* Notification Toast */
+        #notification-toast {
+            transition: transform 0.3s ease-in-out, opacity 0.3s ease-in-out;
         }
     </style>
 </head>
@@ -293,6 +297,23 @@
         </div>
     </div>
 
+    <!-- NOVO: Modal de Confirmação -->
+    <div id="confirm-modal" class="fixed inset-0 z-50 flex items-center justify-center hidden">
+        <div class="bg-white p-8 rounded-lg shadow-xl max-w-sm w-full">
+            <h3 class="text-lg font-bold mb-4">Confirmar Ação</h3>
+            <p id="confirm-modal-text" class="text-gray-600 mb-6">Tem a certeza de que deseja apagar TODOS os dados da base de dados? Esta ação não pode ser desfeita.</p>
+            <div class="flex justify-end space-x-4">
+                <button id="cancel-delete-btn" class="px-4 py-2 bg-gray-200 text-gray-800 font-semibold rounded-lg hover:bg-gray-300">Cancelar</button>
+                <button id="confirm-delete-btn" class="px-4 py-2 bg-red-600 text-white font-semibold rounded-lg hover:bg-red-700">Confirmar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- NOVO: Barra de Notificação (Toast) -->
+    <div id="notification-toast" class="fixed bottom-5 right-5 p-4 rounded-lg shadow-lg text-white max-w-sm transform translate-y-20 opacity-0">
+        <p id="notification-text"></p>
+    </div>
+
 
     <!-- Bibliotecas JS -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -326,6 +347,14 @@
             const modal = document.getElementById('chart-modal');
             const closeModalBtn = document.getElementById('close-modal-btn');
             
+            // --- NOVOS ELEMENTOS DO DOM (MODAL E TOAST) ---
+            const confirmModal = document.getElementById('confirm-modal');
+            const confirmDeleteBtn = document.getElementById('confirm-delete-btn');
+            const cancelDeleteBtn = document.getElementById('cancel-delete-btn');
+            const notificationToast = document.getElementById('notification-toast');
+            const notificationText = document.getElementById('notification-text');
+
+
             // --- VARIÁVEIS DE ESTADO ---
             let originalData = [];
             let portfolioDataMap = new Map();
@@ -358,26 +387,34 @@
 
             processButton.addEventListener('click', handleFileUpload);
             
-            // ALTERAÇÃO: O event listener agora usa a rota segura e pode ser reativado.
-            clearDatabaseBtn.addEventListener('click', async () => {
-                const userConfirmed = window.confirm("Tem a certeza de que deseja apagar TODOS os dados da base de dados? Esta ação não pode ser desfeita.");
-                if (userConfirmed) {
-                    loader.classList.remove('hidden');
-                    try {
-                        // Usa o novo endpoint seguro com método POST e corpo de confirmação
-                        const response = await fetch('/api/delete-all-data', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ confirm: true })
-                        });
-                        if (!response.ok) throw new Error('Falha ao limpar a base de dados.');
-                        alert('Base de dados limpa com sucesso!');
-                        window.location.reload();
-                    } catch (error) {
-                        alert(`Erro: ${error.message}`);
-                    } finally {
-                        loader.classList.add('hidden');
+            // ALTERADO: Event listener agora mostra o modal de confirmação
+            clearDatabaseBtn.addEventListener('click', () => {
+                confirmModal.classList.remove('hidden');
+            });
+            
+            cancelDeleteBtn.addEventListener('click', () => {
+                confirmModal.classList.add('hidden');
+            });
+            
+            confirmDeleteBtn.addEventListener('click', async () => {
+                confirmModal.classList.add('hidden');
+                loader.classList.remove('hidden');
+                try {
+                    const response = await fetch('/api/delete-all-data', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ confirm: true })
+                    });
+                    if (!response.ok) {
+                        const errorData = await response.json();
+                        throw new Error(errorData.message || 'Falha ao limpar a base de dados.');
                     }
+                    showNotification('Base de dados limpa com sucesso!');
+                    setTimeout(() => window.location.reload(), 2000);
+                } catch (error) {
+                    showNotification(`Erro: ${error.message}`, true);
+                } finally {
+                    loader.classList.add('hidden');
                 }
             });
 
@@ -387,6 +424,20 @@
                 uploadPanel.classList.add('translate-x-full');
                 overlay.classList.add('hidden');
             }
+            
+            // NOVA FUNÇÃO: Para mostrar notificações
+            function showNotification(message, isError = false) {
+                notificationText.textContent = message;
+                notificationToast.className = `fixed bottom-5 right-5 p-4 rounded-lg shadow-lg text-white max-w-sm transform transition-transform duration-300 ease-in-out ${isError ? 'bg-red-500' : 'bg-green-500'}`;
+                
+                // Show toast
+                notificationToast.classList.remove('translate-y-20', 'opacity-0');
+
+                // Hide after 3 seconds
+                setTimeout(() => {
+                    notificationToast.classList.add('translate-y-20', 'opacity-0');
+                }, 3000);
+            }
 
             async function loadDataFromAPI() {
                 loader.classList.remove('hidden');
@@ -394,7 +445,7 @@
                 dashboardContent.classList.add('hidden');
 
                 try {
-                    const response = await fetch('/api/dados'); // Rota de busca permanece a mesma
+                    const response = await fetch('/api/dados');
                     if (!response.ok) {
                         if (response.status === 404) {
                              initialMessage.innerHTML = '<p class="text-gray-600">Nenhum dado encontrado no servidor.<br>Use o menu para carregar os seus ficheiros de vendas e carteira.</p>';
@@ -516,7 +567,6 @@
                 clearFiltersButton.addEventListener('click', resetFilters);
 
                 if (originalData.length > 0) {
-                    // Ordena os dados por data para garantir que min e max estão corretos
                     originalData.sort((a, b) => a.DataObj - b.DataObj);
                     const firstDate = originalData[0].DataObj.format('YYYY-MM');
                     const lastDate = originalData[originalData.length - 1].DataObj.format('YYYY-MM');
@@ -544,7 +594,7 @@
                 if(originalData.length === 0) return;
 
                 globallyFilteredData = [...originalData];
-                focusChartBaseData = [...originalData]; // Base para o gráfico de foco não é filtrada por vendedor/fabricante
+                focusChartBaseData = [...originalData];
 
                 const periodo = periodoFilter.value;
                 const vendedores = vendedorSelect.getValue();
@@ -896,3 +946,4 @@
 
 </body>
 </html>
+
