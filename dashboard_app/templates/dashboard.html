@@ -78,7 +78,6 @@
         .modal-body { flex-grow: 1; position: relative; }
         .modal-body canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
 
-        /* --- INÍCIO DAS REGRAS PARA CELULAR (DESIGN RESPONSIVO) --- */
         @media (max-width: 768px) {
             .container {
                 margin-top: 1rem;
@@ -88,7 +87,7 @@
             .section-title { font-size: 1.25rem; }
             
             .kpi-grid, .filters, .chart-grid {
-                grid-template-columns: 1fr; /* Força uma única coluna */
+                grid-template-columns: 1fr;
             }
             .kpi-card { padding: 1rem; }
             .kpi-icon { font-size: 1.5rem; padding: 0.8rem; margin-right: 0.8rem; }
@@ -100,7 +99,6 @@
             }
             .modal-title { font-size: 1rem; }
         }
-        /* --- FIM DAS REGRAS PARA CELULAR --- */
     </style>
 </head>
 <body>
@@ -185,8 +183,8 @@
         <div class="form-group"><label for="portfolio-file">Ficheiro da Carteira (.csv)</label><input type="file" id="portfolio-file" accept=".csv"></div>
         
         <div class="form-group" style="display: none; align-items: center; margin-top: 1rem; user-select: none;">
-            <input type="checkbox" id="replace-data-checkbox" checked style="margin-right: 10px; height: 18px; width: 18px;">
-            <label for="replace-data-checkbox" style="margin-bottom: 0; font-weight: normal; cursor: pointer;">Substituir dados existentes</label>
+            <input type="checkbox" id="replace-data-checkbox" checked>
+            <label for="replace-data-checkbox">Substituir dados existentes</label>
         </div>
         
         <button id="process-button" class="btn-process" disabled>Processar e Salvar</button>
@@ -205,82 +203,32 @@
     </div>
 
     <script>
-        // --- FUNÇÕES DE FORMATAÇÃO ---
+        // --- FUNÇÕES DE FORMATAÇÃO E AJUDA ---
         function formatCurrency(value) { return (Number(value) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }); }
-        
         function formatNumber(value) {
             value = Number(value) || 0;
             if (Math.abs(value) >= 1000000) return (value / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
             if (Math.abs(value) >= 1000) return (value / 1000).toFixed(1).replace(/\.0$/, '') + 'K';
             return value.toLocaleString('pt-BR');
         }
-
-        function formatPercentage(value) {
-            return `${(Number(value) || 0).toFixed(1)}%`;
-        }
-        
+        function formatPercentage(value) { return `${(Number(value) || 0).toFixed(1)}%`; }
         function abbreviateProductName(name) {
             const MAX_LENGTH = 22;
-            const wordMap = {
-                'PANETTONE': 'PANET', 'CHOCOLATE': 'CHOC', 'SUFLAIR': 'SUFL',
-                'TAMPICO': 'TAMP', 'LINDOYA': 'LIND', 'PIMENTA': 'PIM',
-                'MEXICANA': 'MEX', 'FOFURA': 'FOF', 'TORCIDA': 'TORC',
-                'BATON': 'BTN', 'FRUTAS': 'FRT', 'AO LEITE': ''
-            };
-
+            const wordMap = { 'PANETTONE': 'PANET', 'CHOCOLATE': 'CHOC', 'SUFLAIR': 'SUFL', 'TAMPICO': 'TAMP', 'LINDOYA': 'LIND', 'PIMENTA': 'PIM', 'MEXICANA': 'MEX', 'FOFURA': 'FOF', 'TORCIDA': 'TORC', 'BATON': 'BTN', 'FRUTAS': 'FRT', 'AO LEITE': '' };
             let processedName = name.toUpperCase();
-            for (const key in wordMap) {
-                processedName = processedName.replace(new RegExp(key, 'g'), wordMap[key]);
-            }
-            
+            for (const key in wordMap) { processedName = processedName.replace(new RegExp(key, 'g'), wordMap[key]); }
             processedName = processedName.replace(/\s+/g, ' ').trim();
-
-            if (processedName.length > MAX_LENGTH) {
-                return processedName.substring(0, MAX_LENGTH) + '...';
-            }
+            if (processedName.length > MAX_LENGTH) { return processedName.substring(0, MAX_LENGTH) + '...'; }
             return processedName;
         }
 
-        // --- PALETA DE CORES PARA OS GRÁFICOS ---
-        const chartColors = [
-            { background: 'rgba(94, 114, 228, 0.8)', border: 'rgba(94, 114, 228, 1)' },
-            { background: 'rgba(245, 54, 92, 0.8)', border: 'rgba(245, 54, 92, 1)' },
-            { background: 'rgba(45, 206, 137, 0.8)', border: 'rgba(45, 206, 137, 1)' },
-            { background: 'rgba(251, 99, 64, 0.8)', border: 'rgba(251, 99, 64, 1)' },
-            { background: 'rgba(17, 205, 239, 0.8)', border: 'rgba(17, 205, 239, 1)' },
-            { background: 'rgba(137, 101, 224, 0.8)', border: 'rgba(137, 101, 224, 1)' }
-        ];
+        const chartColors = [ { background: 'rgba(94, 114, 228, 0.8)', border: 'rgba(94, 114, 228, 1)' }, { background: 'rgba(245, 54, 92, 0.8)', border: 'rgba(245, 54, 92, 1)' }, { background: 'rgba(45, 206, 137, 0.8)', border: 'rgba(45, 206, 137, 1)' }, { background: 'rgba(251, 99, 64, 0.8)', border: 'rgba(251, 99, 64, 1)' }, { background: 'rgba(17, 205, 239, 0.8)', border: 'rgba(17, 205, 239, 1)' }, { background: 'rgba(137, 101, 224, 0.8)', border: 'rgba(137, 101, 224, 1)' } ];
 
-        // --- FUNÇÃO PARA CRIAR CONFIGURAÇÃO DE GRÁFICO ---
         function createChartConfig(title, type, options = {}) {
             const { isMultiAxis = false, color = chartColors[0], formatterType = 'number' } = options;
             const isLine = type === 'line';
             let formatterFunction = (formatterType === 'percentage') ? formatPercentage : formatNumber;
-
-            const config = {
-                type: type,
-                data: { 
-                    labels: [], 
-                    datasets: isMultiAxis ? [] : [{ 
-                        label: title, data: [], 
-                        backgroundColor: isLine ? color.background.replace('0.8', '0.2') : color.background, 
-                        borderColor: color.border, borderWidth: 2, fill: isLine, tension: 0.1 
-                    }] 
-                },
-                options: {
-                    responsive: true, maintainAspectRatio: false,
-                    customFormatterType: formatterType, 
-                    plugins: {
-                        legend: { display: isMultiAxis, position: 'top' },
-                        title: { display: true, text: title, font: { size: 16 }, padding: { bottom: 20 } },
-                        datalabels: {
-                           display: !isLine, anchor: 'end', align: 'top',
-                           color: '#555', font: { weight: 'bold' }, formatter: formatterFunction
-                        }
-                    },
-                    scales: { y: { ticks: { callback: value => formatNumber(value) } } }
-                }
-            };
+            const config = { type: type, data: { labels: [], datasets: isMultiAxis ? [] : [{ label: title, data: [], backgroundColor: isLine ? color.background.replace('0.8', '0.2') : color.background, borderColor: color.border, borderWidth: 2, fill: isLine, tension: 0.1 }] }, options: { responsive: true, maintainAspectRatio: false, customFormatterType: formatterType, plugins: { legend: { display: isMultiAxis, position: 'top' }, title: { display: true, text: title, font: { size: 16 }, padding: { bottom: 20 } }, datalabels: { display: !isLine, anchor: 'end', align: 'top', color: '#555', font: { weight: 'bold' }, formatter: formatterFunction } }, scales: { y: { ticks: { callback: value => formatNumber(value) } } } } };
             return config;
         }
         
@@ -296,19 +244,14 @@
             const colors = ['rgba(94, 114, 228, 1)', 'rgba(245, 54, 92, 1)', 'rgba(45, 206, 137, 1)'];
             const bgColors = ['rgba(94, 114, 228, 0.2)', 'rgba(245, 54, 92, 0.2)', 'rgba(45, 206, 137, 0.2)'];
             chart.data.labels = labels;
-            chart.data.datasets = datasets.map((ds, index) => ({
-                label: ds.label, data: ds.data,
-                borderColor: colors[index % colors.length],
-                backgroundColor: bgColors[index % bgColors.length],
-                borderWidth: 2, fill: true, tension: 0.1
-            }));
+            chart.data.datasets = datasets.map((ds, index) => ({ label: ds.label, data: ds.data, borderColor: colors[index % colors.length], backgroundColor: bgColors[index % bgColors.length], borderWidth: 2, fill: true, tension: 0.1 }));
             chart.update();
         }
 
         document.addEventListener('DOMContentLoaded', function () {
             Chart.register(ChartDataLabels);
 
-            const baseUrl = ""; // Simplificado para ambiente local
+            const baseUrl = "";
             const elements = {
                 monthFilter: document.getElementById('month-filter'),
                 vendedorFilter: document.getElementById('vendedor-filter'),
@@ -334,8 +277,97 @@
                 topProducts: new Chart(document.getElementById('top-produtos-chart'), createChartConfig('Top 10 Produtos', 'bar', { color: chartColors[5], formatterType: 'number' }))
             };
             
-            async function loadDataFromAPI(month, vendedores) { /* ... Lógica da API ... */ }
-            // ... (O restante da lógica de carregamento de dados, upload, etc. permanece o mesmo) ...
+            async function loadDataFromAPI(month, vendedores) {
+                const params = new URLSearchParams();
+                if (month) params.append('month', month);
+                vendedores.forEach(v => params.append('vendedor', v));
+                elements.errorMessage.textContent = 'Carregando...';
+                try {
+                    const response = await fetch(`/api/dados?${params.toString()}`);
+                    const data = await response.json();
+                    if (!response.ok) throw new Error(data.message || 'Falha ao buscar dados.');
+                    updateDashboard(data);
+                    elements.errorMessage.textContent = '';
+                } catch (error) {
+                    elements.errorMessage.textContent = `Erro: ${error.message}`;
+                }
+            }
+
+            function updateDashboard(data) {
+                let isInitialLoad = !elements.vendedorFilter.hasChildNodes();
+                if (isInitialLoad && data.allVendors) {
+                    data.allVendors.forEach(vendedor => {
+                        const option = document.createElement('option');
+                        option.value = option.textContent = vendedor;
+                        elements.vendedorFilter.appendChild(option);
+                    });
+                    
+                    // Seleciona todos os vendedores por padrão na carga inicial
+                    Array.from(elements.vendedorFilter.options).forEach(opt => opt.selected = true);
+                }
+
+                const kpi = data.kpi || {};
+                document.getElementById("kpi-faturamento-total").textContent = formatCurrency(kpi.faturamentoTotal);
+                document.getElementById("kpi-clientes-atendidos").textContent = kpi.totalClientesAtendidos || 0;
+                document.getElementById("kpi-ticket-medio").textContent = formatCurrency(kpi.ticketMedio);
+                document.getElementById("kpi-positivacao").textContent = `${(kpi.positivacaoMedia || 0).toFixed(2)}%`;
+                document.getElementById("kpi-projecao").textContent = formatCurrency(kpi.projecaoFaturamento);
+
+                updateChartData(window.charts.topSellers, data.topSellers.map(d => d.vendedor), data.topSellers.map(d => d.total));
+                updateChartData(window.charts.topManufacturers, data.topManufacturers.map(d => d.fabricante), data.topManufacturers.map(d => d.total));
+                updateChartData(window.charts.positivacao, data.positivacaoPorVendedor.map(d => d.vendedor), data.positivacaoPorVendedor.map(d => d.positivacao));
+                const abbreviatedProductNames = data.topProducts.map(d => abbreviateProductName(d.produto));
+                updateChartData(window.charts.topProducts, abbreviatedProductNames, data.topProducts.map(d => d.total));
+                updateChartData(window.charts.productMix, data.productMix.map(d => d.vendedor), data.productMix.map(d => d.mix));
+                updateChartData(window.charts.focusManufacturers, data.focusManufacturers.map(d => d.fabricante), data.focusManufacturers.map(d => d.total));
+            
+                const goalsContainer = document.getElementById('goals-table-container');
+                goalsContainer.innerHTML = '';
+                if (data.salesGoals) {
+                    let tableHTML = `<table class="goals-table"><thead><tr><th>Vendedor</th><th>Meta</th><th>Faturamento Atual</th><th>% Atingido</th><th>Projeção</th><th>Venda Diária Necessária</th></tr></thead><tbody>`;
+                    data.salesGoals.forEach(goal => {
+                        const percent = Math.min(goal.percentual, 100);
+                        const percentClass = goal.percentual >= 100 ? 'percent-green' : 'percent-red';
+                        tableHTML += `<tr><td class="vendedor">${goal.vendedor}</td><td class="meta-valor">${formatCurrency(goal.meta)}</td><td class="faturamento-valor">${formatCurrency(goal.atual)}</td><td class="atingido"><span class="${percentClass}">${goal.percentual.toFixed(1)}%</span><div class="percentage-bar"><div class="percentage-fill" style="width: ${percent.toFixed(1)}%;"></div></div></td><td class="projecao">${formatCurrency(goal.projecao)}</td><td class="venda-diaria">${formatCurrency(goal.venda_diaria)}</td></tr>`;
+                    });
+                    goalsContainer.innerHTML = tableHTML + `</tbody></table>`;
+                }
+            }
+
+            async function loadCumulativeData() {
+                if (!elements.compareMonth1.value || !elements.compareMonth2.value) return;
+                const params = new URLSearchParams({ meses: elements.compareMonth1.value, meses: elements.compareMonth2.value });
+                try {
+                    const response = await fetch(`/api/dados-cumulativos?${params.toString()}`);
+                    const data = await response.json();
+                    if (!response.ok) throw new Error(data.message || 'Falha.');
+                    updateMultiLineChart(window.charts.cumulativeComparison, data.labels, data.datasets);
+                } catch (error) { console.error("Erro no gráfico cumulativo:", error); }
+            }
+            
+            function setInitialFilters() {
+                const now = new Date();
+                const formatAsYYYYMM = date => `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}`;
+                elements.monthFilter.value = formatAsYYYYMM(now);
+                elements.compareMonth1.value = formatAsYYYYMM(new Date(now.getFullYear(), now.getMonth() - 1, 1));
+                elements.compareMonth2.value = formatAsYYYYMM(now);
+            }
+
+            function getSelectedVendors() { return Array.from(elements.vendedorFilter.selectedOptions).map(o => o.value); }
+            function handleFilterChange() { loadDataFromAPI(elements.monthFilter.value, getSelectedVendors()); }
+            
+            elements.monthFilter.addEventListener('input', handleFilterChange);
+            elements.vendedorFilter.addEventListener('change', handleFilterChange);
+            elements.compareMonth1.addEventListener('change', loadCumulativeData);
+            elements.compareMonth2.addEventListener('change', loadCumulativeData);
+            elements.menuToggle.addEventListener('click', () => elements.sidebar.classList.toggle('open'));
+            
+            // Lógica de Upload
+            const checkFiles = () => { elements.processButton.disabled = !(elements.salesFileInput.files.length > 0 && elements.portfolioFileInput.files.length > 0); };
+            elements.salesFileInput.addEventListener('change', checkFiles);
+            elements.portfolioFileInput.addEventListener('change', checkFiles);
+            elements.clearButton.addEventListener('click', async () => { /* ... */ });
+            elements.processButton.addEventListener('click', async () => { /* ... */ });
 
             const modal = document.getElementById('chartModal');
             const modalBody = modal.querySelector('.modal-body');
@@ -357,49 +389,32 @@
                     const dataCopy = JSON.parse(JSON.stringify(origConfig.data));
                     const optionsCopy = JSON.parse(JSON.stringify(origConfig.options));
                     const formatterType = origConfig.options.customFormatterType || 'number';
-                    
                     const isMobile = window.innerWidth <= 768;
                     const chartType = origConfig.type;
                     
-                    // --- AJUSTE INTELIGENTE PARA CELULAR ---
                     if (isMobile && chartType === 'bar') {
-                        // Converte para gráfico de barras horizontal
                         optionsCopy.indexAxis = 'y'; 
-                        
-                        // Ajusta posição dos rótulos de dados
                         optionsCopy.plugins.datalabels.align = 'right';
                         optionsCopy.plugins.datalabels.anchor = 'end';
                         optionsCopy.plugins.datalabels.font.size = 12;
-
-                        // Inverte as cores dos eixos para o modo horizontal
                         optionsCopy.scales.x = optionsCopy.scales.x || {};
                         optionsCopy.scales.y = optionsCopy.scales.y || {};
                         optionsCopy.scales.x.ticks = optionsCopy.scales.x.ticks || {};
                         optionsCopy.scales.y.ticks = optionsCopy.scales.y.ticks || {};
-                        
-                        optionsCopy.scales.x.ticks.color = '#a0aec0'; // Eixo de valores (X) fica cinza
-                        optionsCopy.scales.y.ticks.color = '#FFD700'; // Eixo de nomes (Y) fica amarelo
+                        optionsCopy.scales.x.ticks.color = '#a0aec0';
+                        optionsCopy.scales.y.ticks.color = '#FFD700';
                     } else {
-                        // Mantém o estilo padrão para desktop
                         optionsCopy.scales = optionsCopy.scales || {};
                         optionsCopy.scales.x = optionsCopy.scales.x || {};
                         optionsCopy.scales.y = optionsCopy.scales.y || {};
                         optionsCopy.scales.x.ticks = optionsCopy.scales.x.ticks || {};
                         optionsCopy.scales.y.ticks = optionsCopy.scales.y.ticks || {};
-                        
-                        optionsCopy.scales.x.ticks.color = '#FFD700'; // Eixo de nomes (X) fica amarelo
-                        optionsCopy.scales.y.ticks.color = '#a0aec0'; // Eixo de valores (Y) fica cinza
+                        optionsCopy.scales.x.ticks.color = '#FFD700';
+                        optionsCopy.scales.y.ticks.color = '#a0aec0';
                     }
 
                     let formatterFunction = (formatterType === 'percentage') ? formatPercentage : formatNumber;
-                    
-                    optionsCopy.plugins.datalabels = {
-                        ...optionsCopy.plugins.datalabels,
-                        formatter: formatterFunction,
-                        display: true,
-                        color: '#FFD700', 
-                        font: { ...optionsCopy.plugins.datalabels.font, weight: 'bold' }
-                    };
+                    optionsCopy.plugins.datalabels = { ...optionsCopy.plugins.datalabels, formatter: formatterFunction, display: true, color: '#FFD700', font: { ...optionsCopy.plugins.datalabels.font, weight: 'bold' } };
 
                     modalChartInstance = new Chart(ctx, {
                         type: origConfig.type,
@@ -407,7 +422,6 @@
                         options: optionsCopy,
                         plugins: [ChartDataLabels]
                     });
-
                     modalChartTitle.textContent = optionsCopy.plugins.title.text;
                     modal.classList.add('visible');
                 });
@@ -420,11 +434,10 @@
             closeModalBtn.addEventListener('click', closeModal);
             modal.addEventListener('click', e => { if (e.target === modal) closeModal(); });
 
-            // ... (O restante do código, como setInitialFilters, etc., permanece o mesmo) ...
-            // Para simplificação, a lógica de fetch e upload foi omitida, mas deve ser mantida como estava.
-            // setInitialFilters(); 
-            // loadDataFromAPI(elements.monthFilter.value, []); 
-            // loadCumulativeData();
+            // --- ESTA É A PARTE CORRIGIDA ---
+            setInitialFilters();
+            loadDataFromAPI(elements.monthFilter.value, []);
+            loadCumulativeData();
         });
     </script>
 </body>
