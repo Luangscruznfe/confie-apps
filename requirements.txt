@@ -9,6 +9,9 @@ psycopg2-binary==2.9.9
 pandas==2.2.2
 openpyxl==3.1.5
 
+# Upload e Nuvem
+cloudinary==1.41.0
+
 # Utilidades
 python-dateutil==2.9.0.post0
 python-dotenv==1.0.1
