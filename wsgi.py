@@ -1,3 +1,10 @@
+# =======================================================
+# ALTERAÇÃO AQUI: Adicione estas duas linhas no topo
+# =======================================================
+from dotenv import load_dotenv
+load_dotenv()
+# =======================================================
+
 from flask import Flask
 from werkzeug.middleware.dispatcher import DispatcherMiddleware
 
