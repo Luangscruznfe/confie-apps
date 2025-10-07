@@ -12,6 +12,10 @@ openpyxl==3.1.5
 # Upload e Nuvem
 cloudinary==1.41.0
 
+# PDF e Requisições Web
+PyMuPDF==1.24.1
+requests==2.32.3
+
 # Utilidades
 python-dateutil==2.9.0.post0
 python-dotenv==1.0.1
