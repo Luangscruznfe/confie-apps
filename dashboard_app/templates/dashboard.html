@@ -76,6 +76,30 @@
         .modal-close-btn { background: none; border: none; font-size: 2rem; cursor: pointer; color: #a0aec0; line-height: 1; }
         .modal-body { flex-grow: 1; position: relative; }
         .modal-body canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+
+        /* --- INÍCIO DAS REGRAS PARA CELULAR (DESIGN RESPONSIVO) --- */
+        @media (max-width: 768px) {
+            .container {
+                margin-top: 1rem;
+                padding: 0 0.75rem;
+            }
+            h1 { font-size: 1.5rem; }
+            .section-title { font-size: 1.25rem; }
+            
+            .kpi-grid, .filters, .chart-grid {
+                grid-template-columns: 1fr; /* Força uma única coluna */
+            }
+            .kpi-card { padding: 1rem; }
+            .kpi-icon { font-size: 1.5rem; padding: 0.8rem; margin-right: 0.8rem; }
+            .kpi-text p { font-size: 1.1rem; }
+
+            .modal-content {
+                height: 90vh;
+                padding: 1rem;
+            }
+            .modal-title { font-size: 1rem; }
+        }
+        /* --- FIM DAS REGRAS PARA CELULAR --- */
     </style>
 </head>
 <body>
@@ -159,7 +183,11 @@
         <div class="form-group"><label for="sales-file">Ficheiro de Vendas (.xlsx, .csv)</label><input type="file" id="sales-file" accept=".xlsx, .csv"></div>
         <div class="form-group"><label for="portfolio-file">Ficheiro da Carteira (.csv)</label><input type="file" id="portfolio-file" accept=".csv"></div>
         
-           
+        <div class="form-group" style="display: none; align-items: center; margin-top: 1rem; user-select: none;">
+            <input type="checkbox" id="replace-data-checkbox" checked>
+            <label for="replace-data-checkbox">Substituir dados existentes</label>
+        </div>
+        
         <button id="process-button" class="btn-process" disabled>Processar e Salvar</button>
         <div id="status-message" style="margin-top: 1rem; text-align: center;"></div>
         <button id="clear-button" class="btn-clear">Limpar Dados do Servidor</button>
@@ -176,107 +204,32 @@
     </div>
 
     <script>
-        // --- FUNÇÕES DE FORMATAÇÃO ---
+        // --- FUNÇÕES DE FORMATAÇÃO E AJUDA ---
         function formatCurrency(value) { return (Number(value) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }); }
-        
         function formatNumber(value) {
             value = Number(value) || 0;
             if (Math.abs(value) >= 1000000) return (value / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
             if (Math.abs(value) >= 1000) return (value / 1000).toFixed(1).replace(/\.0$/, '') + 'K';
             return value.toLocaleString('pt-BR');
         }
-
-        function formatPercentage(value) {
-            return `${(Number(value) || 0).toFixed(1)}%`;
-        }
-        
-        // --- NOVA FUNÇÃO PARA ABREVIAR NOMES DE PRODUTOS ---
+        function formatPercentage(value) { return `${(Number(value) || 0).toFixed(1)}%`; }
         function abbreviateProductName(name) {
             const MAX_LENGTH = 22;
-            const wordMap = {
-                'PANETTONE': 'PANET', 'CHOCOLATE': 'CHOC', 'SUFLAIR': 'SUFL',
-                'TAMPICO': 'TAMP', 'LINDOYA': 'LIND', 'PIMENTA': 'PIM',
-                'MEXICANA': 'MEX', 'FOFURA': 'FOF', 'TORCIDA': 'TORC',
-                'BATON': 'BTN', 'FRUTAS': 'FRT', 'AO LEITE': ''
-            };
-
+            const wordMap = { 'PANETTONE': 'PANET', 'CHOCOLATE': 'CHOC', 'SUFLAIR': 'SUFL', 'TAMPICO': 'TAMP', 'LINDOYA': 'LIND', 'PIMENTA': 'PIM', 'MEXICANA': 'MEX', 'FOFURA': 'FOF', 'TORCIDA': 'TORC', 'BATON': 'BTN', 'FRUTAS': 'FRT', 'AO LEITE': '' };
             let processedName = name.toUpperCase();
-            for (const key in wordMap) {
-                processedName = processedName.replace(new RegExp(key, 'g'), wordMap[key]);
-            }
-            
+            for (const key in wordMap) { processedName = processedName.replace(new RegExp(key, 'g'), wordMap[key]); }
             processedName = processedName.replace(/\s+/g, ' ').trim();
-
-            if (processedName.length > MAX_LENGTH) {
-                return processedName.substring(0, MAX_LENGTH) + '...';
-            }
+            if (processedName.length > MAX_LENGTH) { return processedName.substring(0, MAX_LENGTH) + '...'; }
             return processedName;
         }
 
-        // --- PALETA DE CORES PARA OS GRÁFICOS ---
-        const chartColors = [
-            { background: 'rgba(94, 114, 228, 0.8)', border: 'rgba(94, 114, 228, 1)' },    // Azul
-            { background: 'rgba(245, 54, 92, 0.8)', border: 'rgba(245, 54, 92, 1)' },     // Rosa
-            { background: 'rgba(45, 206, 137, 0.8)', border: 'rgba(45, 206, 137, 1)' },    // Verde
-            { background: 'rgba(251, 99, 64, 0.8)', border: 'rgba(251, 99, 64, 1)' },     // Laranja
-            { background: 'rgba(17, 205, 239, 0.8)', border: 'rgba(17, 205, 239, 1)' },    // Ciano
-            { background: 'rgba(137, 101, 224, 0.8)', border: 'rgba(137, 101, 224, 1)' }  // Roxo
-        ];
+        const chartColors = [ { background: 'rgba(94, 114, 228, 0.8)', border: 'rgba(94, 114, 228, 1)' }, { background: 'rgba(245, 54, 92, 0.8)', border: 'rgba(245, 54, 92, 1)' }, { background: 'rgba(45, 206, 137, 0.8)', border: 'rgba(45, 206, 137, 1)' }, { background: 'rgba(251, 99, 64, 0.8)', border: 'rgba(251, 99, 64, 1)' }, { background: 'rgba(17, 205, 239, 0.8)', border: 'rgba(17, 205, 239, 1)' }, { background: 'rgba(137, 101, 224, 0.8)', border: 'rgba(137, 101, 224, 1)' } ];
 
-        // --- FUNÇÃO PARA CRIAR CONFIGURAÇÃO DE GRÁFICO ---
         function createChartConfig(title, type, options = {}) {
-            const { 
-                isMultiAxis = false, 
-                color = chartColors[0], 
-                formatterType = 'number' 
-            } = options;
-            
+            const { isMultiAxis = false, color = chartColors[0], formatterType = 'number' } = options;
             const isLine = type === 'line';
-            let formatterFunction;
-            if (formatterType === 'percentage') {
-                formatterFunction = formatPercentage;
-            } else {
-                formatterFunction = formatNumber;
-            }
-
-            const config = {
-                type: type,
-                data: { 
-                    labels: [], 
-                    datasets: isMultiAxis ? [] : [{ 
-                        label: title, 
-                        data: [], 
-                        backgroundColor: isLine ? color.background.replace('0.8', '0.2') : color.background, 
-                        borderColor: color.border, 
-                        borderWidth: 2, 
-                        fill: isLine, 
-                        tension: 0.1 
-                    }] 
-                },
-                options: {
-                    responsive: true, maintainAspectRatio: false,
-                    customFormatterType: formatterType, 
-                    plugins: {
-                        legend: { display: isMultiAxis, position: 'top' },
-                        title: { display: true, text: title, font: { size: 16 }, padding: { bottom: 20 } },
-                        datalabels: {
-                           display: !isLine, 
-                           anchor: 'end',
-                           align: 'top',
-                           color: '#555', 
-                           font: { weight: 'bold' }, 
-                           formatter: formatterFunction
-                        }
-                    },
-                    scales: { 
-                        y: { 
-                            ticks: { 
-                                callback: value => formatNumber(value) 
-                            } 
-                        } 
-                    }
-                }
-            };
+            let formatterFunction = (formatterType === 'percentage') ? formatPercentage : formatNumber;
+            const config = { type: type, data: { labels: [], datasets: isMultiAxis ? [] : [{ label: title, data: [], backgroundColor: isLine ? color.background.replace('0.8', '0.2') : color.background, borderColor: color.border, borderWidth: 2, fill: isLine, tension: 0.1 }] }, options: { responsive: true, maintainAspectRatio: false, customFormatterType: formatterType, plugins: { legend: { display: isMultiAxis, position: 'top' }, title: { display: true, text: title, font: { size: 16 }, padding: { bottom: 20 } }, datalabels: { display: !isLine, anchor: 'end', align: 'top', color: '#555', font: { weight: 'bold' }, formatter: formatterFunction } }, scales: { y: { ticks: { callback: value => formatNumber(value) } } } } };
             return config;
         }
         
@@ -292,19 +245,14 @@
             const colors = ['rgba(94, 114, 228, 1)', 'rgba(245, 54, 92, 1)', 'rgba(45, 206, 137, 1)'];
             const bgColors = ['rgba(94, 114, 228, 0.2)', 'rgba(245, 54, 92, 0.2)', 'rgba(45, 206, 137, 0.2)'];
             chart.data.labels = labels;
-            chart.data.datasets = datasets.map((ds, index) => ({
-                label: ds.label, data: ds.data,
-                borderColor: colors[index % colors.length],
-                backgroundColor: bgColors[index % bgColors.length],
-                borderWidth: 2, fill: true, tension: 0.1
-            }));
+            chart.data.datasets = datasets.map((ds, index) => ({ label: ds.label, data: ds.data, borderColor: colors[index % colors.length], backgroundColor: bgColors[index % bgColors.length], borderWidth: 2, fill: true, tension: 0.1 }));
             chart.update();
         }
 
         document.addEventListener('DOMContentLoaded', function () {
             Chart.register(ChartDataLabels);
 
-            const baseUrl = window.location.pathname.startsWith("/dashboard") ? "/dashboard" : "";
+            const baseUrl = "/dashboard";
             const elements = {
                 monthFilter: document.getElementById('month-filter'),
                 vendedorFilter: document.getElementById('vendedor-filter'),
@@ -316,7 +264,6 @@
                 processButton: document.getElementById('process-button'),
                 salesFileInput: document.getElementById('sales-file'),
                 portfolioFileInput: document.getElementById('portfolio-file'),
-                replaceDataCheckbox: document.getElementById('replace-data-checkbox'),
                 statusMessage: document.getElementById('status-message'),
                 clearButton: document.getElementById('clear-button')
             };
@@ -373,7 +320,6 @@
                 updateChartData(window.charts.topManufacturers, data.topManufacturers.map(d => d.fabricante), data.topManufacturers.map(d => d.total));
                 updateChartData(window.charts.positivacao, data.positivacaoPorVendedor.map(d => d.vendedor), data.positivacaoPorVendedor.map(d => d.positivacao));
                 
-                // --- APLICAÇÃO DA ABREVIAÇÃO ---
                 const abbreviatedProductNames = data.topProducts.map(d => abbreviateProductName(d.produto));
                 updateChartData(window.charts.topProducts, abbreviatedProductNames, data.topProducts.map(d => d.total));
                 
@@ -446,7 +392,8 @@
                 const formData = new FormData();
                 formData.append("salesFile", elements.salesFileInput.files[0]);
                 formData.append("portfolioFile", elements.portfolioFileInput.files[0]);
-                formData.append("replaceData", elements.replaceDataCheckbox.checked);
+                const replaceDataCheckbox = document.getElementById('replace-data-checkbox');
+                formData.append("replaceData", replaceDataCheckbox ? replaceDataCheckbox.checked : 'true');
                 elements.statusMessage.textContent = "Processando...";
                 try {
                     const res = await fetch(`${baseUrl}/api/upload/vendas`, { method: "POST", body: formData });
@@ -486,6 +433,24 @@
 
                     const formatterType = origConfig.options.customFormatterType || 'number';
                     
+                    const isMobile = window.innerWidth <= 768;
+                    const chartType = origConfig.type;
+
+                    if (isMobile && chartType === 'bar') {
+                        optionsCopy.indexAxis = 'y';
+                        
+                        optionsCopy.plugins.datalabels.align = 'right';
+                        optionsCopy.plugins.datalabels.anchor = 'end';
+                        optionsCopy.plugins.datalabels.font = { size: 12, weight: 'bold' };
+                        
+                        optionsCopy.scales.x.ticks.color = '#a0aec0';
+                        optionsCopy.scales.y.ticks.color = '#FFD700';
+
+                    } else {
+                        optionsCopy.scales.x.ticks.color = '#FFD700'; 
+                        optionsCopy.scales.y.ticks.color = '#a0aec0'; 
+                    }
+                    
                     let formatterFunction;
                     if (formatterType === 'percentage') {
                         formatterFunction = formatPercentage;
@@ -498,17 +463,8 @@
                         formatter: formatterFunction,
                         display: true,
                         color: '#FFD700', 
-                        font: { size: 14, weight: 'bold' }
+                        font: { ...optionsCopy.plugins.datalabels.font, weight: 'bold' }
                     };
-
-                    optionsCopy.scales = optionsCopy.scales || {};
-                    optionsCopy.scales.x = optionsCopy.scales.x || {};
-                    optionsCopy.scales.y = optionsCopy.scales.y || {};
-                    optionsCopy.scales.x.ticks = optionsCopy.scales.x.ticks || {};
-                    optionsCopy.scales.y.ticks = optionsCopy.scales.y.ticks || {};
-
-                    optionsCopy.scales.x.ticks.color = '#FFD700'; 
-                    optionsCopy.scales.y.ticks.color = '#a0aec0'; 
 
                     modalChartInstance = new Chart(ctx, {
                         type: origConfig.type,
