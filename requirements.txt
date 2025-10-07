@@ -1,31 +1,14 @@
-# Servidor e framework
+# Framework e Servidor
 Flask==3.0.3
 gunicorn==22.0.0
-Werkzeug==3.0.3
-Jinja2==3.1.4
-itsdangerous==2.2.0
-click==8.1.7
 
-# Banco de dados
+# Banco de Dados
 psycopg2-binary==2.9.9
 
-# Upload e nuvem
-cloudinary==1.41.0
-
-# PDF e relatórios
-PyMuPDF==1.25.5
+# Análise de Dados
 pandas==2.2.2
 openpyxl==3.1.5
 
 # Utilidades
 python-dateutil==2.9.0.post0
-
-requests==2.32.3
-
-# Dependências para o Dashboard
-Flask
-pandas
-plotly
-openpyxl
-
-rapidfuzz==3.5.2
+python-dotenv==1.0.1
