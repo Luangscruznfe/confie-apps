@@ -20,10 +20,9 @@
         }
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: 'Poppins', sans-serif; background-color: var(--secondary-color); color: var(--text-color); line-height: 1.5; }
-        .container { max-width: 1600px; margin: 2rem auto; padding: 0 1.5rem; }
+        .container { max-width: 1600px; margin: 2rem auto; padding: 0 1rem; }
         header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; }
-        h1 { font-size: 1.8rem; }
-        .section-title { font-size: 1.5rem; font-weight: 600; margin-bottom: 1rem; }
+        h1, .section-title { font-size: 1.5rem; font-weight: 600; margin-bottom: 1rem; }
         .menu-toggle { display: block; cursor: pointer; font-size: 1.5rem; background: none; border: none; color: var(--text-color); }
         .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1.5rem; margin-bottom: 2rem; }
         .kpi-card { background-color: var(--card-bg); border-radius: var(--border-radius); box-shadow: var(--shadow); padding: 1.5rem; display: flex; align-items: center; }
@@ -77,28 +76,6 @@
         .modal-close-btn { background: none; border: none; font-size: 2rem; cursor: pointer; color: #a0aec0; line-height: 1; }
         .modal-body { flex-grow: 1; position: relative; }
         .modal-body canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
-
-        @media (max-width: 768px) {
-            .container {
-                margin-top: 1rem;
-                padding: 0 0.75rem;
-            }
-            h1 { font-size: 1.5rem; }
-            .section-title { font-size: 1.25rem; }
-            
-            .kpi-grid, .filters, .chart-grid {
-                grid-template-columns: 1fr;
-            }
-            .kpi-card { padding: 1rem; }
-            .kpi-icon { font-size: 1.5rem; padding: 0.8rem; margin-right: 0.8rem; }
-            .kpi-text p { font-size: 1.1rem; }
-
-            .modal-content {
-                height: 90vh;
-                padding: 1rem;
-            }
-            .modal-title { font-size: 1rem; }
-        }
     </style>
 </head>
 <body>
@@ -182,11 +159,7 @@
         <div class="form-group"><label for="sales-file">Ficheiro de Vendas (.xlsx, .csv)</label><input type="file" id="sales-file" accept=".xlsx, .csv"></div>
         <div class="form-group"><label for="portfolio-file">Ficheiro da Carteira (.csv)</label><input type="file" id="portfolio-file" accept=".csv"></div>
         
-        <div class="form-group" style="display: none; align-items: center; margin-top: 1rem; user-select: none;">
-            <input type="checkbox" id="replace-data-checkbox" checked>
-            <label for="replace-data-checkbox">Substituir dados existentes</label>
-        </div>
-        
+           
         <button id="process-button" class="btn-process" disabled>Processar e Salvar</button>
         <div id="status-message" style="margin-top: 1rem; text-align: center;"></div>
         <button id="clear-button" class="btn-clear">Limpar Dados do Servidor</button>
@@ -203,32 +176,107 @@
     </div>
 
     <script>
-        // --- FUNÇÕES DE FORMATAÇÃO E AJUDA ---
+        // --- FUNÇÕES DE FORMATAÇÃO ---
         function formatCurrency(value) { return (Number(value) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }); }
+        
         function formatNumber(value) {
             value = Number(value) || 0;
             if (Math.abs(value) >= 1000000) return (value / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
             if (Math.abs(value) >= 1000) return (value / 1000).toFixed(1).replace(/\.0$/, '') + 'K';
             return value.toLocaleString('pt-BR');
         }
-        function formatPercentage(value) { return `${(Number(value) || 0).toFixed(1)}%`; }
+
+        function formatPercentage(value) {
+            return `${(Number(value) || 0).toFixed(1)}%`;
+        }
+        
+        // --- NOVA FUNÇÃO PARA ABREVIAR NOMES DE PRODUTOS ---
         function abbreviateProductName(name) {
             const MAX_LENGTH = 22;
-            const wordMap = { 'PANETTONE': 'PANET', 'CHOCOLATE': 'CHOC', 'SUFLAIR': 'SUFL', 'TAMPICO': 'TAMP', 'LINDOYA': 'LIND', 'PIMENTA': 'PIM', 'MEXICANA': 'MEX', 'FOFURA': 'FOF', 'TORCIDA': 'TORC', 'BATON': 'BTN', 'FRUTAS': 'FRT', 'AO LEITE': '' };
+            const wordMap = {
+                'PANETTONE': 'PANET', 'CHOCOLATE': 'CHOC', 'SUFLAIR': 'SUFL',
+                'TAMPICO': 'TAMP', 'LINDOYA': 'LIND', 'PIMENTA': 'PIM',
+                'MEXICANA': 'MEX', 'FOFURA': 'FOF', 'TORCIDA': 'TORC',
+                'BATON': 'BTN', 'FRUTAS': 'FRT', 'AO LEITE': ''
+            };
+
             let processedName = name.toUpperCase();
-            for (const key in wordMap) { processedName = processedName.replace(new RegExp(key, 'g'), wordMap[key]); }
+            for (const key in wordMap) {
+                processedName = processedName.replace(new RegExp(key, 'g'), wordMap[key]);
+            }
+            
             processedName = processedName.replace(/\s+/g, ' ').trim();
-            if (processedName.length > MAX_LENGTH) { return processedName.substring(0, MAX_LENGTH) + '...'; }
+
+            if (processedName.length > MAX_LENGTH) {
+                return processedName.substring(0, MAX_LENGTH) + '...';
+            }
             return processedName;
         }
 
-        const chartColors = [ { background: 'rgba(94, 114, 228, 0.8)', border: 'rgba(94, 114, 228, 1)' }, { background: 'rgba(245, 54, 92, 0.8)', border: 'rgba(245, 54, 92, 1)' }, { background: 'rgba(45, 206, 137, 0.8)', border: 'rgba(45, 206, 137, 1)' }, { background: 'rgba(251, 99, 64, 0.8)', border: 'rgba(251, 99, 64, 1)' }, { background: 'rgba(17, 205, 239, 0.8)', border: 'rgba(17, 205, 239, 1)' }, { background: 'rgba(137, 101, 224, 0.8)', border: 'rgba(137, 101, 224, 1)' } ];
+        // --- PALETA DE CORES PARA OS GRÁFICOS ---
+        const chartColors = [
+            { background: 'rgba(94, 114, 228, 0.8)', border: 'rgba(94, 114, 228, 1)' },    // Azul
+            { background: 'rgba(245, 54, 92, 0.8)', border: 'rgba(245, 54, 92, 1)' },     // Rosa
+            { background: 'rgba(45, 206, 137, 0.8)', border: 'rgba(45, 206, 137, 1)' },    // Verde
+            { background: 'rgba(251, 99, 64, 0.8)', border: 'rgba(251, 99, 64, 1)' },     // Laranja
+            { background: 'rgba(17, 205, 239, 0.8)', border: 'rgba(17, 205, 239, 1)' },    // Ciano
+            { background: 'rgba(137, 101, 224, 0.8)', border: 'rgba(137, 101, 224, 1)' }  // Roxo
+        ];
 
+        // --- FUNÇÃO PARA CRIAR CONFIGURAÇÃO DE GRÁFICO ---
         function createChartConfig(title, type, options = {}) {
-            const { isMultiAxis = false, color = chartColors[0], formatterType = 'number' } = options;
+            const { 
+                isMultiAxis = false, 
+                color = chartColors[0], 
+                formatterType = 'number' 
+            } = options;
+            
             const isLine = type === 'line';
-            let formatterFunction = (formatterType === 'percentage') ? formatPercentage : formatNumber;
-            const config = { type: type, data: { labels: [], datasets: isMultiAxis ? [] : [{ label: title, data: [], backgroundColor: isLine ? color.background.replace('0.8', '0.2') : color.background, borderColor: color.border, borderWidth: 2, fill: isLine, tension: 0.1 }] }, options: { responsive: true, maintainAspectRatio: false, customFormatterType: formatterType, plugins: { legend: { display: isMultiAxis, position: 'top' }, title: { display: true, text: title, font: { size: 16 }, padding: { bottom: 20 } }, datalabels: { display: !isLine, anchor: 'end', align: 'top', color: '#555', font: { weight: 'bold' }, formatter: formatterFunction } }, scales: { y: { ticks: { callback: value => formatNumber(value) } } } } };
+            let formatterFunction;
+            if (formatterType === 'percentage') {
+                formatterFunction = formatPercentage;
+            } else {
+                formatterFunction = formatNumber;
+            }
+
+            const config = {
+                type: type,
+                data: { 
+                    labels: [], 
+                    datasets: isMultiAxis ? [] : [{ 
+                        label: title, 
+                        data: [], 
+                        backgroundColor: isLine ? color.background.replace('0.8', '0.2') : color.background, 
+                        borderColor: color.border, 
+                        borderWidth: 2, 
+                        fill: isLine, 
+                        tension: 0.1 
+                    }] 
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    customFormatterType: formatterType, 
+                    plugins: {
+                        legend: { display: isMultiAxis, position: 'top' },
+                        title: { display: true, text: title, font: { size: 16 }, padding: { bottom: 20 } },
+                        datalabels: {
+                           display: !isLine, 
+                           anchor: 'end',
+                           align: 'top',
+                           color: '#555', 
+                           font: { weight: 'bold' }, 
+                           formatter: formatterFunction
+                        }
+                    },
+                    scales: { 
+                        y: { 
+                            ticks: { 
+                                callback: value => formatNumber(value) 
+                            } 
+                        } 
+                    }
+                }
+            };
             return config;
         }
         
@@ -244,14 +292,19 @@
             const colors = ['rgba(94, 114, 228, 1)', 'rgba(245, 54, 92, 1)', 'rgba(45, 206, 137, 1)'];
             const bgColors = ['rgba(94, 114, 228, 0.2)', 'rgba(245, 54, 92, 0.2)', 'rgba(45, 206, 137, 0.2)'];
             chart.data.labels = labels;
-            chart.data.datasets = datasets.map((ds, index) => ({ label: ds.label, data: ds.data, borderColor: colors[index % colors.length], backgroundColor: bgColors[index % bgColors.length], borderWidth: 2, fill: true, tension: 0.1 }));
+            chart.data.datasets = datasets.map((ds, index) => ({
+                label: ds.label, data: ds.data,
+                borderColor: colors[index % colors.length],
+                backgroundColor: bgColors[index % bgColors.length],
+                borderWidth: 2, fill: true, tension: 0.1
+            }));
             chart.update();
         }
 
         document.addEventListener('DOMContentLoaded', function () {
             Chart.register(ChartDataLabels);
 
-            const baseUrl = "";
+            const baseUrl = window.location.pathname.startsWith("/dashboard") ? "/dashboard" : "";
             const elements = {
                 monthFilter: document.getElementById('month-filter'),
                 vendedorFilter: document.getElementById('vendedor-filter'),
@@ -263,6 +316,7 @@
                 processButton: document.getElementById('process-button'),
                 salesFileInput: document.getElementById('sales-file'),
                 portfolioFileInput: document.getElementById('portfolio-file'),
+                replaceDataCheckbox: document.getElementById('replace-data-checkbox'),
                 statusMessage: document.getElementById('status-message'),
                 clearButton: document.getElementById('clear-button')
             };
@@ -283,7 +337,7 @@
                 vendedores.forEach(v => params.append('vendedor', v));
                 elements.errorMessage.textContent = 'Carregando...';
                 try {
-                    const response = await fetch(`/api/dados?${params.toString()}`);
+                    const response = await fetch(`${baseUrl}/api/dados?${params.toString()}`);
                     const data = await response.json();
                     if (!response.ok) throw new Error(data.message || 'Falha ao buscar dados.');
                     updateDashboard(data);
@@ -293,17 +347,19 @@
                 }
             }
 
+            let isInitialLoad = true;
             function updateDashboard(data) {
-                let isInitialLoad = !elements.vendedorFilter.hasChildNodes();
                 if (isInitialLoad && data.allVendors) {
+                    elements.vendedorFilter.innerHTML = '';
                     data.allVendors.forEach(vendedor => {
                         const option = document.createElement('option');
                         option.value = option.textContent = vendedor;
+                        if (data.selectedVendors && data.selectedVendors.includes(vendedor)) {
+                            option.selected = true;
+                        }
                         elements.vendedorFilter.appendChild(option);
                     });
-                    
-                    // Seleciona todos os vendedores por padrão na carga inicial
-                    Array.from(elements.vendedorFilter.options).forEach(opt => opt.selected = true);
+                    isInitialLoad = false;
                 }
 
                 const kpi = data.kpi || {};
@@ -316,8 +372,11 @@
                 updateChartData(window.charts.topSellers, data.topSellers.map(d => d.vendedor), data.topSellers.map(d => d.total));
                 updateChartData(window.charts.topManufacturers, data.topManufacturers.map(d => d.fabricante), data.topManufacturers.map(d => d.total));
                 updateChartData(window.charts.positivacao, data.positivacaoPorVendedor.map(d => d.vendedor), data.positivacaoPorVendedor.map(d => d.positivacao));
+                
+                // --- APLICAÇÃO DA ABREVIAÇÃO ---
                 const abbreviatedProductNames = data.topProducts.map(d => abbreviateProductName(d.produto));
                 updateChartData(window.charts.topProducts, abbreviatedProductNames, data.topProducts.map(d => d.total));
+                
                 updateChartData(window.charts.productMix, data.productMix.map(d => d.vendedor), data.productMix.map(d => d.mix));
                 updateChartData(window.charts.focusManufacturers, data.focusManufacturers.map(d => d.fabricante), data.focusManufacturers.map(d => d.total));
             
@@ -328,7 +387,15 @@
                     data.salesGoals.forEach(goal => {
                         const percent = Math.min(goal.percentual, 100);
                         const percentClass = goal.percentual >= 100 ? 'percent-green' : 'percent-red';
-                        tableHTML += `<tr><td class="vendedor">${goal.vendedor}</td><td class="meta-valor">${formatCurrency(goal.meta)}</td><td class="faturamento-valor">${formatCurrency(goal.atual)}</td><td class="atingido"><span class="${percentClass}">${goal.percentual.toFixed(1)}%</span><div class="percentage-bar"><div class="percentage-fill" style="width: ${percent.toFixed(1)}%;"></div></div></td><td class="projecao">${formatCurrency(goal.projecao)}</td><td class="venda-diaria">${formatCurrency(goal.venda_diaria)}</td></tr>`;
+                        tableHTML += `
+                            <tr>
+                                <td class="vendedor">${goal.vendedor}</td>
+                                <td class="meta-valor">${formatCurrency(goal.meta)}</td>
+                                <td class="faturamento-valor">${formatCurrency(goal.atual)}</td>
+                                <td class="atingido"><span class="${percentClass}">${goal.percentual.toFixed(1)}%</span><div class="percentage-bar"><div class="percentage-fill" style="width: ${percent.toFixed(1)}%;"></div></div></td>
+                                <td class="projecao">${formatCurrency(goal.projecao)}</td>
+                                <td class="venda-diaria">${formatCurrency(goal.venda_diaria)}</td>
+                            </tr>`;
                     });
                     goalsContainer.innerHTML = tableHTML + `</tbody></table>`;
                 }
@@ -336,23 +403,59 @@
 
             async function loadCumulativeData() {
                 if (!elements.compareMonth1.value || !elements.compareMonth2.value) return;
-                const params = new URLSearchParams({ meses: elements.compareMonth1.value, meses: elements.compareMonth2.value });
+                const params = new URLSearchParams();
+                params.append('meses', elements.compareMonth1.value);
+                params.append('meses', elements.compareMonth2.value);
                 try {
-                    const response = await fetch(`/api/dados-cumulativos?${params.toString()}`);
+                    const response = await fetch(`${baseUrl}/api/dados-cumulativos?${params.toString()}`);
                     const data = await response.json();
                     if (!response.ok) throw new Error(data.message || 'Falha.');
                     updateMultiLineChart(window.charts.cumulativeComparison, data.labels, data.datasets);
                 } catch (error) { console.error("Erro no gráfico cumulativo:", error); }
             }
-            
+
             function setInitialFilters() {
                 const now = new Date();
+                const currentMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+                const previousMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
                 const formatAsYYYYMM = date => `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}`;
-                elements.monthFilter.value = formatAsYYYYMM(now);
-                elements.compareMonth1.value = formatAsYYYYMM(new Date(now.getFullYear(), now.getMonth() - 1, 1));
-                elements.compareMonth2.value = formatAsYYYYMM(now);
+                
+                elements.monthFilter.value = formatAsYYYYMM(currentMonth);
+                elements.compareMonth1.value = formatAsYYYYMM(previousMonth);
+                elements.compareMonth2.value = formatAsYYYYMM(currentMonth);
             }
 
+            elements.menuToggle.addEventListener('click', () => elements.sidebar.classList.toggle('open'));
+            
+            const checkFiles = () => { elements.processButton.disabled = !(elements.salesFileInput.files.length > 0 && elements.portfolioFileInput.files.length > 0); };
+            elements.salesFileInput.addEventListener('change', checkFiles);
+            elements.portfolioFileInput.addEventListener('change', checkFiles);
+            
+            elements.clearButton.addEventListener('click', async () => {
+                if(!confirm("Tem certeza? Todos os dados serão apagados.")) return;
+                elements.statusMessage.textContent="Limpando...";
+                try {
+                    const res = await fetch(`${baseUrl}/api/limpar-dados`,{method:"POST"});
+                    if(!res.ok) throw new Error((await res.json()).message);
+                    elements.statusMessage.textContent = (await res.json()).message;
+                    setTimeout(()=>location.reload(), 1500);
+                } catch(err) { elements.statusMessage.textContent = `Erro: ${err.message}`; }
+            });
+            
+            elements.processButton.addEventListener('click', async () => {
+                const formData = new FormData();
+                formData.append("salesFile", elements.salesFileInput.files[0]);
+                formData.append("portfolioFile", elements.portfolioFileInput.files[0]);
+                formData.append("replaceData", elements.replaceDataCheckbox.checked);
+                elements.statusMessage.textContent = "Processando...";
+                try {
+                    const res = await fetch(`${baseUrl}/api/upload/vendas`, { method: "POST", body: formData });
+                    if (!res.ok) throw new Error((await res.json()).message);
+                    elements.statusMessage.textContent = `Sucesso: ${(await res.json()).message}`;
+                    setTimeout(()=>location.reload(), 1500);
+                } catch (err) { elements.statusMessage.textContent = `Erro: ${err.message}`; }
+            });
+            
             function getSelectedVendors() { return Array.from(elements.vendedorFilter.selectedOptions).map(o => o.value); }
             function handleFilterChange() { loadDataFromAPI(elements.monthFilter.value, getSelectedVendors()); }
             
@@ -360,14 +463,6 @@
             elements.vendedorFilter.addEventListener('change', handleFilterChange);
             elements.compareMonth1.addEventListener('change', loadCumulativeData);
             elements.compareMonth2.addEventListener('change', loadCumulativeData);
-            elements.menuToggle.addEventListener('click', () => elements.sidebar.classList.toggle('open'));
-            
-            // Lógica de Upload
-            const checkFiles = () => { elements.processButton.disabled = !(elements.salesFileInput.files.length > 0 && elements.portfolioFileInput.files.length > 0); };
-            elements.salesFileInput.addEventListener('change', checkFiles);
-            elements.portfolioFileInput.addEventListener('change', checkFiles);
-            elements.clearButton.addEventListener('click', async () => { /* ... */ });
-            elements.processButton.addEventListener('click', async () => { /* ... */ });
 
             const modal = document.getElementById('chartModal');
             const modalBody = modal.querySelector('.modal-body');
@@ -388,33 +483,32 @@
                     const origConfig = originalChart.config;
                     const dataCopy = JSON.parse(JSON.stringify(origConfig.data));
                     const optionsCopy = JSON.parse(JSON.stringify(origConfig.options));
-                    const formatterType = origConfig.options.customFormatterType || 'number';
-                    const isMobile = window.innerWidth <= 768;
-                    const chartType = origConfig.type;
-                    
-                    if (isMobile && chartType === 'bar') {
-                        optionsCopy.indexAxis = 'y'; 
-                        optionsCopy.plugins.datalabels.align = 'right';
-                        optionsCopy.plugins.datalabels.anchor = 'end';
-                        optionsCopy.plugins.datalabels.font.size = 12;
-                        optionsCopy.scales.x = optionsCopy.scales.x || {};
-                        optionsCopy.scales.y = optionsCopy.scales.y || {};
-                        optionsCopy.scales.x.ticks = optionsCopy.scales.x.ticks || {};
-                        optionsCopy.scales.y.ticks = optionsCopy.scales.y.ticks || {};
-                        optionsCopy.scales.x.ticks.color = '#a0aec0';
-                        optionsCopy.scales.y.ticks.color = '#FFD700';
-                    } else {
-                        optionsCopy.scales = optionsCopy.scales || {};
-                        optionsCopy.scales.x = optionsCopy.scales.x || {};
-                        optionsCopy.scales.y = optionsCopy.scales.y || {};
-                        optionsCopy.scales.x.ticks = optionsCopy.scales.x.ticks || {};
-                        optionsCopy.scales.y.ticks = optionsCopy.scales.y.ticks || {};
-                        optionsCopy.scales.x.ticks.color = '#FFD700';
-                        optionsCopy.scales.y.ticks.color = '#a0aec0';
-                    }
 
-                    let formatterFunction = (formatterType === 'percentage') ? formatPercentage : formatNumber;
-                    optionsCopy.plugins.datalabels = { ...optionsCopy.plugins.datalabels, formatter: formatterFunction, display: true, color: '#FFD700', font: { ...optionsCopy.plugins.datalabels.font, weight: 'bold' } };
+                    const formatterType = origConfig.options.customFormatterType || 'number';
+                    
+                    let formatterFunction;
+                    if (formatterType === 'percentage') {
+                        formatterFunction = formatPercentage;
+                    } else {
+                        formatterFunction = formatNumber;
+                    }
+                    
+                    optionsCopy.plugins.datalabels = {
+                        ...optionsCopy.plugins.datalabels,
+                        formatter: formatterFunction,
+                        display: true,
+                        color: '#FFD700', 
+                        font: { size: 14, weight: 'bold' }
+                    };
+
+                    optionsCopy.scales = optionsCopy.scales || {};
+                    optionsCopy.scales.x = optionsCopy.scales.x || {};
+                    optionsCopy.scales.y = optionsCopy.scales.y || {};
+                    optionsCopy.scales.x.ticks = optionsCopy.scales.x.ticks || {};
+                    optionsCopy.scales.y.ticks = optionsCopy.scales.y.ticks || {};
+
+                    optionsCopy.scales.x.ticks.color = '#FFD700'; 
+                    optionsCopy.scales.y.ticks.color = '#a0aec0'; 
 
                     modalChartInstance = new Chart(ctx, {
                         type: origConfig.type,
@@ -422,6 +516,7 @@
                         options: optionsCopy,
                         plugins: [ChartDataLabels]
                     });
+
                     modalChartTitle.textContent = optionsCopy.plugins.title.text;
                     modal.classList.add('visible');
                 });
@@ -434,9 +529,8 @@
             closeModalBtn.addEventListener('click', closeModal);
             modal.addEventListener('click', e => { if (e.target === modal) closeModal(); });
 
-            // --- ESTA É A PARTE CORRIGIDA ---
             setInitialFilters();
-            loadDataFromAPI(elements.monthFilter.value, []);
+            loadDataFromAPI(elements.monthFilter.value, []); 
             loadCumulativeData();
         });
     </script>
