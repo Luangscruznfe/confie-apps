@@ -77,29 +77,17 @@
         .modal-body { flex-grow: 1; position: relative; }
         .modal-body canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
 
-        /* --- INÍCIO DAS REGRAS PARA CELULAR (DESIGN RESPONSIVO) --- */
         @media (max-width: 768px) {
-            .container {
-                margin-top: 1rem;
-                padding: 0 0.75rem;
-            }
+            .container { margin-top: 1rem; padding: 0 0.75rem; }
             h1 { font-size: 1.5rem; }
             .section-title { font-size: 1.25rem; }
-            
-            .kpi-grid, .filters, .chart-grid {
-                grid-template-columns: 1fr; /* Força uma única coluna */
-            }
+            .kpi-grid, .filters, .chart-grid { grid-template-columns: 1fr; }
             .kpi-card { padding: 1rem; }
             .kpi-icon { font-size: 1.5rem; padding: 0.8rem; margin-right: 0.8rem; }
             .kpi-text p { font-size: 1.1rem; }
-
-            .modal-content {
-                height: 90vh;
-                padding: 1rem;
-            }
+            .modal-content { height: 90vh; padding: 1rem; }
             .modal-title { font-size: 1rem; }
         }
-        /* --- FIM DAS REGRAS PARA CELULAR --- */
     </style>
 </head>
 <body>
@@ -110,7 +98,7 @@
         </header>
         <div id="error-message"></div>
         <div class="kpi-grid">
-             <div class="kpi-card"><div class="kpi-icon icon-faturamento">&#8352;$</div><div class="kpi-text"><h3>Faturamento Total</h3><p id="kpi-faturamento-total">R$ 0,00</p></div></div>
+            <div class="kpi-card"><div class="kpi-icon icon-faturamento">&#8352;$</div><div class="kpi-text"><h3>Faturamento Total</h3><p id="kpi-faturamento-total">R$ 0,00</p></div></div>
             <div class="kpi-card"><div class="kpi-icon icon-projecao">&#128200;</div><div class="kpi-text"><h3>Projeção de Faturamento</h3><p id="kpi-projecao">R$ 0,00</p></div></div>
             <div class="kpi-card"><div class="kpi-icon icon-clientes">&#128101;</div><div class="kpi-text"><h3>Total Clientes Atendidos</h3><p id="kpi-clientes-atendidos">0</p></div></div>
             <div class="kpi-card"><div class="kpi-icon icon-positivacao">&#128204;</div><div class="kpi-text"><h3>Positivação Média</h3><p id="kpi-positivacao">0,00%</p></div></div>
@@ -319,10 +307,8 @@
                 updateChartData(window.charts.topSellers, data.topSellers.map(d => d.vendedor), data.topSellers.map(d => d.total));
                 updateChartData(window.charts.topManufacturers, data.topManufacturers.map(d => d.fabricante), data.topManufacturers.map(d => d.total));
                 updateChartData(window.charts.positivacao, data.positivacaoPorVendedor.map(d => d.vendedor), data.positivacaoPorVendedor.map(d => d.positivacao));
-                
                 const abbreviatedProductNames = data.topProducts.map(d => abbreviateProductName(d.produto));
                 updateChartData(window.charts.topProducts, abbreviatedProductNames, data.topProducts.map(d => d.total));
-                
                 updateChartData(window.charts.productMix, data.productMix.map(d => d.vendedor), data.productMix.map(d => d.mix));
                 updateChartData(window.charts.focusManufacturers, data.focusManufacturers.map(d => d.fabricante), data.focusManufacturers.map(d => d.total));
             
@@ -425,56 +411,42 @@
                     
                     if (modalChartInstance) { modalChartInstance.destroy(); }
                     modalBody.innerHTML = '<canvas id="modalChartCanvas"></canvas>';
-                    const ctx = document.getElementById('modalChartCanvas').getContext('2d');
                     
                     const origConfig = originalChart.config;
                     const dataCopy = JSON.parse(JSON.stringify(origConfig.data));
                     const optionsCopy = JSON.parse(JSON.stringify(origConfig.options));
-
-                    const formatterType = origConfig.options.customFormatterType || 'number';
                     
-                    const isMobile = window.innerWidth <= 768;
-                    const chartType = origConfig.type;
-
-                    if (isMobile && chartType === 'bar') {
-                        optionsCopy.indexAxis = 'y';
-                        
-                        optionsCopy.plugins.datalabels.align = 'right';
-                        optionsCopy.plugins.datalabels.anchor = 'end';
-                        optionsCopy.plugins.datalabels.font = { size: 12, weight: 'bold' };
-                        
-                        optionsCopy.scales.x.ticks.color = '#a0aec0';
-                        optionsCopy.scales.y.ticks.color = '#FFD700';
-
-                    } else {
-                        optionsCopy.scales.x.ticks.color = '#FFD700'; 
-                        optionsCopy.scales.y.ticks.color = '#a0aec0'; 
-                    }
-                    
-                    let formatterFunction;
-                    if (formatterType === 'percentage') {
-                        formatterFunction = formatPercentage;
-                    } else {
-                        formatterFunction = formatNumber;
-                    }
-                    
-                    optionsCopy.plugins.datalabels = {
-                        ...optionsCopy.plugins.datalabels,
-                        formatter: formatterFunction,
-                        display: true,
-                        color: '#FFD700', 
-                        font: { ...optionsCopy.plugins.datalabels.font, weight: 'bold' }
-                    };
-
-                    modalChartInstance = new Chart(ctx, {
-                        type: origConfig.type,
-                        data: dataCopy,
-                        options: optionsCopy,
-                        plugins: [ChartDataLabels]
-                    });
-
                     modalChartTitle.textContent = optionsCopy.plugins.title.text;
                     modal.classList.add('visible');
+
+                    setTimeout(() => {
+                        const ctx = document.getElementById('modalChartCanvas').getContext('2d');
+                        const formatterType = origConfig.options.customFormatterType || 'number';
+                        const isMobile = window.innerWidth <= 768;
+                        const chartType = origConfig.type;
+                        
+                        if (isMobile && chartType === 'bar') {
+                            optionsCopy.indexAxis = 'y'; 
+                            optionsCopy.plugins.datalabels.align = 'right';
+                            optionsCopy.plugins.datalabels.anchor = 'end';
+                            optionsCopy.plugins.datalabels.font = { size: 12, weight: 'bold' };
+                            optionsCopy.scales.x.ticks.color = '#a0aec0';
+                            optionsCopy.scales.y.ticks.color = '#FFD700';
+                        } else {
+                            optionsCopy.scales.x.ticks.color = '#FFD700'; 
+                            optionsCopy.scales.y.ticks.color = '#a0aec0'; 
+                        }
+
+                        let formatterFunction = (formatterType === 'percentage') ? formatPercentage : formatNumber;
+                        optionsCopy.plugins.datalabels = { ...optionsCopy.plugins.datalabels, formatter: formatterFunction, display: true, color: '#FFD700', font: { ...optionsCopy.plugins.datalabels.font, weight: 'bold' } };
+
+                        modalChartInstance = new Chart(ctx, {
+                            type: origConfig.type,
+                            data: dataCopy,
+                            options: optionsCopy,
+                            plugins: [ChartDataLabels]
+                        });
+                    }, 50);
                 });
             });
 
