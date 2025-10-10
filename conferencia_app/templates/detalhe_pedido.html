@@ -200,7 +200,7 @@
     		<p class="mb-1"><strong>Qtd. Pedida:</strong> {{ produto.quantidade_pedida }}</p>
 
     		{% if produto.codigo_barras %}
-                    <p class="mb-1 text-muted"><small><strong>Cód. Barras:</strong> {{ produto.codigo_barras }}</small></p>
+                    <p class="mb-1"><small><strong>Cód. Barras:</strong> {{ produto.codigo_barras }}</small></p>
     		{% endif %}
     
     		{% if produto.status != 'Pendente' %}

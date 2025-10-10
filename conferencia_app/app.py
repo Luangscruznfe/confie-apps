@@ -187,16 +187,13 @@ def extrair_dados_do_pdf(stream, nome_da_carga, nome_arquivo):
                     product_chunks.append(palavras_linha)
 
                 for chunk in product_chunks:
-                    barcode_parts = []      # <-- MUDANÇA 1: Adicionamos uma lista para o código de barras
+                    barcode_parts = []
                     nome_produto_parts = []
                     quantidade_parts = []
                     valores_parts = []
 
                     for x0, y0, x1, y1, palavra, *_ in chunk:
-                        # Esta é a alteração principal. Interceptamos o código de barras
-                        # baseado em sua posição horizontal (coordenada x0).
-                        # O valor 40 a 100 é uma estimativa e pode precisar de ajuste fino.
-                        if 40 < x0 < 100:   # <-- MUDANÇA 2: Adicionamos este "elif" para capturar o barcode
+                        if 40 < x0 < 100:
                              barcode_parts.append(palavra)
                         elif x0 < 340:
                             nome_produto_parts.append(palavra)
@@ -208,7 +205,14 @@ def extrair_dados_do_pdf(stream, nome_da_carga, nome_arquivo):
                     if not nome_produto_parts:
                         continue
                     
-                    # Une as partes do código de barras em uma string única
+                    # ===== CORREÇÃO CIRÚRGICA =====
+                    # Move palavras não-numéricas do início da lista de quantidade de volta para o nome do produto.
+                    # Isso corrige o problema de "PI" ou "ACI" entrarem na quantidade.
+                    while quantidade_parts and not quantidade_parts[0].replace(',', '').replace('.', '').isdigit():
+                        palavra_movida = quantidade_parts.pop(0)
+                        nome_produto_parts.append(palavra_movida)
+                    # ==============================
+
                     codigo_barras_final = "".join(barcode_parts)
 
                     if (
@@ -236,7 +240,7 @@ def extrair_dados_do_pdf(stream, nome_da_carga, nome_arquivo):
                     if nome_produto_final and quantidade_completa_str:
                         produtos_finais.append({
                             "produto_nome": nome_produto_final,
-                            "codigo_barras": codigo_barras_final, # <-- MUDANÇA 3: Adicionamos o campo ao resultado
+                            "codigo_barras": codigo_barras_final,
                             "quantidade_pedida": quantidade_completa_str,
                             "quantidade_entregue": None,
                             "status": "Pendente",
@@ -619,15 +623,13 @@ def resetar_dia():
                     TRUNCATE TABLE
                         carga_itens,
                         carga_grupos,
-                        carga_pedidos,
-                        cargas
+                        cargas 
                     RESTART IDENTITY CASCADE;
                 """)
             except Exception:
                 # fallback seguro: apaga na ordem certa
                 cur.execute("DELETE FROM carga_itens;")
                 cur.execute("DELETE FROM carga_grupos;")
-                cur.execute("DELETE FROM carga_pedidos;")
                 cur.execute("DELETE FROM cargas;")
 
         if limpa_pedidos:
