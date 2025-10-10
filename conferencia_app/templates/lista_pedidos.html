@@ -157,6 +157,9 @@
 document.addEventListener('DOMContentLoaded', function() {
     const nomeDaCarga = "{{ nome_da_carga }}";
     const container = document.getElementById('pedidos-container');
+    
+    // 1. Chave única para o localStorage baseada no nome da carga
+    const localStorageKey = `ultimoPedidoClicado_${nomeDaCarga}`;
 
     fetch(`/api/pedidos/${nomeDaCarga}`)
         .then(response => response.json())
@@ -170,13 +173,13 @@ document.addEventListener('DOMContentLoaded', function() {
 
             pedidos.forEach(pedido => {
                 let statusClasse = '';
-                let itemClasse = ''; // Nova variável para a classe da barra inteira
+                let itemClasse = ''; 
                 let statusTexto = pedido.status_conferencia || 'Pendente';
 
                 switch (statusTexto) {
                     case 'Finalizado':
                         statusClasse = 'bg-success';
-                        itemClasse = 'item-finalizado'; // Aplica a classe verde na barra
+                        itemClasse = 'item-finalizado';
                         break;
                     case 'Pendente':
                         statusClasse = 'bg-warning text-dark';
@@ -184,10 +187,12 @@ document.addEventListener('DOMContentLoaded', function() {
                     default:
                         statusClasse = 'bg-secondary';
                 }
-
-                // Adiciona a variável itemClasse à lista de classes do link
+                
+                // NOVIDADE: Adicionamos o atributo 'data-pedido-id' para identificar o link
                 const pedidoHtml = `
-                    <a href="/pedido/${pedido.numero_pedido}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center ${itemClasse}">
+                    <a href="/pedido/${pedido.numero_pedido}" 
+                       class="list-group-item list-group-item-action d-flex justify-content-between align-items-center ${itemClasse}"
+                       data-pedido-id="${pedido.numero_pedido}">
                         <div>
                             <div class="pedido-numero">Pedido: ${pedido.numero_pedido}</div>
                             <div class="cliente-nome">${pedido.nome_cliente}</div>
@@ -197,6 +202,30 @@ document.addEventListener('DOMContentLoaded', function() {
                     </a>
                 `;
                 container.innerHTML += pedidoHtml;
+            });
+
+            // 2. Lógica para restaurar a posição do scroll
+            const ultimoPedidoId = localStorage.getItem(localStorageKey);
+            if (ultimoPedidoId) {
+                const ultimoPedidoElemento = container.querySelector(`[data-pedido-id="${ultimoPedidoId}"]`);
+                if (ultimoPedidoElemento) {
+                    // Rola a tela até o elemento, posicionando-o no centro
+                    ultimoPedidoElemento.scrollIntoView({
+                        behavior: 'auto', // 'auto' para um pulo instantâneo
+                        block: 'center'
+                    });
+                }
+            }
+
+            // 3. Lógica para salvar a posição do próximo clique
+            container.addEventListener('click', function(event) {
+                // Encontra o link do pedido que foi clicado
+                const linkDoPedido = event.target.closest('a.list-group-item');
+                if (linkDoPedido) {
+                    const pedidoId = linkDoPedido.dataset.pedidoId;
+                    // Salva o ID do pedido clicado no localStorage
+                    localStorage.setItem(localStorageKey, pedidoId);
+                }
             });
         })
         .catch(error => {
