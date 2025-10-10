@@ -265,12 +265,14 @@ function atualizarItem(index, quantidadeEntregue, observacao = '') {
         return;
     }
 
+    // Este é o ÚNICO bloco fetch que deve existir dentro da função
     fetch('/api/item/update', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
             pedido_id: "{{ pedido.numero_pedido }}",
             produto_nome: produtoNome,
+            produto_index: index, // A versão correta com o índice
             quantidade_entregue: quantidadeEntregue,
             observacao: observacao
         }),

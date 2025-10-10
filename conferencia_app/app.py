@@ -399,63 +399,70 @@ def update_item_status():
     try:
         conn = get_db_connection()
         cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-        cur.execute("SELECT * FROM pedidos WHERE numero_pedido = %s;", (dados_recebidos['pedido_id'],))
+        
+        pedido_id = dados_recebidos.get('pedido_id')
+        produto_index = dados_recebidos.get('produto_index')
+
+        if produto_index is None:
+            return jsonify({"sucesso": False, "erro": "Índice do produto não fornecido."}), 400
+
+        cur.execute("SELECT * FROM pedidos WHERE numero_pedido = %s;", (pedido_id,))
         pedido = cur.fetchone()
         if not pedido: 
             return jsonify({"sucesso": False, "erro": "Pedido não encontrado."}), 404
 
         produtos_atualizados = pedido['produtos']
-        todos_conferidos = True
+        
+        # Acessa o produto diretamente pelo índice, sem loop
+        if 0 <= produto_index < len(produtos_atualizados):
+            produto_alvo = produtos_atualizados[produto_index]
+        else:
+            return jsonify({"sucesso": False, "erro": "Índice do produto inválido."}), 400
 
-        for produto in produtos_atualizados:
-            if produto['produto_nome'] == dados_recebidos['produto_nome']:
-                qtd_entregue_str = dados_recebidos['quantidade_entregue']
-                produto['quantidade_entregue'] = qtd_entregue_str
-                produto['observacao'] = dados_recebidos.get('observacao', '')
+        # Aplica as atualizações no produto correto
+        qtd_entregue_str = dados_recebidos['quantidade_entregue']
+        produto_alvo['quantidade_entregue'] = qtd_entregue_str
+        produto_alvo['observacao'] = dados_recebidos.get('observacao', '')
 
-                # >>> NOVO: se estiver forçado, sempre fica Confirmado e não recalcula
-                if bool(produto.get('forced_confirmed', False)):
+        if bool(produto_alvo.get('forced_confirmed', False)):
+            status_final = "Confirmado"
+        else:
+            qtd_pedida_str = produto_alvo.get('quantidade_pedida', '0')
+            unidades_pacote = int(produto_alvo.get('unidades_pacote', 1))
+            match_pacotes = re.match(r'(\d+)', qtd_pedida_str)
+            pacotes_pedidos = int(match_pacotes.group(1)) if match_pacotes else 0
+            total_unidades_pedidas = pacotes_pedidos * unidades_pacote
+
+            try:
+                qtd_entregue_int = int(qtd_entregue_str)
+                if qtd_entregue_int == total_unidades_pedidas: 
                     status_final = "Confirmado"
-                    produto['status'] = status_final
-                    break
-
-                # cálculo normal
-                qtd_pedida_str = produto.get('quantidade_pedida', '0')
-                unidades_pacote = int(produto.get('unidades_pacote', 1))
-                match_pacotes = re.match(r'(\d+)', qtd_pedida_str)
-                pacotes_pedidos = int(match_pacotes.group(1)) if match_pacotes else 0
-                total_unidades_pedidas = pacotes_pedidos * unidades_pacote
-
-                try:
-                    qtd_entregue_int = int(qtd_entregue_str)
-                    if qtd_entregue_int == total_unidades_pedidas: 
-                        status_final = "Confirmado"
-                    elif qtd_entregue_int == 0: 
-                        status_final = "Corte Total"
-                    else: 
-                        status_final = "Corte Parcial"
-                except (ValueError, TypeError): 
+                elif qtd_entregue_int == 0: 
+                    status_final = "Corte Total"
+                else: 
                     status_final = "Corte Parcial"
+            except (ValueError, TypeError): 
+                status_final = "Corte Parcial"
 
-                produto['status'] = status_final
-                break
-
-        for produto in produtos_atualizados:
-            if produto['status'] == 'Pendente':
-                todos_conferidos = False
-                break
-
+        produto_alvo['status'] = status_final
+        
+        # Verifica se todos os itens foram conferidos para finalizar o pedido
+        todos_conferidos = all(p['status'] != 'Pendente' for p in produtos_atualizados)
         novo_status_conferencia = 'Finalizado' if todos_conferidos else 'Pendente'
+
         sql_update = "UPDATE pedidos SET produtos = %s, status_conferencia = %s WHERE numero_pedido = %s;"
-        cur.execute(sql_update, (json.dumps(produtos_atualizados), novo_status_conferencia, dados_recebidos['pedido_id']))
+        cur.execute(sql_update, (json.dumps(produtos_atualizados), novo_status_conferencia, pedido_id))
         conn.commit()
+        
         return jsonify({"sucesso": True, "status_final": status_final})
+
     except Exception as e:
         import traceback; traceback.print_exc()
+        if conn: conn.rollback()
         return jsonify({"sucesso": False, "erro": str(e)}), 500
     finally:
         if conn: 
-            cur.close(); 
+            if 'cur' in locals() and cur: cur.close(); 
             conn.close()
 
 # =====================  (NOVO)  =====================
