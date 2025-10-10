@@ -1,7 +1,9 @@
 import os
 import psycopg2
 import pandas as pd
-from flask import Flask, jsonify, render_template, request, Blueprint
+from flask import Flask, jsonify, render_template, request, Blueprint, redirect, url_for, flash
+from werkzeug.security import check_password_hash
+from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 import csv
 import io
 from psycopg2.extras import execute_values
@@ -18,8 +20,17 @@ load_dotenv()
 
 logging.basicConfig(stream=sys.stdout, level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 app = Flask(__name__, static_folder='static', template_folder='templates')
+# --- NOVO: Chave secreta para gerenciar sessões de login ---
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'sua-chave-secreta-padrao-aqui')
 app.logger.addHandler(logging.StreamHandler(sys.stdout))
 app.logger.setLevel(logging.INFO)
+
+# --- NOVO: Configuração do Flask-Login ---
+login_manager = LoginManager()
+login_manager.init_app(app)
+login_manager.login_view = 'login' # Rota para a qual usuários não logados são redirecionados
+login_manager.login_message = "Por favor, faça o login para acessar esta página."
+login_manager.login_message_category = "info"
 
 dashboard_bp = Blueprint('dashboard_api', __name__)
 
@@ -30,7 +41,28 @@ def get_db_connection():
     conn = psycopg2.connect(database_url)
     return conn
 
+# --- NOVO: Classe de usuário para o Flask-Login ---
+class User(UserMixin):
+    def __init__(self, id, username, role):
+        self.id = id
+        self.username = username
+        self.role = role
+
+# --- NOVO: Carrega o usuário da sessão ---
+@login_manager.user_loader
+def load_user(user_id):
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute("SELECT id, username, role FROM usuarios WHERE id = %s", (user_id,))
+    user_data = cur.fetchone()
+    cur.close()
+    conn.close()
+    if user_data:
+        return User(id=user_data[0], username=user_data[1], role=user_data[2])
+    return None
+
 def count_weekdays(year, month, up_to_day=None):
+    # (Sua função original, sem alterações)
     last_day = up_to_day if up_to_day is not None else calendar.monthrange(year, month)[1]
     count = 0
     for day in range(1, last_day + 1):
@@ -38,12 +70,54 @@ def count_weekdays(year, month, up_to_day=None):
         if datetime(year, month, day).weekday() < 5: count += 1
     return count
 
-@app.route("/")
-def dashboard_page():
-    return render_template('dashboard.html')
+# --- NOVO: Rota de Login ---
+@app.route("/login", methods=['GET', 'POST'])
+def login():
+    if current_user.is_authenticated:
+        return redirect(url_for('dashboard_page'))
+    
+    if request.method == 'POST':
+        username = request.form.get('username', '').upper()
+        password = request.form.get('password')
+        
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute("SELECT id, username, password_hash, role FROM usuarios WHERE username = %s", (username,))
+        user_data = cur.fetchone()
+        cur.close()
+        conn.close()
+        
+        if user_data and check_password_hash(user_data[2], password):
+            user = User(id=user_data[0], username=user_data[1], role=user_data[3])
+            login_user(user)
+            return redirect(url_for('dashboard_page'))
+        else:
+            flash('Usuário ou senha inválidos.', 'danger')
 
+    return render_template('login.html')
+
+# --- NOVO: Rota de Logout ---
+@app.route("/logout")
+@login_required
+def logout():
+    logout_user()
+    return redirect(url_for('login'))
+
+# --- ALTERADO: Rota do Dashboard agora exige login ---
+@app.route("/")
+@login_required
+def dashboard_page():
+    # Passa a role do usuário para o template para controlar o que é exibido
+    return render_template('dashboard.html', user_role=current_user.role)
+
+# --- ALTERADO: Rota protegida e com verificação de permissão ---
 @dashboard_bp.route("/api/limpar-dados", methods=['POST'])
+@login_required
 def delete_data():
+    if current_user.role != 'admin':
+        return jsonify({"message": "Acesso negado. Permissão de administrador necessária."}), 403
+    
+    # (Sua função original, sem alterações)
     conn = None
     try:
         conn = get_db_connection()
@@ -60,8 +134,14 @@ def delete_data():
     finally:
         if conn: conn.close()
 
+# --- ALTERADO: Rota protegida e com verificação de permissão ---
 @dashboard_bp.route("/api/upload/vendas", methods=['POST'])
+@login_required
 def upload_data():
+    if current_user.role != 'admin':
+        return jsonify({"message": "Acesso negado. Permissão de administrador necessária."}), 403
+
+    # (Sua função original, sem alterações)
     if 'salesFile' not in request.files or 'portfolioFile' not in request.files:
         return jsonify({"message": "Ficheiros de vendas e carteira são obrigatórios."}), 400
     
@@ -121,12 +201,9 @@ def upload_data():
         sales_df.dropna(subset=['valor', 'produto'], inplace=True)
 
         with conn.cursor() as cur:
-            # --- ALTERAÇÃO PRINCIPAL ---
-            # Em vez de limpar a tabela inteira, apagamos apenas os dados do mês que está sendo atualizado.
             cur.execute("DELETE FROM public.vendas WHERE TO_CHAR(data_venda, 'YYYY-MM') = %s", (upload_month,))
             app.logger.info(f"Dados de vendas para o mês {upload_month} foram limpos para atualização.")
             
-            # O código de inserção permanece o mesmo, inserindo os novos dados.
             data_to_insert = [tuple(row) for row in sales_df[col_names].itertuples(index=False)]
             sql_insert_sales = "INSERT INTO public.vendas (data_venda, cliente, produto, quantidade, valor, fabricante, vendedor) VALUES %s"
             execute_values(cur, sql_insert_sales, data_to_insert, page_size=1000)
@@ -141,8 +218,9 @@ def upload_data():
     finally:
         if conn: conn.close()
 
-# O restante do arquivo (get_data, get_cumulative_data, etc.) permanece exatamente o mesmo.
+# --- ALTERADO: Rota de dados agora filtra por permissão do usuário ---
 @dashboard_bp.route("/api/dados", methods=['GET'])
+@login_required
 def get_data():
     conn = None
     try:
@@ -156,21 +234,24 @@ def get_data():
             max_month_row = cur.fetchone()
             month_filter = (max_month_row[0] if max_month_row and max_month_row[0] else datetime.now().strftime('%Y-%m'))
         
-        vendedores_filter_req = request.args.getlist('vendedor')
-        
-        default_vendedores = ['MARCELO', 'EVERTON', 'MARCOS', 'PEDRO', 'RODOLFO', 'SILVANA', 'THYAGO', 'TIAGO', 'LUIZ']
-        if not vendedores_filter_req:
-            vendedores_filter = default_vendedores
+        if current_user.role == 'admin':
+            vendedores_filter_req = request.args.getlist('vendedor')
+            default_vendedores = ['MARCELO', 'EVERTON', 'MARCOS', 'PEDRO', 'RODOLFO', 'SILVANA', 'THYAGO', 'TIAGO', 'LUIZ']
+            vendedores_filter = vendedores_filter_req if vendedores_filter_req else default_vendedores
         else:
-            vendedores_filter = vendedores_filter_req
+            vendedores_filter = [current_user.username]
         
         results['selectedVendors'] = vendedores_filter
 
         where_conditions = ["EXTRACT(ISODOW FROM data_venda) < 6"]
         where_conditions.append(f"TO_CHAR(data_venda, 'YYYY-MM') = '{month_filter}'")
+        
+        # Cria a lista de vendedores seguros para usar em cláusulas IN
+        safe_vendedores = []
         if vendedores_filter:
             safe_vendedores = ["'" + v.replace("'", "''") + "'" for v in vendedores_filter]
             where_conditions.append(f"vendedor IN ({','.join(safe_vendedores)})")
+            
         where_clause = "WHERE " + " AND ".join(where_conditions)
 
         today = datetime.now()
@@ -223,12 +304,26 @@ def get_data():
         cur.execute(f"SELECT fabricante, SUM(valor) as total FROM public.vendas {focus_where} GROUP BY fabricante ORDER BY total DESC;", fabricantes_foco)
         results['focusManufacturers'] = [{col.name: float(val) if isinstance(val, Decimal) else val for col, val in zip(cur.description, row)} for row in cur.fetchall()]
 
+        # --- INÍCIO DA CORREÇÃO ---
+        # Constrói a cláusula WHERE para a consulta principal da carteira
+        carteira_where_conditions = [
+            f"c.mes = '{month_filter}'",
+            "c.meta_faturamento > 0"
+        ]
+        if vendedores_filter:
+            carteira_where_conditions.append(f"c.vendedor IN ({','.join(safe_vendedores)})")
+        
+        carteira_where_clause = " AND ".join(carteira_where_conditions)
+
+        # A consulta agora usa a nova cláusula `carteira_where_clause` para filtrar a tabela de carteira
         cur.execute(f"""
             WITH VendasAtuais AS (SELECT vendedor, SUM(valor) as faturamento_atual FROM public.vendas {where_clause} GROUP BY vendedor)
             SELECT c.vendedor, c.meta_faturamento as meta, COALESCE(va.faturamento_atual, 0) as atual
             FROM public.carteira c LEFT JOIN VendasAtuais va ON c.vendedor = va.vendedor
-            WHERE c.mes = '{month_filter}' AND c.meta_faturamento > 0;
+            WHERE {carteira_where_clause};
         """)
+        # --- FIM DA CORREÇÃO ---
+        
         sales_goals_raw = [{col.name: val for col, val in zip(cur.description, row)} for row in cur.fetchall()]
         sales_goals = []
         for row in sales_goals_raw:
@@ -256,7 +351,9 @@ def get_data():
     finally:
         if conn: conn.close()
 
+# --- ALTERADO: Rota protegida por login ---
 @dashboard_bp.route("/api/dados-cumulativos", methods=['GET'])
+@login_required
 def get_cumulative_data():
     conn = None
     try:
@@ -265,18 +362,38 @@ def get_cumulative_data():
         if not months_to_compare: 
             return jsonify({"message": "Pelo menos um mês deve ser fornecido."}), 400
 
-        placeholders = ','.join(['%s'] * len(months_to_compare))
-        sql_query = f"""
+        # --- INÍCIO DA CORREÇÃO ---
+        
+        # Prepara a lista de parâmetros para a consulta SQL
+        params = list(months_to_compare)
+        
+        # Constrói a consulta dinamicamente
+        base_query = """
             SELECT 
                 EXTRACT(DAY FROM data_venda) as dia,
                 TO_CHAR(data_venda, 'YYYY-MM') as mes,
                 SUM(valor) as total_dia
             FROM public.vendas
-            WHERE TO_CHAR(data_venda, 'YYYY-MM') IN ({placeholders})
-            GROUP BY 1, 2
-            ORDER BY 1, 2;
         """
-        df = pd.read_sql_query(sql_query, conn, params=months_to_compare)
+        
+        where_conditions = []
+        
+        # Adiciona o filtro de mês, que sempre existe
+        month_placeholders = ','.join(['%s'] * len(months_to_compare))
+        where_conditions.append(f"TO_CHAR(data_venda, 'YYYY-MM') IN ({month_placeholders})")
+        
+        # Adiciona o filtro de vendedor APENAS se o usuário for um vendedor
+        if current_user.role == 'vendedor':
+            where_conditions.append("vendedor = %s")
+            params.append(current_user.username) # Adiciona o nome do vendedor aos parâmetros
+
+        # Monta a query final
+        final_query = f"{base_query} WHERE {' AND '.join(where_conditions)} GROUP BY 1, 2 ORDER BY 1, 2;"
+
+        # Executa a consulta com os parâmetros corretos
+        df = pd.read_sql_query(final_query, conn, params=params)
+        
+        # --- FIM DA CORREÇÃO ---
         
         if df.empty: 
             return jsonify({"labels": list(range(1, 32)), "datasets": []})
@@ -303,4 +420,5 @@ def get_cumulative_data():
 app.register_blueprint(dashboard_bp)
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    # O host 0.0.0.0 é importante para acessar de outros dispositivos na mesma rede
+    app.run(debug=True, host='0.0.0.0', port=8000)

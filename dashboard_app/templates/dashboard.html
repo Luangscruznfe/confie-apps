@@ -2,7 +2,7 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=0.75">
     <title>Dashboard de Análise de Vendas</title>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -17,6 +17,10 @@
             --border-radius: 0.375rem;
             --red-color: #f5365c;
             --green-color: #2dce89;
+            --light-blue-color: #11cdef;
+            --purple-color: #8965e0;
+            --gold-color: #DAA520;
+            --amber-color: #f59e0b;
         }
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: 'Poppins', sans-serif; background-color: var(--secondary-color); color: var(--text-color); line-height: 1.5; }
@@ -27,11 +31,11 @@
         .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1.5rem; margin-bottom: 2rem; }
         .kpi-card { background-color: var(--card-bg); border-radius: var(--border-radius); box-shadow: var(--shadow); padding: 1.5rem; display: flex; align-items: center; }
         .kpi-icon { font-size: 2rem; padding: 1rem; border-radius: 50%; margin-right: 1rem; color: #fff; }
-        .icon-faturamento { background-color: #5e72e4; }
-        .icon-projecao { background-color: #11cdef; }
-        .icon-clientes { background-color: #2dce89; }
+        .icon-faturamento { background-color: var(--primary-color); }
+        .icon-projecao { background-color: var(--light-blue-color); }
+        .icon-clientes { background-color: var(--green-color); }
         .icon-positivacao { background-color: #fb6340; }
-        .icon-ticket { background-color: #8965e0; }
+        .icon-ticket { background-color: var(--purple-color); }
         .kpi-text h3 { font-size: 0.875rem; font-weight: 400; text-transform: uppercase; color: #8898aa; }
         .kpi-text p { font-size: 1.25rem; font-weight: 600; }
         .chart-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 1.5rem; margin-bottom: 2rem; }
@@ -40,43 +44,39 @@
         .filters { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.5rem; background-color: var(--card-bg); padding: 1.5rem; border-radius: var(--border-radius); box-shadow: var(--shadow); margin-bottom: 2rem; }
         .filter-group { display: flex; flex-direction: column; }
         .filter-group label { font-size: 0.8rem; margin-bottom: 0.5rem; font-weight: 600; }
-        .filter-group select, .filter-group input { padding: 0.5rem; border: 1px solid #dee2e6; border-radius: var(--border-radius); font-family: 'Poppins', sans-serif; }
-        .filter-group select[multiple] { height: 150px; }
+        .filter-group input { padding: 0.5rem; border: 1px solid #dee2e6; border-radius: var(--border-radius); font-family: 'Poppins', sans-serif; }
         #error-message { color: red; text-align: center; margin: 1rem 0; }
         .sidebar { position: fixed; top: 0; right: -350px; width: 350px; height: 100%; background-color: #fff; box-shadow: -4px 0 10px rgba(0,0,0,0.1); padding: 2rem; transition: right 0.3s ease-in-out; z-index: 1000; overflow-y: auto; }
         .sidebar.open { right: 0; }
-        .sidebar .form-group { margin-bottom: 1rem; }
-        .sidebar button { width: 100%; padding: 0.75rem; border: none; border-radius: var(--border-radius); cursor: pointer; font-size: 1rem; margin-top: 1rem; }
-        .sidebar .btn-process { background-color: var(--primary-color); color: white; }
-        .sidebar .btn-process:disabled { background-color: #ccc; cursor: not-allowed; }
-        .sidebar .btn-clear { background-color: var(--red-color); color: white; }
         #goals-table-container { background-color: var(--card-bg); border-radius: var(--border-radius); box-shadow: var(--shadow); padding: 1.5rem; overflow-x: auto; }
         .goals-table { width: 100%; border-collapse: collapse; }
         .goals-table th, .goals-table td { padding: 0.75rem 1rem; text-align: left; border-bottom: 1px solid #e9ecef; white-space: nowrap; }
-        .goals-table th { font-weight: bold; font-size: 0.95rem; text-transform: uppercase; color: #DAA520; }
+        .goals-table th { font-weight: bold; font-size: 0.95rem; text-transform: uppercase; color: var(--gold-color); }
+        .goals-table td.vendedor { color: var(--primary-color); font-weight: 600; }
+        .goals-table td.meta-valor { color: var(--green-color); }
+        .goals-table td.projecao { color: var(--light-blue-color); }
+        .goals-table td.venda-diaria { color: var(--purple-color); }
+        .goal-green .faturamento-valor, .goal-green .atingido { color: var(--green-color); }
+        .goal-yellow .faturamento-valor, .goal-yellow .atingido { color: var(--amber-color); }
+        .goal-red .faturamento-valor, .goal-red .atingido { color: var(--red-color); }
+        .goals-table .meta-valor, .goals-table .faturamento-valor, .goals-table .atingido, .goals-table .projecao, .goals-table .venda-diaria { font-weight: 600; }
         .percentage-bar { background-color: #e9ecef; border-radius: 5px; height: 12px; width: 100px; display: inline-block; vertical-align: middle; margin-left: 8px; overflow: hidden; position: relative; }
         .percentage-fill { background-color: var(--green-color); height: 100%; border-radius: 5px; }
-        .goals-table .vendedor { font-weight: 600; color: var(--primary-color); }
-        .goals-table .meta-valor { color: var(--green-color); font-weight: 600; }
-        .goals-table .faturamento-valor { color: var(--red-color); font-weight: 600; }
-        .goals-table .atingido { font-weight: 600; }
-        .goals-table .atingido .percent-green { color: var(--green-color); }
-        .goals-table .atingido .percent-red { color: var(--red-color); }
-        .goals-table .projecao { color: #11cdef; font-weight: 600; }
-        .goals-table .venda-diaria { color: #fb6340; font-weight: 600; }
+        .multiselect-container { position: relative; user-select: none; }
+        .select-box { padding: 0.5rem; border: 1px solid #dee2e6; border-radius: var(--border-radius); cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
+        .select-box .arrow { font-size: 0.8rem; transition: transform 0.2s; }
+        .select-box.open .arrow { transform: rotate(180deg); }
+        #vendedor-selected-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .checkboxes-container { display: none; position: absolute; top: 100%; left: 0; right: 0; border: 1px solid #dee2e6; background: white; z-index: 100; max-height: 200px; overflow-y: auto; border-radius: 0 0 var(--border-radius) var(--border-radius); box-shadow: var(--shadow); }
+        .checkboxes-container.visible { display: block; }
+        .checkboxes-container label { display: block; padding: 0.5rem 1rem; cursor: pointer; }
+        .checkboxes-container label:hover { background-color: #f4f5f7; }
+        .checkboxes-container input[type="checkbox"] { margin-right: 0.5rem; vertical-align: middle; }
+        .checkboxes-container .select-all-label { font-weight: bold; border-bottom: 1px solid #dee2e6; background-color: #fafafa; }
         .expand-btn { position: absolute; top: 0.5rem; right: 0.5rem; cursor: pointer; padding: 0.3rem; border-radius: 50%; transition: background-color 0.2s; background: none; border: none; }
-        .expand-btn:hover { background-color: #f0f0f0; }
         .expand-btn svg { width: 1.25rem; height: 1.25rem; color: #8898aa; }
-        .chart-modal {
-            position: fixed; inset: 0; background-color: rgba(0, 0, 0, 0.75);
-            z-index: 2000; padding: 1rem;
-            display: flex; align-items: center; justify-content: center;
-            opacity: 0; visibility: hidden; pointer-events: none;
-            transition: opacity 0.2s ease-in-out;
-        }
-        .chart-modal.visible {
-            opacity: 1; visibility: visible; pointer-events: auto;
-        }
+        .chart-modal { position: fixed; inset: 0; background-color: rgba(0, 0, 0, 0.75); z-index: 2000; padding: 1rem; display: flex; align-items: center; justify-content: center; opacity: 0; visibility: hidden; pointer-events: none; transition: opacity 0.2s ease-in-out; }
+        .chart-modal.visible { opacity: 1; visibility: visible; pointer-events: auto; }
         .modal-content { background-color: #2d3748; color: #e2e8f0; border-radius: var(--border-radius); box-shadow: 0 10px 25px rgba(0,0,0,0.2); width: 95vw; max-width: 1600px; height: 80vh; padding: 1.5rem; position: relative; display: flex; flex-direction: column; }
         .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
         .modal-title { font-size: 1.25rem; font-weight: 600; color: #e2e8f0; }
@@ -89,17 +89,19 @@
             h1 { font-size: 1.5rem; }
             .section-title { font-size: 1.25rem; }
             .kpi-grid, .filters, .chart-grid { grid-template-columns: 1fr; }
-            .kpi-card { padding: 1rem; }
-            .kpi-icon { font-size: 1.5rem; padding: 0.8rem; margin-right: 0.8rem; }
-            .kpi-text p { font-size: 1.1rem; }
             .modal-content { height: 90vh; padding: 1rem; }
-            .modal-title { font-size: 1rem; }
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <header><h1>Dashboard de Análise de Vendas</h1><button class="menu-toggle" id="menu-toggle">&#9776;</button></header>
+        <header>
+            <h1>Dashboard de Análise de Vendas</h1>
+            <div>
+                <a href="{{ url_for('logout') }}" style="margin-right: 1rem; color: var(--primary-color); text-decoration: none; font-weight: 600;">Sair</a>
+                <button class="menu-toggle" id="menu-toggle">&#9776;</button>
+            </div>
+        </header>
         <div id="error-message"></div>
         <div class="kpi-grid">
             <div class="kpi-card"><div class="kpi-icon icon-faturamento">&#8352;$</div><div class="kpi-text"><h3>Faturamento Total</h3><p id="kpi-faturamento-total">R$ 0,00</p></div></div>
@@ -109,7 +111,19 @@
             <div class="kpi-card"><div class="kpi-icon icon-ticket">&#1279;</div><div class="kpi-text"><h3>Ticket Médio</h3><p id="kpi-ticket-medio">R$ 0,00</p></div></div>
         </div>
         <div class="filters">
-            <div class="filter-group"><label for="vendedor-filter">Filtrar Vendedor (Ctrl+Click para vários):</label><select id="vendedor-filter" multiple></select></div>
+            {% if user_role == 'admin' %}
+            <div class="filter-group">
+                <label for="vendedor-select-box">Filtrar Vendedor:</label>
+                <div class="multiselect-container">
+                    <div class="select-box" id="vendedor-select-box">
+                        <span id="vendedor-selected-text">Todos os Vendedores</span>
+                        <span class="arrow">&#9660;</span>
+                    </div>
+                    <div class="checkboxes-container" id="vendedor-checkboxes-container">
+                    </div>
+                </div>
+            </div>
+            {% endif %}
             <div class="filter-group"><label for="month-filter">Filtrar Mês (Análise Principal):</label><input type="month" id="month-filter"></div>
         </div>
         <h2 class="section-title" style="margin-top: 2rem;">Análise Cumulativa Diária</h2>
@@ -148,266 +162,386 @@
         </div>
     </div>
 
-    <script>
-        function formatCurrency(value) { return (Number(value) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }); }
-        function formatNumber(value) {
-            value = Number(value) || 0;
-            if (Math.abs(value) >= 1000000) return (value / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
-            if (Math.abs(value) >= 1000) return (value / 1000).toFixed(1).replace(/\.0$/, '') + 'K';
-            return value.toLocaleString('pt-BR');
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    function formatCurrency(value) { return (Number(value) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }); }
+    function formatNumber(value) {
+        value = Number(value) || 0;
+        if (Math.abs(value) >= 1000000) return (value / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
+        if (Math.abs(value) >= 1000) return (value / 1000).toFixed(1).replace(/\.0$/, '') + 'K';
+        return value.toLocaleString('pt-BR');
+    }
+    function formatPercentage(value) { return `${(Number(value) || 0).toFixed(1)}%`; }
+    function abbreviateProductName(name) {
+        const MAX_LENGTH = 22;
+        const wordMap = { 'PANETTONE': 'PANET', 'CHOCOLATE': 'CHOC', 'SUFLAIR': 'SUFL', 'TAMPICO': 'TAMP', 'LINDOYA': 'LIND', 'PIMENTA': 'PIM', 'MEXICANA': 'MEX', 'FOFURA': 'FOF', 'TORCIDA': 'TORC', 'BATON': 'BTN', 'FRUTAS': 'FRT', 'AO LEITE': '' };
+        let processedName = name.toUpperCase();
+        for (const key in wordMap) { processedName = processedName.replace(new RegExp(key, 'g'), wordMap[key]); }
+        processedName = processedName.replace(/\s+/g, ' ').trim();
+        if (processedName.length > MAX_LENGTH) { return processedName.substring(0, MAX_LENGTH) + '...'; }
+        return processedName;
+    }
+
+    const chartColors = [ 
+        { background: 'rgba(94, 114, 228, 0.8)', border: 'rgba(94, 114, 228, 1)' }, 
+        { background: 'rgba(245, 54, 92, 0.8)', border: 'rgba(245, 54, 92, 1)' }, 
+        { background: 'rgba(45, 206, 137, 0.8)', border: 'rgba(45, 206, 137, 1)' }, 
+        { background: 'rgba(251, 99, 64, 0.8)', border: 'rgba(251, 99, 64, 1)' }, 
+        { background: 'rgba(17, 205, 239, 0.8)', border: 'rgba(17, 205, 239, 1)' }, 
+        { background: 'rgba(137, 101, 224, 0.8)', border: 'rgba(137, 101, 224, 1)' } 
+    ];
+
+    function createChartConfig(title, type, options = {}) {
+        const { isMultiAxis = false, color = chartColors[0], formatterType = 'number' } = options;
+        const isLine = type === 'line';
+        let formatterFunction = (formatterType === 'percentage') ? formatPercentage : formatNumber;
+        const textColor = '#525f7f';
+        const tickFormatter = (formatterType === 'percentage') ? (value) => `${value}%` : (value) => formatNumber(value);
+
+        return { 
+            type: type, 
+            data: { 
+                labels: [], 
+                datasets: isMultiAxis ? [] : [{ 
+                    label: title, 
+                    data: [], 
+                    backgroundColor: isLine ? color.background.replace('0.8', '0.2') : color.background, 
+                    borderColor: color.border, 
+                    borderWidth: 2, 
+                    fill: isLine, 
+                    tension: 0.1 
+                }] 
+            }, 
+            options: { 
+                responsive: true, 
+                maintainAspectRatio: false, 
+                customFormatterType: formatterType,
+                plugins: { 
+                    legend: { display: isMultiAxis, position: 'top' }, 
+                    title: { 
+                        display: true, 
+                        text: title, 
+                        font: { size: 16 }, 
+                        padding: { bottom: 20 },
+                        color: '#f5365c'
+                    }, 
+                    datalabels: { 
+                        display: !isLine, 
+                        anchor: 'end', 
+                        align: 'top', 
+                        color: textColor,
+                        font: { weight: 'bold' }, 
+                        formatter: formatterFunction
+                    } 
+                }, 
+                scales: { 
+                    x: { ticks: { color: textColor } },
+                    y: { ticks: { color: textColor, callback: tickFormatter } }
+                } 
+            } 
+        };
+    }
+
+    function updateChartData(chart, labels, data) {
+        if (!chart || !chart.data) return;
+        chart.data.labels = labels;
+        chart.data.datasets[0].data = data;
+        chart.update();
+    }
+
+    function updateMultiLineChart(chart, labels, datasets) {
+        if (!chart || !chart.data) return;
+        const colors = ['rgba(94, 114, 228, 1)', 'rgba(245, 54, 92, 1)', 'rgba(45, 206, 137, 1)'];
+        const bgColors = ['rgba(94, 114, 228, 0.2)', 'rgba(245, 54, 92, 0.2)', 'rgba(45, 206, 137, 0.2)'];
+        chart.data.labels = labels;
+        chart.data.datasets = datasets.map((ds, index) => ({ label: ds.label, data: ds.data, borderColor: colors[index % colors.length], backgroundColor: bgColors[index % bgColors.length], borderWidth: 2, fill: true, tension: 0.1 }));
+        chart.update();
+    }
+
+    Chart.register(ChartDataLabels);
+
+    const baseUrl = "/dashboard";
+    const elements = {
+        monthFilter: document.getElementById('month-filter'),
+        errorMessage: document.getElementById('error-message'),
+        compareMonth1: document.getElementById('compare-month-1'),
+        compareMonth2: document.getElementById('compare-month-2'),
+        menuToggle: document.getElementById('menu-toggle'),
+        sidebar: document.getElementById('sidebar'),
+        processButton: document.getElementById('process-button'),
+        salesFileInput: document.getElementById('sales-file'),
+        portfolioFileInput: document.getElementById('portfolio-file'),
+        statusMessage: document.getElementById('status-message'),
+        clearButton: document.getElementById('clear-button'),
+        vendedorSelectBox: document.getElementById('vendedor-select-box'),
+        vendedorCheckboxesContainer: document.getElementById('vendedor-checkboxes-container'),
+        vendedorSelectedText: document.getElementById('vendedor-selected-text')
+    };
+
+    window.charts = {
+        cumulativeComparison: new Chart(document.getElementById('cumulative-comparison-chart'), createChartConfig('Faturamento Cumulativo por Dia', 'line', { isMultiAxis: true })),
+        topSellers: new Chart(document.getElementById('top-vendedores-chart'), createChartConfig('Faturamento por Vendedor', 'bar', { color: chartColors[0], formatterType: 'number' })),
+        topManufacturers: new Chart(document.getElementById('top-fabricantes-chart'), createChartConfig('Top 10 Fabricantes', 'bar', { color: chartColors[1], formatterType: 'number' })),
+        focusManufacturers: new Chart(document.getElementById('focus-manufacturers-chart'), createChartConfig('Faturamento Fabricantes Foco', 'bar', { color: chartColors[2], formatterType: 'number' })),
+        positivacao: new Chart(document.getElementById('positivacao-chart'), createChartConfig('Positivação de Clientes', 'bar', { color: chartColors[3], formatterType: 'percentage' })),
+        productMix: new Chart(document.getElementById('mix-produtos-chart'), createChartConfig('Mix de Produtos', 'bar', { color: chartColors[4], formatterType: 'percentage' })),
+        topProducts: new Chart(document.getElementById('top-produtos-chart'), createChartConfig('Top 10 Produtos', 'bar', { color: chartColors[5], formatterType: 'number' }))
+    };
+    
+    async function loadDataFromAPI(month, vendedores) {
+        const params = new URLSearchParams();
+        if (month) params.append('month', month);
+        // Só adiciona o filtro de vendedor se o elemento existir na página (para admins)
+        if (elements.vendedorSelectBox) {
+            vendedores.forEach(v => params.append('vendedor', v));
         }
-        function formatPercentage(value) { return `${(Number(value) || 0).toFixed(1)}%`; }
-        function abbreviateProductName(name) {
-            const MAX_LENGTH = 22;
-            const wordMap = { 'PANETTONE': 'PANET', 'CHOCOLATE': 'CHOC', 'SUFLAIR': 'SUFL', 'TAMPICO': 'TAMP', 'LINDOYA': 'LIND', 'PIMENTA': 'PIM', 'MEXICANA': 'MEX', 'FOFURA': 'FOF', 'TORCIDA': 'TORC', 'BATON': 'BTN', 'FRUTAS': 'FRT', 'AO LEITE': '' };
-            let processedName = name.toUpperCase();
-            for (const key in wordMap) { processedName = processedName.replace(new RegExp(key, 'g'), wordMap[key]); }
-            processedName = processedName.replace(/\s+/g, ' ').trim();
-            if (processedName.length > MAX_LENGTH) { return processedName.substring(0, MAX_LENGTH) + '...'; }
-            return processedName;
+        elements.errorMessage.textContent = 'Carregando...';
+        try {
+            const response = await fetch(`${baseUrl}/api/dados?${params.toString()}`);
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.message || 'Falha ao buscar dados.');
+            updateDashboard(data);
+            elements.errorMessage.textContent = '';
+        } catch (error) {
+            elements.errorMessage.textContent = `Erro: ${error.message}`;
         }
+    }
 
-        const chartColors = [ { background: 'rgba(94, 114, 228, 0.8)', border: 'rgba(94, 114, 228, 1)' }, { background: 'rgba(245, 54, 92, 0.8)', border: 'rgba(245, 54, 92, 1)' }, { background: 'rgba(45, 206, 137, 0.8)', border: 'rgba(45, 206, 137, 1)' }, { background: 'rgba(251, 99, 64, 0.8)', border: 'rgba(251, 99, 64, 1)' }, { background: 'rgba(17, 205, 239, 0.8)', border: 'rgba(17, 205, 239, 1)' }, { background: 'rgba(137, 101, 224, 0.8)', border: 'rgba(137, 101, 224, 1)' } ];
+    let isInitialLoad = true;
+    function updateDashboard(data) {
+        // Popula o seletor de vendedores apenas se ele existir (para admins)
+        if (isInitialLoad && data.allVendors && elements.vendedorCheckboxesContainer) {
+            const container = elements.vendedorCheckboxesContainer;
+            container.innerHTML = ''; 
 
-        function createChartConfig(title, type, options = {}) {
-            const { isMultiAxis = false, color = chartColors[0], formatterType = 'number' } = options;
-            const isLine = type === 'line';
-            let formatterFunction = (formatterType === 'percentage') ? formatPercentage : formatNumber;
-            return { type: type, data: { labels: [], datasets: isMultiAxis ? [] : [{ label: title, data: [], backgroundColor: isLine ? color.background.replace('0.8', '0.2') : color.background, borderColor: color.border, borderWidth: 2, fill: isLine, tension: 0.1 }] }, options: { responsive: true, maintainAspectRatio: false, customFormatterType: formatterType, plugins: { legend: { display: isMultiAxis, position: 'top' }, title: { display: true, text: title, font: { size: 16 }, padding: { bottom: 20 } }, datalabels: { display: !isLine, anchor: 'end', align: 'top', color: '#555', font: { weight: 'bold' }, formatter: formatterFunction } }, scales: { y: { ticks: { callback: value => formatNumber(value) } } } } };
-        }
-        
-        function updateChartData(chart, labels, data) {
-            if (!chart || !chart.data) return;
-            chart.data.labels = labels;
-            chart.data.datasets[0].data = data;
-            chart.update();
-        }
-        
-        function updateMultiLineChart(chart, labels, datasets) {
-            if (!chart || !chart.data) return;
-            const colors = ['rgba(94, 114, 228, 1)', 'rgba(245, 54, 92, 1)', 'rgba(45, 206, 137, 1)'];
-            const bgColors = ['rgba(94, 114, 228, 0.2)', 'rgba(245, 54, 92, 0.2)', 'rgba(45, 206, 137, 0.2)'];
-            chart.data.labels = labels;
-            chart.data.datasets = datasets.map((ds, index) => ({ label: ds.label, data: ds.data, borderColor: colors[index % colors.length], backgroundColor: bgColors[index % bgColors.length], borderWidth: 2, fill: true, tension: 0.1 }));
-            chart.update();
-        }
+            const selectAllLabel = document.createElement('label');
+            selectAllLabel.className = 'select-all-label';
+            selectAllLabel.innerHTML = `<input type="checkbox" id="select-all-vendedores"> Selecionar Todos`;
+            container.appendChild(selectAllLabel);
 
-        document.addEventListener('DOMContentLoaded', function () {
-            Chart.register(ChartDataLabels);
-
-            const baseUrl = "/dashboard";
-            const elements = {
-                monthFilter: document.getElementById('month-filter'),
-                vendedorFilter: document.getElementById('vendedor-filter'),
-                errorMessage: document.getElementById('error-message'),
-                compareMonth1: document.getElementById('compare-month-1'),
-                compareMonth2: document.getElementById('compare-month-2'),
-                menuToggle: document.getElementById('menu-toggle'),
-                sidebar: document.getElementById('sidebar'),
-                processButton: document.getElementById('process-button'),
-                salesFileInput: document.getElementById('sales-file'),
-                portfolioFileInput: document.getElementById('portfolio-file'),
-                statusMessage: document.getElementById('status-message'),
-                clearButton: document.getElementById('clear-button')
-            };
-
-            window.charts = {
-                cumulativeComparison: new Chart(document.getElementById('cumulative-comparison-chart'), createChartConfig('Faturamento Cumulativo por Dia', 'line', { isMultiAxis: true })),
-                topSellers: new Chart(document.getElementById('top-vendedores-chart'), createChartConfig('Faturamento por Vendedor', 'bar', { color: chartColors[0], formatterType: 'number' })),
-                topManufacturers: new Chart(document.getElementById('top-fabricantes-chart'), createChartConfig('Top 10 Fabricantes', 'bar', { color: chartColors[1], formatterType: 'number' })),
-                focusManufacturers: new Chart(document.getElementById('focus-manufacturers-chart'), createChartConfig('Faturamento Fabricantes Foco', 'bar', { color: chartColors[2], formatterType: 'number' })),
-                positivacao: new Chart(document.getElementById('positivacao-chart'), createChartConfig('Positivação de Clientes', 'bar', { color: chartColors[3], formatterType: 'percentage' })),
-                productMix: new Chart(document.getElementById('mix-produtos-chart'), createChartConfig('Mix de Produtos', 'bar', { color: chartColors[4], formatterType: 'percentage' })),
-                topProducts: new Chart(document.getElementById('top-produtos-chart'), createChartConfig('Top 10 Produtos', 'bar', { color: chartColors[5], formatterType: 'number' }))
-            };
-            
-            async function loadDataFromAPI(month, vendedores) {
-                const params = new URLSearchParams();
-                if (month) params.append('month', month);
-                vendedores.forEach(v => params.append('vendedor', v));
-                elements.errorMessage.textContent = 'Carregando...';
-                try {
-                    const response = await fetch(`${baseUrl}/api/dados?${params.toString()}`);
-                    const data = await response.json();
-                    if (!response.ok) throw new Error(data.message || 'Falha ao buscar dados.');
-                    updateDashboard(data);
-                    elements.errorMessage.textContent = '';
-                } catch (error) {
-                    elements.errorMessage.textContent = `Erro: ${error.message}`;
-                }
-            }
-
-            let isInitialLoad = true;
-            function updateDashboard(data) {
-                if (isInitialLoad && data.allVendors) {
-                    elements.vendedorFilter.innerHTML = '';
-                    data.allVendors.forEach(vendedor => {
-                        const option = document.createElement('option');
-                        option.value = option.textContent = vendedor;
-                        if (data.selectedVendors && data.selectedVendors.includes(vendedor)) {
-                            option.selected = true;
-                        }
-                        elements.vendedorFilter.appendChild(option);
-                    });
-                    isInitialLoad = false;
-                }
-
-                const kpi = data.kpi || {};
-                document.getElementById("kpi-faturamento-total").textContent = formatCurrency(kpi.faturamentoTotal);
-                document.getElementById("kpi-clientes-atendidos").textContent = kpi.totalClientesAtendidos || 0;
-                document.getElementById("kpi-ticket-medio").textContent = formatCurrency(kpi.ticketMedio);
-                document.getElementById("kpi-positivacao").textContent = `${(kpi.positivacaoMedia || 0).toFixed(2)}%`;
-                document.getElementById("kpi-projecao").textContent = formatCurrency(kpi.projecaoFaturamento);
-
-                updateChartData(window.charts.topSellers, data.topSellers.map(d => d.vendedor), data.topSellers.map(d => d.total));
-                updateChartData(window.charts.topManufacturers, data.topManufacturers.map(d => d.fabricante), data.topManufacturers.map(d => d.total));
-                updateChartData(window.charts.positivacao, data.positivacaoPorVendedor.map(d => d.vendedor), data.positivacaoPorVendedor.map(d => d.positivacao));
-                const abbreviatedProductNames = data.topProducts.map(d => abbreviateProductName(d.produto));
-                updateChartData(window.charts.topProducts, abbreviatedProductNames, data.topProducts.map(d => d.total));
-                updateChartData(window.charts.productMix, data.productMix.map(d => d.vendedor), data.productMix.map(d => d.mix));
-                updateChartData(window.charts.focusManufacturers, data.focusManufacturers.map(d => d.fabricante), data.focusManufacturers.map(d => d.total));
-            
-                const goalsContainer = document.getElementById('goals-table-container');
-                goalsContainer.innerHTML = '';
-                if (data.salesGoals) {
-                    let tableHTML = `<table class="goals-table"><thead><tr><th>Vendedor</th><th>Meta</th><th>Faturamento Atual</th><th>% Atingido</th><th>Projeção</th><th>Venda Diária Necessária</th></tr></thead><tbody>`;
-                    data.salesGoals.forEach(goal => {
-                        const percent = Math.min(goal.percentual, 100);
-                        const percentClass = goal.percentual >= 100 ? 'percent-green' : 'percent-red';
-                        tableHTML += `<tr><td class="vendedor">${goal.vendedor}</td><td class="meta-valor">${formatCurrency(goal.meta)}</td><td class="faturamento-valor">${formatCurrency(goal.atual)}</td><td class="atingido"><span class="${percentClass}">${goal.percentual.toFixed(1)}%</span><div class="percentage-bar"><div class="percentage-fill" style="width: ${percent.toFixed(1)}%;"></div></div></td><td class="projecao">${formatCurrency(goal.projecao)}</td><td class="venda-diaria">${formatCurrency(goal.venda_diaria)}</td></tr>`;
-                    });
-                    goalsContainer.innerHTML = tableHTML + `</tbody></table>`;
-                }
-            }
-
-            async function loadCumulativeData() {
-                if (!elements.compareMonth1.value || !elements.compareMonth2.value) return;
-                const params = new URLSearchParams();
-                params.append('meses', elements.compareMonth1.value);
-                params.append('meses', elements.compareMonth2.value);
-                try {
-                    const response = await fetch(`${baseUrl}/api/dados-cumulativos?${params.toString()}`);
-                    const data = await response.json();
-                    if (!response.ok) throw new Error(data.message || 'Falha.');
-                    updateMultiLineChart(window.charts.cumulativeComparison, data.labels, data.datasets);
-                } catch (error) { console.error("Erro no gráfico cumulativo:", error); }
-            }
-
-            function setInitialFilters() {
-                const now = new Date();
-                const currentMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-                const previousMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-                const formatAsYYYYMM = date => `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}`;
-                elements.monthFilter.value = formatAsYYYYMM(currentMonth);
-                elements.compareMonth1.value = formatAsYYYYMM(previousMonth);
-                elements.compareMonth2.value = formatAsYYYYMM(currentMonth);
-            }
-
-            function getSelectedVendors() { return Array.from(elements.vendedorFilter.selectedOptions).map(o => o.value); }
-            function handleFilterChange() { loadDataFromAPI(elements.monthFilter.value, getSelectedVendors()); }
-            
-            elements.monthFilter.addEventListener('input', handleFilterChange);
-            elements.vendedorFilter.addEventListener('change', handleFilterChange);
-            elements.compareMonth1.addEventListener('change', loadCumulativeData);
-            elements.compareMonth2.addEventListener('change', loadCumulativeData);
-            elements.menuToggle.addEventListener('click', () => elements.sidebar.classList.toggle('open'));
-            
-            const checkFiles = () => { elements.processButton.disabled = !(elements.salesFileInput.files.length > 0 && elements.portfolioFileInput.files.length > 0); };
-            elements.salesFileInput.addEventListener('change', checkFiles);
-            elements.portfolioFileInput.addEventListener('change', checkFiles);
-            
-            elements.clearButton.addEventListener('click', async () => {
-                if(!confirm("Tem certeza? Todos os dados serão apagados.")) return;
-                elements.statusMessage.textContent="Limpando...";
-                try {
-                    const res = await fetch(`${baseUrl}/api/limpar-dados`,{method:"POST"});
-                    if(!res.ok) throw new Error((await res.json()).message);
-                    elements.statusMessage.textContent = (await res.json()).message;
-                    setTimeout(()=>location.reload(), 1500);
-                } catch(err) { elements.statusMessage.textContent = `Erro: ${err.message}`; }
+            data.allVendors.forEach(vendedor => {
+                const label = document.createElement('label');
+                label.innerHTML = `<input type="checkbox" class="vendedor-checkbox" value="${vendedor}"> ${vendedor}`;
+                container.appendChild(label);
             });
             
-            elements.processButton.addEventListener('click', async () => {
-                const formData = new FormData();
-                formData.append("salesFile", elements.salesFileInput.files[0]);
-                formData.append("portfolioFile", elements.portfolioFileInput.files[0]);
-                const replaceDataCheckbox = document.getElementById('replace-data-checkbox');
-                formData.append("replaceData", replaceDataCheckbox ? replaceDataCheckbox.checked : 'true');
-                elements.statusMessage.textContent = "Processando...";
-                try {
-                    const res = await fetch(`${baseUrl}/api/upload/vendas`, { method: "POST", body: formData });
-                    if (!res.ok) throw new Error((await res.json()).message);
-                    elements.statusMessage.textContent = `Sucesso: ${(await res.json()).message}`;
-                    setTimeout(()=>location.reload(), 1500);
-                } catch (err) { elements.statusMessage.textContent = `Erro: ${err.message}`; }
-            });
+            addVendorCheckboxListeners();
+            isInitialLoad = false;
+        }
+
+        const kpi = data.kpi || {};
+        document.getElementById("kpi-faturamento-total").textContent = formatCurrency(kpi.faturamentoTotal);
+        document.getElementById("kpi-clientes-atendidos").textContent = kpi.totalClientesAtendidos || 0;
+        document.getElementById("kpi-ticket-medio").textContent = formatCurrency(kpi.ticketMedio);
+        document.getElementById("kpi-positivacao").textContent = `${(kpi.positivacaoMedia || 0).toFixed(2)}%`;
+        document.getElementById("kpi-projecao").textContent = formatCurrency(kpi.projecaoFaturamento);
+
+        updateChartData(window.charts.topSellers, data.topSellers.map(d => d.vendedor), data.topSellers.map(d => d.total));
+        updateChartData(window.charts.topManufacturers, data.topManufacturers.map(d => d.fabricante), data.topManufacturers.map(d => d.total));
+        updateChartData(window.charts.positivacao, data.positivacaoPorVendedor.map(d => d.vendedor), data.positivacaoPorVendedor.map(d => d.positivacao));
+        const abbreviatedProductNames = data.topProducts.map(d => abbreviateProductName(d.produto));
+        updateChartData(window.charts.topProducts, abbreviatedProductNames, data.topProducts.map(d => d.total));
+        updateChartData(window.charts.productMix, data.productMix.map(d => d.vendedor), data.productMix.map(d => d.mix));
+        updateChartData(window.charts.focusManufacturers, data.focusManufacturers.map(d => d.fabricante), data.focusManufacturers.map(d => d.total));
+    
+        const goalsContainer = document.getElementById('goals-table-container');
+        goalsContainer.innerHTML = '';
+        if (data.salesGoals) {
+            let tableHTML = `<table class="goals-table"><thead><tr><th>Vendedor</th><th>Meta</th><th>Faturamento Atual</th><th>% Atingido</th><th>Projeção</th><th>Venda Diária Necessária</th></tr></thead><tbody>`;
             
-            const modal = document.getElementById('chartModal');
-            const modalBody = modal.querySelector('.modal-body');
-            const modalChartTitle = document.getElementById('modalChartTitle');
-            const closeModalBtn = document.getElementById('closeModalBtn');
-            let modalChartInstance = null;
+            data.salesGoals.forEach(goal => {
+                const percentForBar = Math.min(goal.percentual, 100);
+                const rawPercent = goal.percentual;
 
-            document.querySelectorAll('.expand-btn').forEach(button => {
-                button.addEventListener('click', () => {
-                    const chartId = button.dataset.chartId;
-                    const originalChart = window.charts[chartId];
-                    if (!originalChart) return;
-                    
-                    if (modalChartInstance) { modalChartInstance.destroy(); }
-                    modalBody.innerHTML = '<canvas id="modalChartCanvas"></canvas>';
-                    
-                    const origConfig = originalChart.config;
-                    const dataCopy = JSON.parse(JSON.stringify(origConfig.data));
-                    const optionsCopy = JSON.parse(JSON.stringify(origConfig.options));
-                    
-                    modalChartTitle.textContent = optionsCopy.plugins.title.text;
-                    modal.classList.add('visible');
+                let rowClass = '';
+                if (rawPercent >= 100) { rowClass = 'goal-green'; } 
+                else if (rawPercent >= 75) { rowClass = 'goal-yellow'; } 
+                else { rowClass = 'goal-red'; }
 
-                    setTimeout(() => {
-                        const ctx = document.getElementById('modalChartCanvas').getContext('2d');
-                        if (!ctx) return;
-
-                        const formatterType = origConfig.options.customFormatterType || 'number';
-                        const isMobile = window.innerWidth <= 768;
-                        const chartType = origConfig.type;
-                        
-                        if (isMobile && chartType === 'bar') {
-                            optionsCopy.indexAxis = 'y'; 
-                            optionsCopy.plugins.datalabels.align = 'right';
-                            optionsCopy.plugins.datalabels.anchor = 'end';
-                            optionsCopy.plugins.datalabels.font = { size: 12, weight: 'bold' };
-                            optionsCopy.scales.x.ticks.color = '#a0aec0';
-                            optionsCopy.scales.y.ticks.color = '#FFD700';
-                        } else {
-                            optionsCopy.scales.x.ticks.color = '#FFD700'; 
-                            optionsCopy.scales.y.ticks.color = '#a0aec0'; 
-                        }
-
-                        let formatterFunction = (formatterType === 'percentage') ? formatPercentage : formatNumber;
-                        optionsCopy.plugins.datalabels = { ...optionsCopy.plugins.datalabels, formatter: formatterFunction, display: true, color: '#FFD700', font: { ...optionsCopy.plugins.datalabels.font, weight: 'bold' } };
-
-                        modalChartInstance = new Chart(ctx, {
-                            type: origConfig.type,
-                            data: dataCopy,
-                            options: optionsCopy,
-                            plugins: [ChartDataLabels]
-                        });
-                    }, 50);
-                });
+                tableHTML += `<tr class="${rowClass}"><td class="vendedor">${goal.vendedor}</td><td class="meta-valor">${formatCurrency(goal.meta)}</td><td class="faturamento-valor">${formatCurrency(goal.atual)}</td><td class="atingido"><span>${rawPercent.toFixed(1)}%</span><div class="percentage-bar"><div class="percentage-fill" style="width: ${percentForBar.toFixed(1)}%;"></div></div></td><td class="projecao">${formatCurrency(goal.projecao)}</td><td class="venda-diaria">${formatCurrency(goal.venda_diaria)}</td></tr>`;
             });
+            goalsContainer.innerHTML = tableHTML + `</tbody></table>`;
+        }
+    }
 
-            const closeModal = () => {
-                modal.classList.remove('visible');
-                if (modalChartInstance) { modalChartInstance.destroy(); modalChartInstance = null; }
-            };
-            closeModalBtn.addEventListener('click', closeModal);
-            modal.addEventListener('click', e => { if (e.target === modal) closeModal(); });
+    async function loadCumulativeData() {
+        if (!elements.compareMonth1.value || !elements.compareMonth2.value) return;
+        const params = new URLSearchParams();
+        params.append('meses', elements.compareMonth1.value);
+        params.append('meses', elements.compareMonth2.value);
+        try {
+            const response = await fetch(`${baseUrl}/api/dados-cumulativos?${params.toString()}`);
+            if (response.status === 401) { window.location.href = '/login'; return; }
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.message || 'Falha.');
+            updateMultiLineChart(window.charts.cumulativeComparison, data.labels, data.datasets);
+        } catch (error) { console.error("Erro no gráfico cumulativo:", error); }
+    }
 
-            setInitialFilters();
-            loadDataFromAPI(elements.monthFilter.value, []); 
-            loadCumulativeData();
+    function setInitialFilters() {
+        const now = new Date();
+        const currentMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+        const previousMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        const formatAsYYYYMM = date => `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}`;
+        elements.monthFilter.value = formatAsYYYYMM(currentMonth);
+        elements.compareMonth1.value = formatAsYYYYMM(previousMonth);
+        elements.compareMonth2.value = formatAsYYYYMM(currentMonth);
+    }
+    
+    function getSelectedVendors() {
+        // Retorna um array vazio se o seletor não existir (para vendedores)
+        if (!elements.vendedorSelectBox) return [];
+        const checkboxes = document.querySelectorAll('.vendedor-checkbox:checked');
+        return Array.from(checkboxes).map(cb => cb.value);
+    }
+
+    function updateSelectedVendorsText() {
+        if (!elements.vendedorSelectedText) return;
+        const selected = getSelectedVendors();
+        const totalVendors = document.querySelectorAll('.vendedor-checkbox').length;
+        if (selected.length === 0 || selected.length === totalVendors) {
+            elements.vendedorSelectedText.textContent = 'Todos os Vendedores';
+        } else if (selected.length === 1) {
+            elements.vendedorSelectedText.textContent = selected[0];
+        } else if (selected.length > 1 && selected.length <= 3) {
+            elements.vendedorSelectedText.textContent = selected.join(', ');
+        } else {
+            elements.vendedorSelectedText.textContent = `${selected.length} vendedores selecionados`;
+        }
+    }
+    
+    function addVendorCheckboxListeners() {
+        if (!elements.vendedorCheckboxesContainer) return;
+        const selectAllCheckbox = document.getElementById('select-all-vendedores');
+        const vendorCheckboxes = document.querySelectorAll('.vendedor-checkbox');
+
+        selectAllCheckbox.addEventListener('change', () => {
+            vendorCheckboxes.forEach(cb => {
+                cb.checked = selectAllCheckbox.checked;
+            });
+            updateSelectedVendorsText();
+            handleFilterChange();
         });
-    </script>
-</body>
+
+        vendorCheckboxes.forEach(checkbox => {
+            checkbox.addEventListener('change', () => {
+                if (!checkbox.checked) {
+                    selectAllCheckbox.checked = false;
+                } else {
+                    const allChecked = Array.from(vendorCheckboxes).every(cb => cb.checked);
+                    selectAllCheckbox.checked = allChecked;
+                }
+                updateSelectedVendorsText();
+                handleFilterChange();
+            });
+        });
+    }
+
+    if (elements.vendedorSelectBox) {
+        elements.vendedorSelectBox.addEventListener('click', (e) => {
+            e.stopPropagation();
+            elements.vendedorCheckboxesContainer.classList.toggle('visible');
+            elements.vendedorSelectBox.classList.toggle('open');
+        });
+    }
+
+    document.addEventListener('click', function(event) {
+        if (elements.vendedorSelectBox && !elements.vendedorSelectBox.contains(event.target) && !elements.vendedorCheckboxesContainer.contains(event.target)) {
+            elements.vendedorCheckboxesContainer.classList.remove('visible');
+            elements.vendedorSelectBox.classList.remove('open');
+        }
+    });
+
+    function handleFilterChange() { 
+        loadDataFromAPI(elements.monthFilter.value, getSelectedVendors()); 
+    }
+    
+    elements.monthFilter.addEventListener('input', handleFilterChange);
+    elements.compareMonth1.addEventListener('change', loadCumulativeData);
+    elements.compareMonth2.addEventListener('change', loadCumulativeData);
+    elements.menuToggle.addEventListener('click', () => elements.sidebar.classList.toggle('open'));
+    
+    const checkFiles = () => { elements.processButton.disabled = !(elements.salesFileInput.files.length > 0 && elements.portfolioFileInput.files.length > 0); };
+    elements.salesFileInput.addEventListener('change', checkFiles);
+    elements.portfolioFileInput.addEventListener('change', checkFiles);
+    
+    elements.clearButton.addEventListener('click', async () => {
+        if(!confirm("Tem certeza? Todos os dados serão apagados.")) return;
+        elements.statusMessage.textContent="Limpando...";
+        try {
+            const res = await fetch(`${baseUrl}/api/limpar-dados`,{method:"POST"});
+            if (res.status === 401) { window.location.href = '/login'; return; }
+            if(!res.ok) throw new Error((await res.json()).message);
+            elements.statusMessage.textContent = (await res.json()).message;
+            setTimeout(()=>location.reload(), 1500);
+        } catch(err) { elements.statusMessage.textContent = `Erro: ${err.message}`; }
+    });
+    
+    elements.processButton.addEventListener('click', async () => {
+        const formData = new FormData();
+        formData.append("salesFile", elements.salesFileInput.files[0]);
+        formData.append("portfolioFile", elements.portfolioFileInput.files[0]);
+        const replaceDataCheckbox = document.getElementById('replace-data-checkbox');
+        formData.append("replaceData", replaceDataCheckbox ? replaceDataCheckbox.checked : 'true');
+        elements.statusMessage.textContent = "Processando...";
+        try {
+            const res = await fetch(`${baseUrl}/api/upload/vendas`, { method: "POST", body: formData });
+            if (res.status === 401) { window.location.href = '/login'; return; }
+            if (!res.ok) throw new Error((await res.json()).message);
+            elements.statusMessage.textContent = `Sucesso: ${(await res.json()).message}`;
+            setTimeout(()=>location.reload(), 1500);
+        } catch (err) { elements.statusMessage.textContent = `Erro: ${err.message}`; }
+    });
+    
+    const modal = document.getElementById('chartModal');
+    const modalBody = modal.querySelector('.modal-body');
+    const modalChartTitle = document.getElementById('modalChartTitle');
+    const closeModalBtn = document.getElementById('closeModalBtn');
+    let modalChartInstance = null;
+
+    document.querySelectorAll('.expand-btn').forEach(button => {
+        button.addEventListener('click', () => {
+            const chartId = button.dataset.chartId;
+            const originalChart = window.charts[chartId];
+            if (!originalChart) return;
+            if (modalChartInstance) { modalChartInstance.destroy(); modalChartInstance = null; }
+            modalBody.innerHTML = '<canvas id="modalChartCanvas"></canvas>';
+            const origConfig = originalChart.config;
+            const dataCopy = JSON.parse(JSON.stringify(origConfig.data));
+            const optionsCopy = JSON.parse(JSON.stringify(origConfig.options));
+            const isMobile = window.innerWidth <= 768;
+            const yellowColor = '#FFD700';
+            const formatterFunction = (optionsCopy.customFormatterType === 'percentage') ? formatPercentage : formatNumber;
+            optionsCopy.plugins.datalabels.formatter = formatterFunction;
+            optionsCopy.plugins.datalabels.color = yellowColor;
+            optionsCopy.scales.x.ticks.color = yellowColor;
+            optionsCopy.scales.y.ticks.color = yellowColor;
+            if (isMobile && origConfig.type === 'bar') {
+                optionsCopy.plugins.datalabels.align = 'end';
+                optionsCopy.plugins.datalabels.anchor = 'end';
+            }
+            const ctx = document.getElementById('modalChartCanvas').getContext('2d');
+            if (!ctx) return;
+            try {
+                modalChartInstance = new Chart(ctx, { type: origConfig.type, data: dataCopy, options: optionsCopy, plugins: [ChartDataLabels] });
+            } catch (error) { console.error("Erro ao criar a instância do gráfico no modal:", error); }
+            modalChartTitle.textContent = optionsCopy.plugins.title.text;
+            modal.classList.add('visible');
+        });
+    });
+
+    const closeModal = () => {
+        modal.classList.remove('visible');
+        if (modalChartInstance) { modalChartInstance.destroy(); modalChartInstance = null; }
+    };
+    closeModalBtn.addEventListener('click', closeModal);
+    modal.addEventListener('click', e => { if (e.target === modal) closeModal(); });
+
+    setInitialFilters();
+    loadDataFromAPI(elements.monthFilter.value, getSelectedVendors());
+    loadCumulativeData();
+
+    console.log('Teste final do body, JS carregado');
+});
+</script>
 </html>
