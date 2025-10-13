@@ -83,6 +83,17 @@
         .modal-close-btn { background: none; border: none; font-size: 2rem; cursor: pointer; color: #a0aec0; line-height: 1; }
         .modal-body { flex-grow: 1; position: relative; }
         .modal-body canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+        .update-banner {
+            background-color: #fffbeb;
+            color: #b45309;
+            padding: 1rem;
+            text-align: center;
+            font-size: 1.1rem;
+            font-weight: 600;
+            border-radius: var(--border-radius);
+            margin-bottom: 2rem;
+            border: 1px solid #fde68a;
+        }
         
         @media (max-width: 768px) {
             .container { margin-top: 1rem; padding: 0 0.75rem; }
@@ -102,6 +113,9 @@
                 <button class="menu-toggle" id="menu-toggle">&#9776;</button>
             </div>
         </header>
+        <div class="update-banner">
+            Última atualização de faturamento: <strong>{{ last_update_date }}</strong>
+        </div>
         <div id="error-message"></div>
         <div class="kpi-grid">
             <div class="kpi-card"><div class="kpi-icon icon-faturamento">&#8352;$</div><div class="kpi-text"><h3>Faturamento Total</h3><p id="kpi-faturamento-total">R$ 0,00</p></div></div>
@@ -284,14 +298,14 @@ document.addEventListener('DOMContentLoaded', function () {
         topManufacturers: new Chart(document.getElementById('top-fabricantes-chart'), createChartConfig('Top 10 Fabricantes', 'bar', { color: chartColors[1], formatterType: 'number' })),
         focusManufacturers: new Chart(document.getElementById('focus-manufacturers-chart'), createChartConfig('Faturamento Fabricantes Foco', 'bar', { color: chartColors[2], formatterType: 'number' })),
         positivacao: new Chart(document.getElementById('positivacao-chart'), createChartConfig('Positivação de Clientes', 'bar', { color: chartColors[3], formatterType: 'percentage' })),
-        productMix: new Chart(document.getElementById('mix-produtos-chart'), createChartConfig('Mix de Produtos', 'bar', { color: chartColors[4], formatterType: 'percentage' })),
+        // --- ALTERAÇÃO NO TIPO DE DADO DO GRÁFICO ---
+        productMix: new Chart(document.getElementById('mix-produtos-chart'), createChartConfig('Mix de Produtos', 'bar', { color: chartColors[4], formatterType: 'number' })),
         topProducts: new Chart(document.getElementById('top-produtos-chart'), createChartConfig('Top 10 Produtos', 'bar', { color: chartColors[5], formatterType: 'number' }))
     };
     
     async function loadDataFromAPI(month, vendedores) {
         const params = new URLSearchParams();
         if (month) params.append('month', month);
-        // Só adiciona o filtro de vendedor se o elemento existir na página (para admins)
         if (elements.vendedorSelectBox) {
             vendedores.forEach(v => params.append('vendedor', v));
         }
@@ -309,22 +323,18 @@ document.addEventListener('DOMContentLoaded', function () {
 
     let isInitialLoad = true;
     function updateDashboard(data) {
-        // Popula o seletor de vendedores apenas se ele existir (para admins)
         if (isInitialLoad && data.allVendors && elements.vendedorCheckboxesContainer) {
             const container = elements.vendedorCheckboxesContainer;
             container.innerHTML = ''; 
-
             const selectAllLabel = document.createElement('label');
             selectAllLabel.className = 'select-all-label';
             selectAllLabel.innerHTML = `<input type="checkbox" id="select-all-vendedores"> Selecionar Todos`;
             container.appendChild(selectAllLabel);
-
             data.allVendors.forEach(vendedor => {
                 const label = document.createElement('label');
                 label.innerHTML = `<input type="checkbox" class="vendedor-checkbox" value="${vendedor}"> ${vendedor}`;
                 container.appendChild(label);
             });
-            
             addVendorCheckboxListeners();
             isInitialLoad = false;
         }
@@ -341,23 +351,24 @@ document.addEventListener('DOMContentLoaded', function () {
         updateChartData(window.charts.positivacao, data.positivacaoPorVendedor.map(d => d.vendedor), data.positivacaoPorVendedor.map(d => d.positivacao));
         const abbreviatedProductNames = data.topProducts.map(d => abbreviateProductName(d.produto));
         updateChartData(window.charts.topProducts, abbreviatedProductNames, data.topProducts.map(d => d.total));
-        updateChartData(window.charts.productMix, data.productMix.map(d => d.vendedor), data.productMix.map(d => d.mix));
+        
+        // --- ALTERAÇÃO NA FORMA DE ACESSAR OS DADOS ---
+        // Agora usamos 'd.total' em vez de 'd.mix'
+        updateChartData(window.charts.productMix, data.productMix.map(d => d.vendedor), data.productMix.map(d => d.total));
+        
         updateChartData(window.charts.focusManufacturers, data.focusManufacturers.map(d => d.fabricante), data.focusManufacturers.map(d => d.total));
     
         const goalsContainer = document.getElementById('goals-table-container');
         goalsContainer.innerHTML = '';
         if (data.salesGoals) {
             let tableHTML = `<table class="goals-table"><thead><tr><th>Vendedor</th><th>Meta</th><th>Faturamento Atual</th><th>% Atingido</th><th>Projeção</th><th>Venda Diária Necessária</th></tr></thead><tbody>`;
-            
             data.salesGoals.forEach(goal => {
                 const percentForBar = Math.min(goal.percentual, 100);
                 const rawPercent = goal.percentual;
-
                 let rowClass = '';
                 if (rawPercent >= 100) { rowClass = 'goal-green'; } 
                 else if (rawPercent >= 75) { rowClass = 'goal-yellow'; } 
                 else { rowClass = 'goal-red'; }
-
                 tableHTML += `<tr class="${rowClass}"><td class="vendedor">${goal.vendedor}</td><td class="meta-valor">${formatCurrency(goal.meta)}</td><td class="faturamento-valor">${formatCurrency(goal.atual)}</td><td class="atingido"><span>${rawPercent.toFixed(1)}%</span><div class="percentage-bar"><div class="percentage-fill" style="width: ${percentForBar.toFixed(1)}%;"></div></div></td><td class="projecao">${formatCurrency(goal.projecao)}</td><td class="venda-diaria">${formatCurrency(goal.venda_diaria)}</td></tr>`;
             });
             goalsContainer.innerHTML = tableHTML + `</tbody></table>`;
@@ -389,7 +400,6 @@ document.addEventListener('DOMContentLoaded', function () {
     }
     
     function getSelectedVendors() {
-        // Retorna um array vazio se o seletor não existir (para vendedores)
         if (!elements.vendedorSelectBox) return [];
         const checkboxes = document.querySelectorAll('.vendedor-checkbox:checked');
         return Array.from(checkboxes).map(cb => cb.value);
@@ -414,23 +424,15 @@ document.addEventListener('DOMContentLoaded', function () {
         if (!elements.vendedorCheckboxesContainer) return;
         const selectAllCheckbox = document.getElementById('select-all-vendedores');
         const vendorCheckboxes = document.querySelectorAll('.vendedor-checkbox');
-
         selectAllCheckbox.addEventListener('change', () => {
-            vendorCheckboxes.forEach(cb => {
-                cb.checked = selectAllCheckbox.checked;
-            });
+            vendorCheckboxes.forEach(cb => { cb.checked = selectAllCheckbox.checked; });
             updateSelectedVendorsText();
             handleFilterChange();
         });
-
         vendorCheckboxes.forEach(checkbox => {
             checkbox.addEventListener('change', () => {
-                if (!checkbox.checked) {
-                    selectAllCheckbox.checked = false;
-                } else {
-                    const allChecked = Array.from(vendorCheckboxes).every(cb => cb.checked);
-                    selectAllCheckbox.checked = allChecked;
-                }
+                if (!checkbox.checked) { selectAllCheckbox.checked = false; } 
+                else { const allChecked = Array.from(vendorCheckboxes).every(cb => cb.checked); selectAllCheckbox.checked = allChecked; }
                 updateSelectedVendorsText();
                 handleFilterChange();
             });

@@ -1,7 +1,6 @@
 from werkzeug.security import generate_password_hash
 
-# --- COLOQUE AS NOVAS SENHAS AQUI ---
-# Modifique apenas as senhas que você deseja alterar.
+# Script preenchido com as últimas senhas que você definiu
 users_to_update = {
     'MARCELO': 'marcelo18',
     'EVERTON': 'everton57',
