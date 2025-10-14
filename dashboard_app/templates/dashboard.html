@@ -130,8 +130,7 @@
                 <label for="vendedor-select-box">Filtrar Vendedor:</label>
                 <div class="multiselect-container">
                     <div class="select-box" id="vendedor-select-box">
-                        <span id="vendedor-selected-text">Todos os Vendedores</span>
-                        <span class="arrow">&#9660;</span>
+                        <span id="vendedor-selected-text">VENDEDORES PRINCIPAIS</span>
                     </div>
                     <div class="checkboxes-container" id="vendedor-checkboxes-container">
                     </div>
@@ -298,7 +297,6 @@ document.addEventListener('DOMContentLoaded', function () {
         topManufacturers: new Chart(document.getElementById('top-fabricantes-chart'), createChartConfig('Top 10 Fabricantes', 'bar', { color: chartColors[1], formatterType: 'number' })),
         focusManufacturers: new Chart(document.getElementById('focus-manufacturers-chart'), createChartConfig('Faturamento Fabricantes Foco', 'bar', { color: chartColors[2], formatterType: 'number' })),
         positivacao: new Chart(document.getElementById('positivacao-chart'), createChartConfig('Positivação de Clientes', 'bar', { color: chartColors[3], formatterType: 'percentage' })),
-        // --- ALTERAÇÃO NO TIPO DE DADO DO GRÁFICO ---
         productMix: new Chart(document.getElementById('mix-produtos-chart'), createChartConfig('Mix de Produtos', 'bar', { color: chartColors[4], formatterType: 'number' })),
         topProducts: new Chart(document.getElementById('top-produtos-chart'), createChartConfig('Top 10 Produtos', 'bar', { color: chartColors[5], formatterType: 'number' }))
     };
@@ -351,11 +349,7 @@ document.addEventListener('DOMContentLoaded', function () {
         updateChartData(window.charts.positivacao, data.positivacaoPorVendedor.map(d => d.vendedor), data.positivacaoPorVendedor.map(d => d.positivacao));
         const abbreviatedProductNames = data.topProducts.map(d => abbreviateProductName(d.produto));
         updateChartData(window.charts.topProducts, abbreviatedProductNames, data.topProducts.map(d => d.total));
-        
-        // --- ALTERAÇÃO NA FORMA DE ACESSAR OS DADOS ---
-        // Agora usamos 'd.total' em vez de 'd.mix'
         updateChartData(window.charts.productMix, data.productMix.map(d => d.vendedor), data.productMix.map(d => d.total));
-        
         updateChartData(window.charts.focusManufacturers, data.focusManufacturers.map(d => d.fabricante), data.focusManufacturers.map(d => d.total));
     
         const goalsContainer = document.getElementById('goals-table-container');
@@ -405,17 +399,29 @@ document.addEventListener('DOMContentLoaded', function () {
         return Array.from(checkboxes).map(cb => cb.value);
     }
 
+    // --- ALTERAÇÃO 2: Lógica de texto do seletor atualizada ---
     function updateSelectedVendorsText() {
         if (!elements.vendedorSelectedText) return;
         const selected = getSelectedVendors();
         const totalVendors = document.querySelectorAll('.vendedor-checkbox').length;
-        if (selected.length === 0 || selected.length === totalVendors) {
-            elements.vendedorSelectedText.textContent = 'Todos os Vendedores';
-        } else if (selected.length === 1) {
+        const selectAllCheckbox = document.getElementById('select-all-vendedores');
+
+        // Verifica se o "Selecionar Todos" está marcado
+        if (selectAllCheckbox && selectAllCheckbox.checked && selected.length === totalVendors) {
+            elements.vendedorSelectedText.textContent = 'TODOS OS VENDEDORES';
+        } 
+        // Verifica se está no estado padrão (nenhum selecionado)
+        else if (selected.length === 0) {
+            elements.vendedorSelectedText.textContent = 'VENDEDORES PRINCIPAIS';
+        } 
+        // Lógica para 1, 2 ou 3 selecionados
+        else if (selected.length === 1) {
             elements.vendedorSelectedText.textContent = selected[0];
         } else if (selected.length > 1 && selected.length <= 3) {
             elements.vendedorSelectedText.textContent = selected.join(', ');
-        } else {
+        } 
+        // Lógica para mais de 3 selecionados
+        else {
             elements.vendedorSelectedText.textContent = `${selected.length} vendedores selecionados`;
         }
     }
