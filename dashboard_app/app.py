@@ -197,6 +197,7 @@ def upload_data():
     finally:
         if conn: conn.close()
 
+# Substitua a sua função get_data() por esta:
 @dashboard_bp.route("/api/dados", methods=['GET'])
 @login_required
 def get_data():
@@ -217,21 +218,34 @@ def get_data():
         else:
             vendedores_filter = [current_user.username]
         results['selectedVendors'] = vendedores_filter
-        where_conditions = ["EXTRACT(ISODOW FROM data_venda) < 6"]
+
+        # --- ALTERAÇÃO AQUI ---
+        # A linha "EXTRACT(ISODOW FROM data_venda) < 6" foi removida.
+        where_conditions = [] 
         where_conditions.append(f"TO_CHAR(data_venda, 'YYYY-MM') = '{month_filter}'")
+        
         safe_vendedores = []
         if vendedores_filter:
             safe_vendedores = ["'" + v.replace("'", "''") + "'" for v in vendedores_filter]
             where_conditions.append(f"vendedor IN ({','.join(safe_vendedores)})")
-        where_clause = "WHERE " + " AND ".join(where_conditions)
+        
+        # Se nenhuma condição existir (raro), não adiciona WHERE.
+        where_clause = "WHERE " + " AND ".join(where_conditions) if where_conditions else ""
+        # --- FIM DA ALTERAÇÃO ---
+
         today = datetime.now()
         analysis_year, analysis_month = map(int, month_filter.split('-'))
         total_dias_uteis_mes = count_weekdays(analysis_year, analysis_month)
         dias_uteis_passados = count_weekdays(analysis_year, analysis_month, today.day) if analysis_year == today.year and analysis_month == today.month else total_dias_uteis_mes
+        
+        # Esta consulta agora usará o novo where_clause (sem filtro de dia da semana)
         cur.execute(f"SELECT COALESCE(SUM(valor), 0), COALESCE(COUNT(DISTINCT cliente), 0), COALESCE(COUNT(*), 0) FROM public.vendas {where_clause};")
         faturamento_total, total_clientes_atendidos, total_vendas = cur.fetchone() or (0, 0, 0)
         ticket_medio = float(faturamento_total / total_vendas) if total_vendas > 0 else 0.0
-        media_diaria = float(faturamento_total / dias_uteis_passados) if dias_uteis_passados > 0 else 0.0
+        
+        # A projeção ainda é baseada em dias úteis, o que faz sentido
+        media_diaria_dias_uteis = float(faturamento_total / dias_uteis_passados) if dias_uteis_passados > 0 else 0.0
+        
         positivacao_carteira_where = f"WHERE Carteira.mes = '{month_filter}'"
         if vendedores_filter: positivacao_carteira_where += f" AND Carteira.vendedor IN ({','.join(safe_vendedores)})"
         cur.execute(f"""
@@ -241,7 +255,15 @@ def get_data():
         """)
         positivacao_result = cur.fetchone()
         positivacao_media = float(positivacao_result[0]) if positivacao_result and positivacao_result[0] is not None else 0.0
-        results['kpi'] = {"faturamentoTotal": float(faturamento_total), "totalClientesAtendidos": total_clientes_atendidos, "ticketMedio": ticket_medio, "positivacaoMedia": positivacao_media, "projecaoFaturamento": media_diaria * total_dias_uteis_mes}
+        
+        results['kpi'] = {
+            "faturamentoTotal": float(faturamento_total), 
+            "totalClientesAtendidos": total_clientes_atendidos, 
+            "ticketMedio": ticket_medio, 
+            "positivacaoMedia": positivacao_media, 
+            "projecaoFaturamento": media_diaria_dias_uteis * total_dias_uteis_mes # Projeção continua baseada em dias úteis
+        }
+
         query_mappings = {
             'topSellers': "SELECT vendedor, SUM(valor) as total FROM public.vendas {where_clause} GROUP BY vendedor ORDER BY total DESC;",
             'topManufacturers': "SELECT fabricante, SUM(valor) as total FROM public.vendas {where_clause} GROUP BY fabricante ORDER BY total DESC LIMIT 10;",
@@ -257,8 +279,6 @@ def get_data():
         """)
         results['positivacaoPorVendedor'] = [{col.name: float(val) if isinstance(val, Decimal) else val for col, val in zip(cur.description, row)} for row in cur.fetchall()]
         
-        # --- ALTERAÇÃO NO CÁLCULO DO MIX DE PRODUTOS ---
-        # A consulta agora retorna a contagem bruta (total) em vez da porcentagem (mix)
         cur.execute(f"""
             WITH ProdutosVendidos AS (
                 SELECT vendedor, COUNT(DISTINCT produto) AS produtos_unicos_vendidos 
@@ -274,10 +294,9 @@ def get_data():
             ORDER BY total DESC;
         """)
         results['productMix'] = [{col.name: val for col, val in zip(cur.description, row)} for row in cur.fetchall()]
-        # --- FIM DA ALTERAÇÃO ---
 
         fabricantes_foco = ['SELMI', 'LUCKY', 'RICLAN', 'KELLANOVA', 'TAMPICO', 'CONSABOR', 'YAI', 'TECPOLPA', 'GOLDKO']
-        focus_where = where_clause + f" AND fabricante IN ({','.join(['%s'] * len(fabricantes_foco))})"
+        focus_where = where_clause + (f" AND fabricante IN ({','.join(['%s'] * len(fabricantes_foco))})" if where_clause else f"WHERE fabricante IN ({','.join(['%s'] * len(fabricantes_foco))})")
         cur.execute(f"SELECT fabricante, SUM(valor) as total FROM public.vendas {focus_where} GROUP BY fabricante ORDER BY total DESC;", fabricantes_foco)
         results['focusManufacturers'] = [{col.name: float(val) if isinstance(val, Decimal) else val for col, val in zip(cur.description, row)} for row in cur.fetchall()]
         
@@ -300,7 +319,7 @@ def get_data():
             row['percentual'] = (atual / meta) * 100 if meta > 0 else 0.0
             restante = meta - atual
             row['venda_diaria'] = (restante / (total_dias_uteis_mes - dias_uteis_passados)) if (total_dias_uteis_mes - dias_uteis_passados) > 0 and restante > 0 else 0.0
-            row['projecao'] = (atual / dias_uteis_passados) * total_dias_uteis_mes if dias_uteis_passados > 0 else 0.0
+            row['projecao'] = (media_diaria_dias_uteis * total_dias_uteis_mes) if dias_uteis_passados > 0 else 0.0
             sales_goals.append(row)
         results['salesGoals'] = sorted(sales_goals, key=lambda x: x['percentual'], reverse=True)
         
