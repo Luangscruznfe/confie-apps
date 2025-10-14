@@ -219,9 +219,7 @@ def get_data():
             vendedores_filter = [current_user.username]
         results['selectedVendors'] = vendedores_filter
 
-        # --- ALTERAÇÃO AQUI ---
-        # A linha "EXTRACT(ISODOW FROM data_venda) < 6" foi removida.
-        where_conditions = [] 
+        where_conditions = []
         where_conditions.append(f"TO_CHAR(data_venda, 'YYYY-MM') = '{month_filter}'")
         
         safe_vendedores = []
@@ -229,21 +227,17 @@ def get_data():
             safe_vendedores = ["'" + v.replace("'", "''") + "'" for v in vendedores_filter]
             where_conditions.append(f"vendedor IN ({','.join(safe_vendedores)})")
         
-        # Se nenhuma condição existir (raro), não adiciona WHERE.
         where_clause = "WHERE " + " AND ".join(where_conditions) if where_conditions else ""
-        # --- FIM DA ALTERAÇÃO ---
 
         today = datetime.now()
         analysis_year, analysis_month = map(int, month_filter.split('-'))
         total_dias_uteis_mes = count_weekdays(analysis_year, analysis_month)
         dias_uteis_passados = count_weekdays(analysis_year, analysis_month, today.day) if analysis_year == today.year and analysis_month == today.month else total_dias_uteis_mes
         
-        # Esta consulta agora usará o novo where_clause (sem filtro de dia da semana)
         cur.execute(f"SELECT COALESCE(SUM(valor), 0), COALESCE(COUNT(DISTINCT cliente), 0), COALESCE(COUNT(*), 0) FROM public.vendas {where_clause};")
         faturamento_total, total_clientes_atendidos, total_vendas = cur.fetchone() or (0, 0, 0)
         ticket_medio = float(faturamento_total / total_vendas) if total_vendas > 0 else 0.0
         
-        # A projeção ainda é baseada em dias úteis, o que faz sentido
         media_diaria_dias_uteis = float(faturamento_total / dias_uteis_passados) if dias_uteis_passados > 0 else 0.0
         
         positivacao_carteira_where = f"WHERE Carteira.mes = '{month_filter}'"
@@ -261,7 +255,7 @@ def get_data():
             "totalClientesAtendidos": total_clientes_atendidos, 
             "ticketMedio": ticket_medio, 
             "positivacaoMedia": positivacao_media, 
-            "projecaoFaturamento": media_diaria_dias_uteis * total_dias_uteis_mes # Projeção continua baseada em dias úteis
+            "projecaoFaturamento": media_diaria_dias_uteis * total_dias_uteis_mes
         }
 
         query_mappings = {
@@ -319,7 +313,11 @@ def get_data():
             row['percentual'] = (atual / meta) * 100 if meta > 0 else 0.0
             restante = meta - atual
             row['venda_diaria'] = (restante / (total_dias_uteis_mes - dias_uteis_passados)) if (total_dias_uteis_mes - dias_uteis_passados) > 0 and restante > 0 else 0.0
-            row['projecao'] = (media_diaria_dias_uteis * total_dias_uteis_mes) if dias_uteis_passados > 0 else 0.0
+            
+            # --- CORREÇÃO AQUI ---
+            # A projeção agora usa o faturamento 'atual' de cada vendedor individualmente
+            row['projecao'] = (atual / dias_uteis_passados) * total_dias_uteis_mes if dias_uteis_passados > 0 else 0.0
+            
             sales_goals.append(row)
         results['salesGoals'] = sorted(sales_goals, key=lambda x: x['percentual'], reverse=True)
         
