@@ -115,7 +115,7 @@ def dashboard_page():
 @login_required
 def delete_data():
     if current_user.role != 'admin':
-        return jsonify({"message": "Acesso negado. Permissão de administrador necessária."}), 403
+        return jsonify({"message": "Acesso negado."}), 403
     conn = None
     try:
         conn = get_db_connection()
@@ -123,41 +123,46 @@ def delete_data():
             cur.execute("TRUNCATE TABLE public.vendas RESTART IDENTITY;")
             cur.execute("TRUNCATE TABLE public.carteira RESTART IDENTITY;")
             conn.commit()
-            app.logger.info("Todos os dados das tabelas 'vendas' e 'carteira' foram apagados.")
         return jsonify({"message": "Dados limpos com sucesso!"}), 200
     except Exception as e:
         if conn: conn.rollback()
-        app.logger.error(f"Erro ao limpar dados: {e}", exc_info=True)
-        return jsonify({"message": f"Erro interno no servidor: {str(e)}"}), 500
+        return jsonify({"message": f"Erro: {str(e)}"}), 500
     finally:
         if conn: conn.close()
 
+# --- ALTERAÇÃO 1: Função de Upload agora lê a coluna H (Nome Fantasia) ---
 @dashboard_bp.route("/api/upload/vendas", methods=['POST'])
 @login_required
 def upload_data():
     if current_user.role != 'admin':
-        return jsonify({"message": "Acesso negado. Permissão de administrador necessária."}), 403
+        return jsonify({"message": "Acesso negado."}), 403
     if 'salesFile' not in request.files or 'portfolioFile' not in request.files:
-        return jsonify({"message": "Ficheiros de vendas e carteira são obrigatórios."}), 400
+        return jsonify({"message": "Ficheiros obrigatórios."}), 400
     sales_file = request.files['salesFile']
     portfolio_file = request.files['portfolioFile']
     conn = None
     try:
         conn = get_db_connection()
         if not sales_file.filename.endswith(('.xlsx', '.csv')):
-            return jsonify({"message": "Formato de ficheiro de vendas inválido."}), 400
-        app.logger.info(f"A processar o ficheiro de vendas: {sales_file.filename}")
-        usecols_spec, col_names = "B,G,M,N,P,U,W", ['data_venda', 'cliente', 'produto', 'quantidade', 'valor', 'fabricante', 'vendedor']
+            return jsonify({"message": "Formato de ficheiro inválido."}), 400
+        
+        # Adicionada a coluna H e o nome 'nome_fantasia'
+        usecols_spec, col_names = "B,G,H,M,N,P,U,W", ['data_venda', 'cliente', 'nome_fantasia', 'produto', 'quantidade', 'valor', 'fabricante', 'vendedor']
+        
         sales_file.stream.seek(0)
-        sales_df = pd.read_excel(sales_file.stream, skiprows=9, usecols=usecols_spec, header=None) if sales_file.filename.endswith('.xlsx') else pd.read_csv(sales_file.stream, sep=';', skiprows=9, usecols=[1, 6, 12, 13, 15, 20, 22], header=None, encoding='latin1')
+        # Adicionado o índice da coluna H (7) para CSV
+        sales_df = pd.read_excel(sales_file.stream, skiprows=9, usecols=usecols_spec, header=None) if sales_file.filename.endswith('.xlsx') else pd.read_csv(sales_file.stream, sep=';', skiprows=9, usecols=[1, 6, 7, 12, 13, 15, 20, 22], header=None, encoding='latin1')
+        
         sales_df.columns = col_names
         sales_df['data_venda'] = pd.to_datetime(sales_df['data_venda'], dayfirst=True, errors='coerce')
         sales_df.dropna(subset=['data_venda'], inplace=True)
-        if sales_df.empty: return jsonify({"message": "O ficheiro de vendas não contém datas válidas."}), 400
+
+        if sales_df.empty: return jsonify({"message": "O ficheiro não contém datas válidas."}), 400
+        
         upload_month = sales_df['data_venda'].dt.to_period('M').mode()[0].strftime('%Y-%m')
-        app.logger.info(f"Mês de referência para este upload: {upload_month}")
-        app.logger.info(f"Lendo o ficheiro da carteira: {portfolio_file.filename}")
+
         portfolio_df = pd.read_csv(portfolio_file.stream, sep=';', encoding='latin1')
+        # ... (resto da lógica do portfolio continua igual)
         first_col_name = portfolio_df.columns[0]
         if ';' in first_col_name:
             split_data = portfolio_df[first_col_name].str.split(';', n=1, expand=True)
@@ -175,29 +180,76 @@ def upload_data():
             cur.execute("DELETE FROM public.carteira WHERE mes = %s", (upload_month,))
             sql_insert_portfolio = "INSERT INTO public.carteira (vendedor, total_clientes, total_produtos, meta_faturamento, mes) VALUES %s"
             execute_values(cur, sql_insert_portfolio, [tuple(row) for row in df_for_db.itertuples(index=False)])
-            app.logger.info(f"{len(portfolio_df)} registos da carteira inseridos para {upload_month}.")
+
         for col in ['quantidade', 'valor']:
             if sales_df[col].dtype == 'object':
                 sales_df[col] = sales_df[col].astype(str).str.replace(r'[^\d,]', '', regex=True).str.replace(',', '.')
             sales_df[col] = pd.to_numeric(sales_df[col], errors='coerce')
         sales_df.dropna(subset=['valor', 'produto'], inplace=True)
+        
         with conn.cursor() as cur:
             cur.execute("DELETE FROM public.vendas WHERE TO_CHAR(data_venda, 'YYYY-MM') = %s", (upload_month,))
-            app.logger.info(f"Dados de vendas para o mês {upload_month} foram limpos para atualização.")
             data_to_insert = [tuple(row) for row in sales_df[col_names].itertuples(index=False)]
-            sql_insert_sales = "INSERT INTO public.vendas (data_venda, cliente, produto, quantidade, valor, fabricante, vendedor) VALUES %s"
+            # Atualizado o SQL INSERT para incluir a nova coluna
+            sql_insert_sales = "INSERT INTO public.vendas (data_venda, cliente, nome_fantasia, produto, quantidade, valor, fabricante, vendedor) VALUES %s"
             execute_values(cur, sql_insert_sales, data_to_insert, page_size=1000)
-            app.logger.info(f"{len(data_to_insert)} registos de vendas inseridos para {upload_month}.")
+            
         conn.commit()
         return jsonify({"message": f"{len(data_to_insert)} registos inseridos!"}), 201
     except Exception as e:
         if conn: conn.rollback()
-        app.logger.error(f"Erro no upload dos dados: {e}", exc_info=True)
-        return jsonify({"message": f"Erro ao processar os ficheiros: {str(e)}"}), 500
+        return jsonify({"message": f"Erro: {str(e)}"}), 500
     finally:
         if conn: conn.close()
 
-# Substitua a sua função get_data() por esta:
+# --- ALTERAÇÃO 2: NOVA ROTA NA API PARA O GRÁFICO DE TOP CLIENTES ---
+@dashboard_bp.route("/api/top-clientes", methods=['GET'])
+@login_required
+def get_top_clientes_data():
+    conn = None
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        
+        month_filter = request.args.get('month')
+        if not month_filter:
+            return jsonify({"message": "Mês é obrigatório"}), 400
+
+        # Aplica a mesma lógica de permissão: admin pode filtrar, vendedor só vê o seu
+        if current_user.role == 'admin':
+            vendedores_filter = request.args.getlist('vendedor')
+        else:
+            vendedores_filter = [current_user.username]
+        
+        where_conditions = [f"TO_CHAR(data_venda, 'YYYY-MM') = '{month_filter}'"]
+        if vendedores_filter:
+            safe_vendedores = ["'" + v.replace("'", "''") + "'" for v in vendedores_filter]
+            where_conditions.append(f"vendedor IN ({','.join(safe_vendedores)})")
+
+        where_clause = "WHERE " + " AND ".join(where_conditions)
+
+        # A query agora agrupa pelo nome_fantasia e soma o valor
+        query = f"""
+            SELECT nome_fantasia, SUM(valor) as total
+            FROM public.vendas
+            {where_clause}
+            AND nome_fantasia IS NOT NULL AND TRIM(nome_fantasia) <> ''
+            GROUP BY nome_fantasia
+            ORDER BY total DESC
+            LIMIT 5;
+        """
+        cur.execute(query)
+        top_clientes = [{col.name: float(val) if isinstance(val, Decimal) else val for col, val in zip(cur.description, row)} for row in cur.fetchall()]
+        
+        cur.close()
+        return jsonify(top_clientes)
+    except Exception as e:
+        app.logger.error(f"Erro ao buscar top clientes: {e}", exc_info=True)
+        return jsonify({"message": f"Erro interno: {str(e)}"}), 500
+    finally:
+        if conn: conn.close()
+
+# (O resto do seu app.py continua aqui, sem alterações)
 @dashboard_bp.route("/api/dados", methods=['GET'])
 @login_required
 def get_data():
@@ -218,28 +270,20 @@ def get_data():
         else:
             vendedores_filter = [current_user.username]
         results['selectedVendors'] = vendedores_filter
-
-        where_conditions = []
-        where_conditions.append(f"TO_CHAR(data_venda, 'YYYY-MM') = '{month_filter}'")
-        
+        where_conditions = [f"TO_CHAR(data_venda, 'YYYY-MM') = '{month_filter}'"]
         safe_vendedores = []
         if vendedores_filter:
             safe_vendedores = ["'" + v.replace("'", "''") + "'" for v in vendedores_filter]
             where_conditions.append(f"vendedor IN ({','.join(safe_vendedores)})")
-        
         where_clause = "WHERE " + " AND ".join(where_conditions) if where_conditions else ""
-
         today = datetime.now()
         analysis_year, analysis_month = map(int, month_filter.split('-'))
         total_dias_uteis_mes = count_weekdays(analysis_year, analysis_month)
         dias_uteis_passados = count_weekdays(analysis_year, analysis_month, today.day) if analysis_year == today.year and analysis_month == today.month else total_dias_uteis_mes
-        
         cur.execute(f"SELECT COALESCE(SUM(valor), 0), COALESCE(COUNT(DISTINCT cliente), 0), COALESCE(COUNT(*), 0) FROM public.vendas {where_clause};")
         faturamento_total, total_clientes_atendidos, total_vendas = cur.fetchone() or (0, 0, 0)
         ticket_medio = float(faturamento_total / total_vendas) if total_vendas > 0 else 0.0
-        
         media_diaria_dias_uteis = float(faturamento_total / dias_uteis_passados) if dias_uteis_passados > 0 else 0.0
-        
         positivacao_carteira_where = f"WHERE Carteira.mes = '{month_filter}'"
         if vendedores_filter: positivacao_carteira_where += f" AND Carteira.vendedor IN ({','.join(safe_vendedores)})"
         cur.execute(f"""
@@ -249,7 +293,6 @@ def get_data():
         """)
         positivacao_result = cur.fetchone()
         positivacao_media = float(positivacao_result[0]) if positivacao_result and positivacao_result[0] is not None else 0.0
-        
         results['kpi'] = {
             "faturamentoTotal": float(faturamento_total), 
             "totalClientesAtendidos": total_clientes_atendidos, 
@@ -257,7 +300,6 @@ def get_data():
             "positivacaoMedia": positivacao_media, 
             "projecaoFaturamento": media_diaria_dias_uteis * total_dias_uteis_mes
         }
-
         query_mappings = {
             'topSellers': "SELECT vendedor, SUM(valor) as total FROM public.vendas {where_clause} GROUP BY vendedor ORDER BY total DESC;",
             'topManufacturers': "SELECT fabricante, SUM(valor) as total FROM public.vendas {where_clause} GROUP BY fabricante ORDER BY total DESC LIMIT 10;",
@@ -272,28 +314,20 @@ def get_data():
             FROM public.carteira AS c LEFT JOIN VendasPorVendedor vpv ON c.vendedor = vpv.vendedor {positivacao_carteira_where.replace('Carteira', 'c')} ORDER BY 2 DESC;
         """)
         results['positivacaoPorVendedor'] = [{col.name: float(val) if isinstance(val, Decimal) else val for col, val in zip(cur.description, row)} for row in cur.fetchall()]
-        
         cur.execute(f"""
             WITH ProdutosVendidos AS (
                 SELECT vendedor, COUNT(DISTINCT produto) AS produtos_unicos_vendidos 
-                FROM public.vendas {where_clause} 
-                GROUP BY vendedor
-            )
-            SELECT 
-                c.vendedor, 
-                COALESCE(pv.produtos_unicos_vendidos, 0) as total
+                FROM public.vendas {where_clause} GROUP BY vendedor)
+            SELECT c.vendedor, COALESCE(pv.produtos_unicos_vendidos, 0) as total
             FROM public.carteira AS c 
-            LEFT JOIN ProdutosVendidos pv ON c.vendedor = pv.vendedor 
-            {positivacao_carteira_where.replace('Carteira', 'c')}
+            LEFT JOIN ProdutosVendidos pv ON c.vendedor = pv.vendedor {positivacao_carteira_where.replace('Carteira', 'c')}
             ORDER BY total DESC;
         """)
         results['productMix'] = [{col.name: val for col, val in zip(cur.description, row)} for row in cur.fetchall()]
-
         fabricantes_foco = ['SELMI', 'LUCKY', 'RICLAN', 'KELLANOVA', 'TAMPICO', 'CONSABOR', 'YAI', 'TECPOLPA', 'GOLDKO']
         focus_where = where_clause + (f" AND fabricante IN ({','.join(['%s'] * len(fabricantes_foco))})" if where_clause else f"WHERE fabricante IN ({','.join(['%s'] * len(fabricantes_foco))})")
         cur.execute(f"SELECT fabricante, SUM(valor) as total FROM public.vendas {focus_where} GROUP BY fabricante ORDER BY total DESC;", fabricantes_foco)
         results['focusManufacturers'] = [{col.name: float(val) if isinstance(val, Decimal) else val for col, val in zip(cur.description, row)} for row in cur.fetchall()]
-        
         carteira_where_conditions = [f"c.mes = '{month_filter}'", "c.meta_faturamento > 0"]
         if vendedores_filter:
             carteira_where_conditions.append(f"c.vendedor IN ({','.join(safe_vendedores)})")
@@ -313,20 +347,11 @@ def get_data():
             row['percentual'] = (atual / meta) * 100 if meta > 0 else 0.0
             restante = meta - atual
             row['venda_diaria'] = (restante / (total_dias_uteis_mes - dias_uteis_passados)) if (total_dias_uteis_mes - dias_uteis_passados) > 0 and restante > 0 else 0.0
-            
-            # --- CORREÇÃO AQUI ---
-            # A projeção agora usa o faturamento 'atual' de cada vendedor individualmente
             row['projecao'] = (atual / dias_uteis_passados) * total_dias_uteis_mes if dias_uteis_passados > 0 else 0.0
-            
             sales_goals.append(row)
         results['salesGoals'] = sorted(sales_goals, key=lambda x: x['percentual'], reverse=True)
-        
-        cur.execute("""
-            SELECT DISTINCT vendedor FROM public.vendas
-            WHERE vendedor IS NOT NULL AND TRIM(vendedor) <> '' ORDER BY vendedor;
-        """)
+        cur.execute("SELECT DISTINCT vendedor FROM public.vendas WHERE vendedor IS NOT NULL AND TRIM(vendedor) <> '' ORDER BY vendedor;")
         results['allVendors'] = [r[0] for r in cur.fetchall()]
-        
         cur.close()
         return jsonify(results)
     except Exception as e:
@@ -343,7 +368,7 @@ def get_cumulative_data():
         conn = get_db_connection()
         months_to_compare = request.args.getlist('meses')
         if not months_to_compare: 
-            return jsonify({"message": "Pelo menos um mês deve ser fornecido."}), 400
+            return jsonify({"message": "Mês obrigatório."}), 400
         params = list(months_to_compare)
         base_query = "SELECT EXTRACT(DAY FROM data_venda) as dia, TO_CHAR(data_venda, 'YYYY-MM') as mes, SUM(valor) as total_dia FROM public.vendas"
         where_conditions = []

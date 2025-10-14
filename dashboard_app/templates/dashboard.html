@@ -131,6 +131,7 @@
                 <div class="multiselect-container">
                     <div class="select-box" id="vendedor-select-box">
                         <span id="vendedor-selected-text">VENDEDORES PRINCIPAIS</span>
+                        <span class="arrow">&#9660;</span>
                     </div>
                     <div class="checkboxes-container" id="vendedor-checkboxes-container">
                     </div>
@@ -157,6 +158,12 @@
             <div class="chart-container"><button class="expand-btn" data-chart-id="positivacao" title="Expandir Gráfico"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m-1.5 6L3.75 20.25m0 0v-4.5m0 4.5h4.5M20.25 20.25v-4.5m0 4.5h-4.5m4.5 0L15 15" /></svg></button><canvas id="positivacao-chart"></canvas></div>
             <div class="chart-container"><button class="expand-btn" data-chart-id="productMix" title="Expandir Gráfico"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m-1.5 6L3.75 20.25m0 0v-4.5m0 4.5h4.5M20.25 20.25v-4.5m0 4.5h-4.5m4.5 0L15 15" /></svg></button><canvas id="mix-produtos-chart"></canvas></div>
             <div class="chart-container"><button class="expand-btn" data-chart-id="topProducts" title="Expandir Gráfico"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m-1.5 6L3.75 20.25m0 0v-4.5m0 4.5h4.5M20.25 20.25v-4.5m0 4.5h-4.5m4.5 0L15 15" /></svg></button><canvas id="top-produtos-chart"></canvas></div>
+        </div>
+        <h2 class="section-title" style="margin-top: 2rem;">Top 5 Clientes</h2>
+        <div class="chart-grid-full-width">
+            <div class="chart-container">
+                <canvas id="top-clientes-chart"></canvas>
+            </div>
         </div>
     </div>
     <div class="sidebar" id="sidebar">
@@ -200,8 +207,9 @@ document.addEventListener('DOMContentLoaded', function () {
         { background: 'rgba(245, 54, 92, 0.8)', border: 'rgba(245, 54, 92, 1)' }, 
         { background: 'rgba(45, 206, 137, 0.8)', border: 'rgba(45, 206, 137, 1)' }, 
         { background: 'rgba(251, 99, 64, 0.8)', border: 'rgba(251, 99, 64, 1)' }, 
-        { background: 'rgba(17, 205, 239, 0.8)', border: 'rgba(17, 205, 239, 1)' }, 
-        { background: 'rgba(137, 101, 224, 0.8)', border: 'rgba(137, 101, 224, 1)' } 
+        { background: 'rgba(17, 205, 239, 0.8)', border: 'rgba(17, 205, 239, 1)' },
+        { background: 'rgba(137, 101, 224, 0.8)', border: 'rgba(137, 101, 224, 1)' },
+        { background: 'rgba(108, 117, 125, 0.8)', border: 'rgba(108, 117, 125, 1)' } 
     ];
 
     function createChartConfig(title, type, options = {}) {
@@ -298,7 +306,8 @@ document.addEventListener('DOMContentLoaded', function () {
         focusManufacturers: new Chart(document.getElementById('focus-manufacturers-chart'), createChartConfig('Faturamento Fabricantes Foco', 'bar', { color: chartColors[2], formatterType: 'number' })),
         positivacao: new Chart(document.getElementById('positivacao-chart'), createChartConfig('Positivação de Clientes', 'bar', { color: chartColors[3], formatterType: 'percentage' })),
         productMix: new Chart(document.getElementById('mix-produtos-chart'), createChartConfig('Mix de Produtos', 'bar', { color: chartColors[4], formatterType: 'number' })),
-        topProducts: new Chart(document.getElementById('top-produtos-chart'), createChartConfig('Top 10 Produtos', 'bar', { color: chartColors[5], formatterType: 'number' }))
+        topProducts: new Chart(document.getElementById('top-produtos-chart'), createChartConfig('Top 10 Produtos', 'bar', { color: chartColors[5], formatterType: 'number' })),
+        topClientes: new Chart(document.getElementById('top-clientes-chart'), createChartConfig('Top 5 Clientes', 'bar', { color: chartColors[6], formatterType: 'number' }))
     };
     
     async function loadDataFromAPI(month, vendedores) {
@@ -311,11 +320,35 @@ document.addEventListener('DOMContentLoaded', function () {
         try {
             const response = await fetch(`${baseUrl}/api/dados?${params.toString()}`);
             const data = await response.json();
-            if (!response.ok) throw new Error(data.message || 'Falha ao buscar dados.');
+            if (!response.ok) throw new Error(data.message || 'Falha.');
             updateDashboard(data);
             elements.errorMessage.textContent = '';
         } catch (error) {
             elements.errorMessage.textContent = `Erro: ${error.message}`;
+        }
+    }
+    
+    async function loadTopClientesData() {
+        const month = elements.monthFilter.value;
+        const vendedores = getSelectedVendors();
+        const params = new URLSearchParams();
+        if (month) params.append('month', month);
+        vendedores.forEach(v => params.append('vendedor', v));
+        try {
+            const response = await fetch(`${baseUrl}/api/top-clientes?${params.toString()}`);
+            if (response.status === 401) { window.location.href = '/login'; return; }
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.message || 'Falha.');
+            let chartTitle = "Top 5 Clientes (Geral)";
+            if (vendedores.length === 1) {
+                chartTitle = `Top 5 Clientes de ${vendedores[0]}`;
+            } else if (vendedores.length > 1) {
+                chartTitle = "Top 5 Clientes (Seleção)";
+            }
+            window.charts.topClientes.options.plugins.title.text = chartTitle;
+            updateChartData(window.charts.topClientes, data.map(d => d.nome_fantasia), data.map(d => d.total));
+        } catch (error) {
+            console.error("Erro ao buscar dados de top clientes:", error);
         }
     }
 
@@ -399,28 +432,22 @@ document.addEventListener('DOMContentLoaded', function () {
         return Array.from(checkboxes).map(cb => cb.value);
     }
 
-    // --- ALTERAÇÃO 2: Lógica de texto do seletor atualizada ---
     function updateSelectedVendorsText() {
         if (!elements.vendedorSelectedText) return;
         const selected = getSelectedVendors();
         const totalVendors = document.querySelectorAll('.vendedor-checkbox').length;
         const selectAllCheckbox = document.getElementById('select-all-vendedores');
-
-        // Verifica se o "Selecionar Todos" está marcado
         if (selectAllCheckbox && selectAllCheckbox.checked && selected.length === totalVendors) {
             elements.vendedorSelectedText.textContent = 'TODOS OS VENDEDORES';
         } 
-        // Verifica se está no estado padrão (nenhum selecionado)
         else if (selected.length === 0) {
             elements.vendedorSelectedText.textContent = 'VENDEDORES PRINCIPAIS';
         } 
-        // Lógica para 1, 2 ou 3 selecionados
         else if (selected.length === 1) {
             elements.vendedorSelectedText.textContent = selected[0];
         } else if (selected.length > 1 && selected.length <= 3) {
             elements.vendedorSelectedText.textContent = selected.join(', ');
         } 
-        // Lógica para mais de 3 selecionados
         else {
             elements.vendedorSelectedText.textContent = `${selected.length} vendedores selecionados`;
         }
@@ -462,6 +489,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function handleFilterChange() { 
         loadDataFromAPI(elements.monthFilter.value, getSelectedVendors()); 
+        loadTopClientesData();
     }
     
     elements.monthFilter.addEventListener('input', handleFilterChange);
@@ -480,7 +508,8 @@ document.addEventListener('DOMContentLoaded', function () {
             const res = await fetch(`${baseUrl}/api/limpar-dados`,{method:"POST"});
             if (res.status === 401) { window.location.href = '/login'; return; }
             if(!res.ok) throw new Error((await res.json()).message);
-            elements.statusMessage.textContent = (await res.json()).message;
+            const data = await res.json();
+            elements.statusMessage.textContent = data.message;
             setTimeout(()=>location.reload(), 1500);
         } catch(err) { elements.statusMessage.textContent = `Erro: ${err.message}`; }
     });
@@ -495,12 +524,18 @@ document.addEventListener('DOMContentLoaded', function () {
         try {
             const res = await fetch(`${baseUrl}/api/upload/vendas`, { method: "POST", body: formData });
             if (res.status === 401) { window.location.href = '/login'; return; }
-            if (!res.ok) throw new Error((await res.json()).message);
-            elements.statusMessage.textContent = `Sucesso: ${(await res.json()).message}`;
-            setTimeout(()=>location.reload(), 1500);
-        } catch (err) { elements.statusMessage.textContent = `Erro: ${err.message}`; }
+            const data = await res.json();
+            if (!res.ok) {
+                throw new Error(data.message || 'Erro desconhecido no servidor.');
+            }
+            elements.statusMessage.textContent = `Sucesso: ${data.message}`;
+            setTimeout(() => location.reload(), 1500);
+        } catch (err) {
+            elements.statusMessage.textContent = `Erro: ${err.message}`;
+        }
     });
-    
+
+    // --- CÓDIGO DO MODAL REINSERIDO ---
     const modal = document.getElementById('chartModal');
     const modalBody = modal.querySelector('.modal-body');
     const modalChartTitle = document.getElementById('modalChartTitle');
@@ -544,10 +579,12 @@ document.addEventListener('DOMContentLoaded', function () {
     };
     closeModalBtn.addEventListener('click', closeModal);
     modal.addEventListener('click', e => { if (e.target === modal) closeModal(); });
+    // --- FIM DO CÓDIGO DO MODAL ---
 
     setInitialFilters();
     loadDataFromAPI(elements.monthFilter.value, getSelectedVendors());
     loadCumulativeData();
+    loadTopClientesData();
 
     console.log('Teste final do body, JS carregado');
 });
