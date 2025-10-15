@@ -327,6 +327,7 @@ document.addEventListener('DOMContentLoaded', function () {
         elements.errorMessage.textContent = 'Carregando...';
         try {
             const response = await fetch(`${baseUrl}/api/dados?${params.toString()}`);
+            if (response.status === 401) { window.location.href = '/login'; return; }
             const data = await response.json();
             if (!response.ok) throw new Error(data.message || 'Falha.');
             updateDashboard(data);
@@ -440,15 +441,28 @@ document.addEventListener('DOMContentLoaded', function () {
         } catch (error) { console.error("Erro no gráfico cumulativo:", error); }
     }
 
+    // --- CORREÇÃO DA FUNÇÃO setInitialFilters ---
     function setInitialFilters() {
         const initialMonth = "{{ initial_month|safe }}";
-        elements.monthFilter.value = initialMonth;
-        const [year, month] = initialMonth.split('-').map(Number);
-        const initialDate = new Date(year, month - 1, 1);
-        const previousMonth = new Date(initialDate.getFullYear(), initialDate.getMonth() - 1, 1);
-        const formatAsYYYYMM = date => `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}`;
-        elements.compareMonth1.value = formatAsYYYYMM(previousMonth);
-        elements.compareMonth2.value = initialMonth;
+        
+        if (initialMonth && initialMonth.includes('-')) {
+            elements.monthFilter.value = initialMonth;
+            const [year, month] = initialMonth.split('-').map(Number);
+            const initialDate = new Date(year, month - 1, 1);
+            const previousMonth = new Date(initialDate.getFullYear(), initialDate.getMonth() - 1, 1);
+            const formatAsYYYYMM = date => `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}`;
+            elements.compareMonth1.value = formatAsYYYYMM(previousMonth);
+            elements.compareMonth2.value = initialMonth;
+        } else {
+            // Fallback
+            const now = new Date();
+            const currentMonthDate = new Date(now.getFullYear(), now.getMonth(), 1);
+            const previousMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+            const formatAsYYYYMM = date => `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}`;
+            elements.monthFilter.value = formatAsYYYYMM(currentMonthDate);
+            elements.compareMonth1.value = formatAsYYYYMM(previousMonthDate);
+            elements.compareMonth2.value = formatAsYYYYMM(currentMonthDate);
+        }
     }
     
     function getSelectedVendors() {
@@ -497,6 +511,7 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
+    // --- CORREÇÃO: Adiciona verificação para evitar erro em tela de vendedor ---
     if (elements.vendedorSelectBox) {
         elements.vendedorSelectBox.addEventListener('click', (e) => {
             e.stopPropagation();
