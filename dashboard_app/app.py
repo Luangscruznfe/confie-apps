@@ -272,11 +272,24 @@ def get_data():
             safe_vendedores = ["'" + v.replace("'", "''") + "'" for v in vendedores_filter]
             where_conditions.append(f"vendedor IN ({','.join(safe_vendedores)})")
         where_clause = "WHERE " + " AND ".join(where_conditions) if where_conditions else ""
-        today = datetime.now()
+        
         analysis_year, analysis_month = map(int, month_filter.split('-'))
         total_dias_uteis_mes = count_weekdays(analysis_year, analysis_month)
-        dias_uteis_passados = count_weekdays(analysis_year, analysis_month, today.day) if analysis_year == today.year and analysis_month == today.month else total_dias_uteis_mes
-        
+
+        # --- CORREÇÃO DA LÓGICA DE PROJEÇÃO ---
+        # 1. Encontra a data da última venda DENTRO do filtro atual (mês e vendedor)
+        cur.execute(f"SELECT MAX(data_venda) FROM public.vendas {where_clause};")
+        last_sale_date_row = cur.fetchone()
+        last_sale_date = last_sale_date_row[0] if last_sale_date_row and last_sale_date_row[0] else None
+
+        # 2. Usa a data da última venda para calcular os dias úteis passados
+        if last_sale_date:
+            dias_uteis_passados = count_weekdays(analysis_year, analysis_month, last_sale_date.day)
+        else:
+            # Se não houver vendas, não há dias úteis passados com faturamento
+            dias_uteis_passados = 0
+        # --- FIM DA CORREÇÃO ---
+
         cur.execute(f"SELECT COALESCE(SUM(valor), 0), COALESCE(COUNT(DISTINCT cliente), 0), COALESCE(COUNT(DISTINCT nota_fiscal), 0) FROM public.vendas {where_clause};")
         faturamento_total, total_clientes_atendidos, total_pedidos = cur.fetchone() or (0, 0, 0)
         
@@ -284,8 +297,6 @@ def get_data():
         
         media_diaria_dias_uteis = float(faturamento_total / dias_uteis_passados) if dias_uteis_passados > 0 else 0.0
         
-        # --- CORREÇÃO DA AMBIGUIDADE AQUI ---
-        # A cláusula WHERE para a carteira agora especifica 'Carteira.vendedor'
         positivacao_carteira_where = f"WHERE Carteira.mes = '{month_filter}'"
         if vendedores_filter:
             positivacao_carteira_where += f" AND Carteira.vendedor IN ({','.join(safe_vendedores)})"
@@ -371,7 +382,6 @@ def get_data():
         return jsonify({"message": f"Erro interno: {str(e)}"}), 500
     finally:
         if conn: conn.close()
-
 @dashboard_bp.route("/api/dados-cumulativos", methods=['GET'])
 @login_required
 def get_cumulative_data():
