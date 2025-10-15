@@ -215,11 +215,12 @@ document.addEventListener('DOMContentLoaded', function () {
     function createChartConfig(title, type, options = {}) {
         const { isMultiAxis = false, color = chartColors[0], formatterType = 'number' } = options;
         const isLine = type === 'line';
+        const isDoughnut = type === 'doughnut';
         let formatterFunction = (formatterType === 'percentage') ? formatPercentage : formatNumber;
         const textColor = '#525f7f';
         const tickFormatter = (formatterType === 'percentage') ? (value) => `${value}%` : (value) => formatNumber(value);
 
-        return { 
+        let config = { 
             type: type, 
             data: { 
                 labels: [], 
@@ -228,7 +229,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     data: [], 
                     backgroundColor: isLine ? color.background.replace('0.8', '0.2') : color.background, 
                     borderColor: color.border, 
-                    borderWidth: 2, 
+                    borderWidth: isDoughnut ? 1 : 2,
                     fill: isLine, 
                     tension: 0.1 
                 }] 
@@ -238,7 +239,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 maintainAspectRatio: false, 
                 customFormatterType: formatterType,
                 plugins: { 
-                    legend: { display: isMultiAxis, position: 'top' }, 
+                    legend: { display: isMultiAxis || isDoughnut, position: 'top' }, 
                     title: { 
                         display: true, 
                         text: title, 
@@ -247,20 +248,27 @@ document.addEventListener('DOMContentLoaded', function () {
                         color: '#f5365c'
                     }, 
                     datalabels: { 
-                        display: !isLine, 
-                        anchor: 'end', 
-                        align: 'top', 
-                        color: textColor,
+                        display: !isLine,
+                        color: isDoughnut ? '#fff' : textColor,
                         font: { weight: 'bold' }, 
                         formatter: formatterFunction
                     } 
                 }, 
-                scales: { 
+                scales: isDoughnut ? {} : { // Gráficos de Donut não têm eixos
                     x: { ticks: { color: textColor } },
                     y: { ticks: { color: textColor, callback: tickFormatter } }
                 } 
             } 
         };
+        // Remove alinhamento de datalabels para Donut para centralizar
+        if (isDoughnut) {
+            delete config.options.plugins.datalabels.anchor;
+            delete config.options.plugins.datalabels.align;
+        } else {
+             config.options.plugins.datalabels.anchor = 'end';
+             config.options.plugins.datalabels.align = 'top';
+        }
+        return config;
     }
 
     function updateChartData(chart, labels, data) {
@@ -304,7 +312,8 @@ document.addEventListener('DOMContentLoaded', function () {
         topSellers: new Chart(document.getElementById('top-vendedores-chart'), createChartConfig('Faturamento por Vendedor', 'bar', { color: chartColors[0], formatterType: 'number' })),
         topManufacturers: new Chart(document.getElementById('top-fabricantes-chart'), createChartConfig('Top 10 Fabricantes', 'bar', { color: chartColors[1], formatterType: 'number' })),
         focusManufacturers: new Chart(document.getElementById('focus-manufacturers-chart'), createChartConfig('Faturamento Fabricantes Foco', 'bar', { color: chartColors[2], formatterType: 'number' })),
-        positivacao: new Chart(document.getElementById('positivacao-chart'), createChartConfig('Positivação de Clientes', 'bar', { color: chartColors[3], formatterType: 'percentage' })),
+        // --- ALTERAÇÃO 2: MUDANÇA DE TIPO DE GRÁFICO E FORMATADOR ---
+        positivacao: new Chart(document.getElementById('positivacao-chart'), createChartConfig('Positivação de Clientes', 'doughnut', { formatterType: 'number' })),
         productMix: new Chart(document.getElementById('mix-produtos-chart'), createChartConfig('Mix de Produtos', 'bar', { color: chartColors[4], formatterType: 'number' })),
         topProducts: new Chart(document.getElementById('top-produtos-chart'), createChartConfig('Top 10 Produtos', 'bar', { color: chartColors[5], formatterType: 'number' })),
         topClientes: new Chart(document.getElementById('top-clientes-chart'), createChartConfig('Top 5 Clientes', 'bar', { color: chartColors[6], formatterType: 'number' }))
@@ -379,7 +388,25 @@ document.addEventListener('DOMContentLoaded', function () {
 
         updateChartData(window.charts.topSellers, data.topSellers.map(d => d.vendedor), data.topSellers.map(d => d.total));
         updateChartData(window.charts.topManufacturers, data.topManufacturers.map(d => d.fabricante), data.topManufacturers.map(d => d.total));
-        updateChartData(window.charts.positivacao, data.positivacaoPorVendedor.map(d => d.vendedor), data.positivacaoPorVendedor.map(d => d.positivacao));
+        
+        // --- ALTERAÇÃO 3: LÓGICA DE ATUALIZAÇÃO PARA O GRÁFICO DE DONUT ---
+const positivacaoData = data.positivacaoGeral;
+if (positivacaoData) {
+    const chart = window.charts.positivacao;
+    // Alteração na linha abaixo
+    chart.data.labels = ['Clientes Positivados', 'Clientes Não Positivados'];
+    chart.data.datasets[0].data = [positivacaoData.ativados, positivacaoData.nao_ativados];
+    chart.data.datasets[0].backgroundColor = [
+        'rgba(45, 206, 137, 0.8)', // Verde para positivados
+        'rgba(245, 54, 92, 0.7)'     // Vermelho para não positivados
+    ];
+    chart.data.datasets[0].borderColor = [
+        'rgba(45, 206, 137, 1)',
+        'rgba(245, 54, 92, 1)'
+    ];
+    chart.update();
+}
+
         const abbreviatedProductNames = data.topProducts.map(d => abbreviateProductName(d.produto));
         updateChartData(window.charts.topProducts, abbreviatedProductNames, data.topProducts.map(d => d.total));
         updateChartData(window.charts.productMix, data.productMix.map(d => d.vendedor), data.productMix.map(d => d.total));
@@ -507,8 +534,8 @@ document.addEventListener('DOMContentLoaded', function () {
         try {
             const res = await fetch(`${baseUrl}/api/limpar-dados`,{method:"POST"});
             if (res.status === 401) { window.location.href = '/login'; return; }
-            if(!res.ok) throw new Error((await res.json()).message);
             const data = await res.json();
+            if(!res.ok) throw new Error(data.message);
             elements.statusMessage.textContent = data.message;
             setTimeout(()=>location.reload(), 1500);
         } catch(err) { elements.statusMessage.textContent = `Erro: ${err.message}`; }
@@ -535,7 +562,6 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
 
-    // --- CÓDIGO DO MODAL REINSERIDO ---
     const modal = document.getElementById('chartModal');
     const modalBody = modal.querySelector('.modal-body');
     const modalChartTitle = document.getElementById('modalChartTitle');
@@ -579,7 +605,6 @@ document.addEventListener('DOMContentLoaded', function () {
     };
     closeModalBtn.addEventListener('click', closeModal);
     modal.addEventListener('click', e => { if (e.target === modal) closeModal(); });
-    // --- FIM DO CÓDIGO DO MODAL ---
 
     setInitialFilters();
     loadDataFromAPI(elements.monthFilter.value, getSelectedVendors());
