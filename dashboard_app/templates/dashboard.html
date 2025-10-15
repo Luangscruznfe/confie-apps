@@ -193,6 +193,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
     function formatPercentage(value) { return `${(Number(value) || 0).toFixed(1)}%`; }
     function abbreviateProductName(name) {
+        if (!name) return '';
         const MAX_LENGTH = 22;
         const wordMap = { 'PANETTONE': 'PANET', 'CHOCOLATE': 'CHOC', 'SUFLAIR': 'SUFL', 'TAMPICO': 'TAMP', 'LINDOYA': 'LIND', 'PIMENTA': 'PIM', 'MEXICANA': 'MEX', 'FOFURA': 'FOF', 'TORCIDA': 'TORC', 'BATON': 'BTN', 'FRUTAS': 'FRT', 'AO LEITE': '' };
         let processedName = name.toUpperCase();
@@ -254,13 +255,12 @@ document.addEventListener('DOMContentLoaded', function () {
                         formatter: formatterFunction
                     } 
                 }, 
-                scales: isDoughnut ? {} : { // Gráficos de Donut não têm eixos
+                scales: isDoughnut ? {} : {
                     x: { ticks: { color: textColor } },
                     y: { ticks: { color: textColor, callback: tickFormatter } }
                 } 
             } 
         };
-        // Remove alinhamento de datalabels para Donut para centralizar
         if (isDoughnut) {
             delete config.options.plugins.datalabels.anchor;
             delete config.options.plugins.datalabels.align;
@@ -311,12 +311,11 @@ document.addEventListener('DOMContentLoaded', function () {
         cumulativeComparison: new Chart(document.getElementById('cumulative-comparison-chart'), createChartConfig('Faturamento Cumulativo por Dia', 'line', { isMultiAxis: true })),
         topSellers: new Chart(document.getElementById('top-vendedores-chart'), createChartConfig('Faturamento por Vendedor', 'bar', { color: chartColors[0], formatterType: 'number' })),
         topManufacturers: new Chart(document.getElementById('top-fabricantes-chart'), createChartConfig('Top 10 Fabricantes', 'bar', { color: chartColors[1], formatterType: 'number' })),
-        focusManufacturers: new Chart(document.getElementById('focus-manufacturers-chart'), createChartConfig('Faturamento Fabricantes Foco', 'bar', { color: chartColors[2], formatterType: 'number' })),
-        // --- ALTERAÇÃO 2: MUDANÇA DE TIPO DE GRÁFICO E FORMATADOR ---
+        focusManufacturers: new Chart(document.getElementById('focus-manufacturers-chart'), createChartConfig('Faturamento Fabricantes Foco', 'bar', { color: chartColors[3], formatterType: 'number' })),
         positivacao: new Chart(document.getElementById('positivacao-chart'), createChartConfig('Positivação de Clientes', 'doughnut', { formatterType: 'number' })),
         productMix: new Chart(document.getElementById('mix-produtos-chart'), createChartConfig('Mix de Produtos', 'bar', { color: chartColors[4], formatterType: 'number' })),
         topProducts: new Chart(document.getElementById('top-produtos-chart'), createChartConfig('Top 10 Produtos', 'bar', { color: chartColors[5], formatterType: 'number' })),
-        topClientes: new Chart(document.getElementById('top-clientes-chart'), createChartConfig('Top 5 Clientes', 'bar', { color: chartColors[6], formatterType: 'number' }))
+        topClientes: new Chart(document.getElementById('top-clientes-chart'), createChartConfig('Top 5 Clientes', 'bar', { color: chartColors[3], formatterType: 'number' }))
     };
     
     async function loadDataFromAPI(month, vendedores) {
@@ -389,23 +388,21 @@ document.addEventListener('DOMContentLoaded', function () {
         updateChartData(window.charts.topSellers, data.topSellers.map(d => d.vendedor), data.topSellers.map(d => d.total));
         updateChartData(window.charts.topManufacturers, data.topManufacturers.map(d => d.fabricante), data.topManufacturers.map(d => d.total));
         
-        // --- ALTERAÇÃO 3: LÓGICA DE ATUALIZAÇÃO PARA O GRÁFICO DE DONUT ---
-const positivacaoData = data.positivacaoGeral;
-if (positivacaoData) {
-    const chart = window.charts.positivacao;
-    // Alteração na linha abaixo
-    chart.data.labels = ['Clientes Positivados', 'Clientes Não Positivados'];
-    chart.data.datasets[0].data = [positivacaoData.ativados, positivacaoData.nao_ativados];
-    chart.data.datasets[0].backgroundColor = [
-        'rgba(45, 206, 137, 0.8)', // Verde para positivados
-        'rgba(245, 54, 92, 0.7)'     // Vermelho para não positivados
-    ];
-    chart.data.datasets[0].borderColor = [
-        'rgba(45, 206, 137, 1)',
-        'rgba(245, 54, 92, 1)'
-    ];
-    chart.update();
-}
+        const positivacaoData = data.positivacaoGeral;
+        if (positivacaoData) {
+            const chart = window.charts.positivacao;
+            chart.data.labels = ['Clientes Positivados', 'Clientes Não Positivados'];
+            chart.data.datasets[0].data = [positivacaoData.ativados, positivacaoData.nao_ativados];
+            chart.data.datasets[0].backgroundColor = [
+                'rgba(45, 206, 137, 0.8)',
+                'rgba(245, 54, 92, 0.7)'
+            ];
+            chart.data.datasets[0].borderColor = [
+                'rgba(45, 206, 137, 1)',
+                'rgba(245, 54, 92, 1)'
+            ];
+            chart.update();
+        }
 
         const abbreviatedProductNames = data.topProducts.map(d => abbreviateProductName(d.produto));
         updateChartData(window.charts.topProducts, abbreviatedProductNames, data.topProducts.map(d => d.total));
@@ -444,13 +441,14 @@ if (positivacaoData) {
     }
 
     function setInitialFilters() {
-        const now = new Date();
-        const currentMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-        const previousMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        const initialMonth = "{{ initial_month|safe }}";
+        elements.monthFilter.value = initialMonth;
+        const [year, month] = initialMonth.split('-').map(Number);
+        const initialDate = new Date(year, month - 1, 1);
+        const previousMonth = new Date(initialDate.getFullYear(), initialDate.getMonth() - 1, 1);
         const formatAsYYYYMM = date => `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}`;
-        elements.monthFilter.value = formatAsYYYYMM(currentMonth);
         elements.compareMonth1.value = formatAsYYYYMM(previousMonth);
-        elements.compareMonth2.value = formatAsYYYYMM(currentMonth);
+        elements.compareMonth2.value = initialMonth;
     }
     
     function getSelectedVendors() {
@@ -583,8 +581,14 @@ if (positivacaoData) {
             const formatterFunction = (optionsCopy.customFormatterType === 'percentage') ? formatPercentage : formatNumber;
             optionsCopy.plugins.datalabels.formatter = formatterFunction;
             optionsCopy.plugins.datalabels.color = yellowColor;
-            optionsCopy.scales.x.ticks.color = yellowColor;
-            optionsCopy.scales.y.ticks.color = yellowColor;
+            
+            if (optionsCopy.scales && optionsCopy.scales.x) {
+                optionsCopy.scales.x.ticks.color = yellowColor;
+            }
+            if (optionsCopy.scales && optionsCopy.scales.y) {
+                optionsCopy.scales.y.ticks.color = yellowColor;
+            }
+
             if (isMobile && origConfig.type === 'bar') {
                 optionsCopy.plugins.datalabels.align = 'end';
                 optionsCopy.plugins.datalabels.anchor = 'end';
