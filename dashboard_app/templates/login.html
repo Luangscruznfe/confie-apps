@@ -3,41 +3,136 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login - Dashboard</title>
+    <title>Login - Dashboard Confie</title>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
     <style>
-        :root { --primary-color: #5e72e4; --text-color: #525f7f; }
-        body { font-family: 'Poppins', sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; background-color: #f4f5f7; }
-        .login-container { background: white; padding: 2.5rem; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); width: 100%; max-width: 400px; text-align: center; }
-        h1 { margin-bottom: 2rem; color: var(--text-color); }
-        .form-group { margin-bottom: 1.5rem; text-align: left; }
-        label { display: block; margin-bottom: 0.5rem; font-weight: 600; }
-        input { width: 100%; padding: 0.75rem; border: 1px solid #dee2e6; border-radius: 4px; font-size: 1rem; }
-        button { width: 100%; padding: 0.75rem; border: none; background-color: var(--primary-color); color: white; font-size: 1rem; font-weight: 600; border-radius: 4px; cursor: pointer; }
-        .alert { padding: 1rem; margin-top: 1.5rem; border-radius: 4px; background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        :root { 
+            --primary-color: #5e72e4; 
+            --text-color: #525f7f; 
+        }
+
+        /* --- ESTILO DO BODY --- */
+        body { 
+            font-family: 'Poppins', sans-serif; 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            height: 100vh; 
+            margin: 0;
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* --- IMAGEM DE FUNDO EM TELA CHEIA --- */
+        .background-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: url("{{ url_for('static', filename='fundo-login.png') }}"); /* 👈 sua imagem de fundo */
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            opacity: 1.0; /* 👈 aqui você controla a transparência (0.0 a 1.0) */
+            z-index: 0;
+        }
+
+        /* --- CONTAINER DE LOGIN --- */
+        .login-container { 
+            background: rgba(255, 255, 255, 0.9); /* leve transparência no card */
+            border-radius: 12px; 
+            box-shadow: 0 4px 25px rgba(0,0,0,0.15); 
+            width: 100%; 
+            max-width: 400px;
+            overflow: hidden;
+            position: relative;
+            z-index: 1;
+        }
+        
+        .logo-login {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+        
+        .form-wrapper {
+            padding: 2.5rem;
+        }
+
+        .form-group { 
+            margin-bottom: 1.5rem; 
+            text-align: left; 
+        }
+        label { 
+            display: block; 
+            margin-bottom: 0.5rem; 
+            font-weight: 600; 
+            color: var(--text-color);
+        }
+        input { 
+            width: 100%; 
+            padding: 0.75rem; 
+            border: 1px solid #dee2e6; 
+            border-radius: 6px; 
+            font-size: 1rem; 
+        }
+        button { 
+            width: 100%; 
+            padding: 0.75rem; 
+            border: none; 
+            background-color: var(--primary-color); 
+            color: white; 
+            font-size: 1rem; 
+            font-weight: 600; 
+            border-radius: 6px; 
+            cursor: pointer; 
+            transition: background-color 0.2s;
+        }
+        button:hover {
+            background-color: #465de2;
+        }
+        .alert { 
+            padding: 1rem; 
+            margin-top: 1.5rem; 
+            border-radius: 4px; 
+            background-color: #f8d7da; 
+            color: #721c24; 
+            border: 1px solid #f5c6cb; 
+        }
     </style>
 </head>
 <body>
+    <!-- Fundo com imagem -->
+    <div class="background-overlay"></div>
+
+    <!-- Card de login -->
     <div class="login-container">
-        <h1>Acesso ao Dashboard Confie</h1>
-        <form method="POST">
-            <div class="form-group">
-                <label for="username">Usuário</label>
-                <input type="text" id="username" name="username" required>
-            </div>
-            <div class="form-group">
-                <label for="password">Senha</label>
-                <input type="password" id="password" name="password" required>
-            </div>
-            <button type="submit">Entrar</button>
-        </form>
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                {% for category, message in messages %}
-                    <div class="alert">{{ message }}</div>
-                {% endfor %}
-            {% endif %}
-        {% endwith %}
+        <div class="login-header">
+            <img src="{{ url_for('static', filename='logo_confie.png') }}" alt="Logo Confie" class="logo-login">
+        </div>
+
+        <div class="form-wrapper">
+            <form method="POST">
+                <div class="form-group">
+                    <label for="username">Usuário</label>
+                    <input type="text" id="username" name="username" required>
+                </div>
+                <div class="form-group">
+                    <label for="password">Senha</label>
+                    <input type="password" id="password" name="password" required>
+                </div>
+                <button type="submit">Entrar</button>
+            </form>
+
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="alert">{{ message }}</div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+        </div>
     </div>
 </body>
 </html>

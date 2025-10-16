@@ -19,7 +19,11 @@ from dateutil.relativedelta import relativedelta
 load_dotenv()
 
 logging.basicConfig(stream=sys.stdout, level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-app = Flask(__name__, static_folder='static', template_folder='templates')
+
+# --- CORREÇÃO AQUI ---
+# Adicionamos static_url_path para que o Flask gere os links corretos para os arquivos estáticos
+app = Flask(__name__, static_folder='static', template_folder='templates', static_url_path='/dashboard/static')
+
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'sua-chave-secreta-padrao-aqui')
 app.logger.addHandler(logging.StreamHandler(sys.stdout))
 app.logger.setLevel(logging.INFO)
@@ -137,7 +141,6 @@ def delete_data():
     finally:
         if conn: conn.close()
 
-# --- ALTERAÇÃO 1: Função de Upload agora lê a coluna C (Nota Fiscal) ---
 @dashboard_bp.route("/api/upload/vendas", methods=['POST'])
 @login_required
 def upload_data():
@@ -152,22 +155,14 @@ def upload_data():
         conn = get_db_connection()
         if not sales_file.filename.endswith(('.xlsx', '.csv')):
             return jsonify({"message": "Formato de ficheiro inválido."}), 400
-        
-        # Adicionada a coluna C e o nome 'nota_fiscal'
         usecols_spec, col_names = "B,C,G,H,M,N,P,U,W", ['data_venda', 'nota_fiscal', 'cliente', 'nome_fantasia', 'produto', 'quantidade', 'valor', 'fabricante', 'vendedor']
-        
         sales_file.stream.seek(0)
-        # Adicionado o índice da coluna C (2) para CSV
         sales_df = pd.read_excel(sales_file.stream, skiprows=9, usecols=usecols_spec, header=None) if sales_file.filename.endswith('.xlsx') else pd.read_csv(sales_file.stream, sep=';', skiprows=9, usecols=[1, 2, 6, 7, 12, 13, 15, 20, 22], header=None, encoding='latin1')
-        
         sales_df.columns = col_names
         sales_df['data_venda'] = pd.to_datetime(sales_df['data_venda'], dayfirst=True, errors='coerce')
         sales_df.dropna(subset=['data_venda'], inplace=True)
-
         if sales_df.empty: return jsonify({"message": "O ficheiro não contém datas válidas."}), 400
-        
         upload_month = sales_df['data_venda'].dt.to_period('M').mode()[0].strftime('%Y-%m')
-
         portfolio_df = pd.read_csv(portfolio_file.stream, sep=';', encoding='latin1')
         first_col_name = portfolio_df.columns[0]
         if ';' in first_col_name:
@@ -186,20 +181,16 @@ def upload_data():
             cur.execute("DELETE FROM public.carteira WHERE mes = %s", (upload_month,))
             sql_insert_portfolio = "INSERT INTO public.carteira (vendedor, total_clientes, total_produtos, meta_faturamento, mes) VALUES %s"
             execute_values(cur, sql_insert_portfolio, [tuple(row) for row in df_for_db.itertuples(index=False)])
-
         for col in ['quantidade', 'valor']:
             if sales_df[col].dtype == 'object':
                 sales_df[col] = sales_df[col].astype(str).str.replace(r'[^\d,]', '', regex=True).str.replace(',', '.')
             sales_df[col] = pd.to_numeric(sales_df[col], errors='coerce')
         sales_df.dropna(subset=['valor', 'produto'], inplace=True)
-        
         with conn.cursor() as cur:
             cur.execute("DELETE FROM public.vendas WHERE TO_CHAR(data_venda, 'YYYY-MM') = %s", (upload_month,))
             data_to_insert = [tuple(row) for row in sales_df[col_names].itertuples(index=False)]
-            # Atualizado o SQL INSERT para incluir a nova coluna 'nota_fiscal'
             sql_insert_sales = "INSERT INTO public.vendas (data_venda, nota_fiscal, cliente, nome_fantasia, produto, quantidade, valor, fabricante, vendedor) VALUES %s"
             execute_values(cur, sql_insert_sales, data_to_insert, page_size=1000)
-            
         conn.commit()
         return jsonify({"message": f"{len(data_to_insert)} registos inseridos!"}), 201
     except Exception as e:
@@ -243,8 +234,6 @@ def get_top_clientes_data():
     finally:
         if conn: conn.close()
 
-# Substitua a sua função get_data() inteira por esta:
-
 @dashboard_bp.route("/api/dados", methods=['GET'])
 @login_required
 def get_data():
@@ -275,20 +264,15 @@ def get_data():
         
         analysis_year, analysis_month = map(int, month_filter.split('-'))
         total_dias_uteis_mes = count_weekdays(analysis_year, analysis_month)
-
-        # --- CORREÇÃO DA LÓGICA DE PROJEÇÃO ---
-        # 1. Encontra a data da última venda DENTRO do filtro atual (mês e vendedor)
+        
         cur.execute(f"SELECT MAX(data_venda) FROM public.vendas {where_clause};")
         last_sale_date_row = cur.fetchone()
         last_sale_date = last_sale_date_row[0] if last_sale_date_row and last_sale_date_row[0] else None
 
-        # 2. Usa a data da última venda para calcular os dias úteis passados
         if last_sale_date:
             dias_uteis_passados = count_weekdays(analysis_year, analysis_month, last_sale_date.day)
         else:
-            # Se não houver vendas, não há dias úteis passados com faturamento
             dias_uteis_passados = 0
-        # --- FIM DA CORREÇÃO ---
 
         cur.execute(f"SELECT COALESCE(SUM(valor), 0), COALESCE(COUNT(DISTINCT cliente), 0), COALESCE(COUNT(DISTINCT nota_fiscal), 0) FROM public.vendas {where_clause};")
         faturamento_total, total_clientes_atendidos, total_pedidos = cur.fetchone() or (0, 0, 0)
@@ -382,6 +366,7 @@ def get_data():
         return jsonify({"message": f"Erro interno: {str(e)}"}), 500
     finally:
         if conn: conn.close()
+
 @dashboard_bp.route("/api/dados-cumulativos", methods=['GET'])
 @login_required
 def get_cumulative_data():
