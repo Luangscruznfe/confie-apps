@@ -45,8 +45,7 @@
             align-items: center;
             gap: 1rem;
         }
-        h1, .section-title { font-size: 1.5rem; font-weight: 600; margin-bottom: 1rem; }
-        .menu-toggle { display: block; cursor: pointer; font-size: 1.5rem; background: none; border: none; color: var(--text-color); }
+        .section-title { font-size: 1.5rem; font-weight: 600; margin-bottom: 1rem; }
         .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1.5rem; margin-bottom: 2rem; }
         .kpi-card { background-color: var(--card-bg); border-radius: var(--border-radius); box-shadow: var(--shadow); padding: 1.5rem; display: flex; align-items: center; }
         .kpi-icon { font-size: 2rem; padding: 1rem; border-radius: 50%; margin-right: 1rem; color: #fff; }
@@ -65,8 +64,6 @@
         .filter-group label { font-size: 0.8rem; margin-bottom: 0.5rem; font-weight: 600; }
         .filter-group input { padding: 0.5rem; border: 1px solid #dee2e6; border-radius: var(--border-radius); font-family: 'Poppins', sans-serif; }
         #error-message { color: red; text-align: center; margin: 1rem 0; }
-        .sidebar { position: fixed; top: 0; right: -350px; width: 350px; height: 100%; background-color: #fff; box-shadow: -4px 0 10px rgba(0,0,0,0.1); padding: 2rem; transition: right 0.3s ease-in-out; z-index: 1000; overflow-y: auto; }
-        .sidebar.open { right: 0; }
         #goals-table-container { background-color: var(--card-bg); border-radius: var(--border-radius); box-shadow: var(--shadow); padding: 1.5rem; overflow-x: auto; }
         .goals-table { width: 100%; border-collapse: collapse; }
         .goals-table th, .goals-table td { padding: 0.75rem 1rem; text-align: left; border-bottom: 1px solid #e9ecef; white-space: nowrap; }
@@ -113,10 +110,122 @@
             margin-bottom: 2rem;
             border: 1px solid #fde68a;
         }
+
+        .menu-toggle {
+            font-size: 2rem;
+            background: none;
+            border: none;
+            color: var(--text-color);
+            cursor: pointer;
+        }
+        .sidebar {
+            position: fixed;
+            top: 0;
+            right: -350px;
+            width: 100%;
+            max-width: 350px;
+            height: 100%;
+            background-color: #fff;
+            box-shadow: -4px 0 10px rgba(0,0,0,0.1);
+            padding: 2rem;
+            transition: right 0.3s ease-in-out;
+            z-index: 1000;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+        }
+        .sidebar.open {
+            right: 0;
+        }
+        .sidebar .sidebar-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+        }
+        .sidebar .sidebar-header h2 {
+            margin: 0;
+        }
+        .sidebar .close-btn {
+            font-size: 2.5rem;
+            line-height: 1;
+        }
+        .sidebar .form-group {
+            margin-bottom: 1.5rem;
+        }
+        .sidebar .file-input-wrapper {
+            position: relative;
+        }
+        .sidebar .file-input-label {
+            display: flex;
+            align-items: center;
+            padding: 0.75rem 1rem;
+            border: 2px dashed #dee2e6;
+            border-radius: var(--border-radius);
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .sidebar .file-input-label:hover {
+            background-color: #f8f9fa;
+        }
+        .sidebar .file-input-label svg {
+            width: 24px;
+            height: 24px;
+            margin-right: 0.75rem;
+            color: var(--text-color);
+        }
+        .sidebar .file-input-text {
+            color: #8898aa;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .sidebar input[type="file"] {
+            position: absolute;
+            width: 0.1px;
+            height: 0.1px;
+            opacity: 0;
+            overflow: hidden;
+            z-index: -1;
+        }
+        .sidebar .btn-process, .sidebar .btn-clear {
+            width: 100%;
+            padding: 0.8rem;
+            font-size: 1rem;
+            font-weight: 600;
+            border: none;
+            border-radius: var(--border-radius);
+            cursor: pointer;
+            transition: background-color 0.2s, color 0.2s;
+        }
+        .sidebar .btn-process {
+            background-color: var(--primary-color);
+            color: #fff;
+            margin-top: auto;
+        }
+        .sidebar .btn-process:disabled {
+            background-color: #cad1f7;
+            cursor: not-allowed;
+        }
+        .sidebar .btn-clear {
+            background: none;
+            border: 2px solid var(--red-color);
+            color: var(--red-color);
+            margin-top: 1rem;
+        }
+        .sidebar .btn-clear:hover {
+            background-color: var(--red-color);
+            color: #fff;
+        }
+        #status-message {
+            margin-top: 1rem;
+            text-align: center;
+            font-weight: 600;
+        }
         
         @media (max-width: 768px) {
             .container { margin-top: 1rem; padding: 0 0.75rem; }
-            h1 { font-size: 1.5rem; }
+            .header-logo { max-height: 35px; }
             .section-title { font-size: 1.25rem; }
             .kpi-grid, .filters, .chart-grid { grid-template-columns: 1fr; }
             .modal-content { height: 90vh; padding: 1rem; }
@@ -133,6 +242,7 @@
                 <button class="menu-toggle" id="menu-toggle">&#9776;</button>
             </div>
         </header>
+
         <div class="update-banner">
             Última atualização de faturamento: <strong>{{ last_update_date }}</strong>
         </div>
@@ -186,15 +296,37 @@
             </div>
         </div>
     </div>
+    
     <div class="sidebar" id="sidebar">
-        <h2>Gestão de Dados</h2>
-        <div class="form-group"><label for="sales-file">Ficheiro de Vendas (.xlsx, .csv)</label><input type="file" id="sales-file" accept=".xlsx, .csv"></div>
-        <div class="form-group"><label for="portfolio-file">Ficheiro da Carteira (.csv)</label><input type="file" id="portfolio-file" accept=".csv"></div>
-        <div class="form-group" style="display: none;"><input type="checkbox" id="replace-data-checkbox" checked></div>
+        <div class="sidebar-header">
+            <h2>Gestão de Dados</h2>
+            <button class="menu-toggle close-btn" id="close-sidebar-btn">&times;</button>
+        </div>
+        <div class="form-group">
+            <label for="sales-file">Ficheiro de Vendas (.xlsx, .csv)</label>
+            <div class="file-input-wrapper">
+                <label for="sales-file" class="file-input-label">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 16.5V9.75m0 0l-3.75 3.75M12 9.75l3.75 3.75M3.75 18A2.25 2.25 0 006 20.25h12A2.25 2.25 0 0020.25 18v-2.25a2.25 2.25 0 00-2.25-2.25H6.75A2.25 2.25 0 004.5 15.75V18a2.25 2.25 0 00-2.25-2.25H3.75A2.25 2.25 0 001.5 18v0A2.25 2.25 0 003.75 18z" /></svg>
+                    <span class="file-input-text" data-input-id="sales-file">Escolher arquivo...</span>
+                </label>
+                <input type="file" id="sales-file" accept=".xlsx, .csv">
+            </div>
+        </div>
+        <div class="form-group">
+            <label for="portfolio-file">Ficheiro da Carteira (.csv)</label>
+             <div class="file-input-wrapper">
+                <label for="portfolio-file" class="file-input-label">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 16.5V9.75m0 0l-3.75 3.75M12 9.75l3.75 3.75M3.75 18A2.25 2.25 0 006 20.25h12A2.25 2.25 0 0020.25 18v-2.25a2.25 2.25 0 00-2.25-2.25H6.75A2.25 2.25 0 004.5 15.75V18a2.25 2.25 0 00-2.25-2.25H3.75A2.25 2.25 0 001.5 18v0A2.25 2.25 0 003.75 18z" /></svg>
+                    <span class="file-input-text" data-input-id="portfolio-file">Escolher arquivo...</span>
+                </label>
+                <input type="file" id="portfolio-file" accept=".csv">
+            </div>
+        </div>
+        <div id="status-message"></div>
         <button id="process-button" class="btn-process" disabled>Processar e Salvar</button>
-        <div id="status-message" style="margin-top: 1rem; text-align: center;"></div>
         <button id="clear-button" class="btn-clear">Limpar Dados do Servidor</button>
     </div>
+
     <div id="chartModal" class="chart-modal">
         <div class="modal-content">
             <div class="modal-header"><h2 id="modalChartTitle" class="modal-title"></h2><button id="closeModalBtn" class="modal-close-btn">&times;</button></div>
@@ -204,6 +336,7 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function () {
+    // Funções de formatação (sem alterações)
     function formatCurrency(value) { return (Number(value) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }); }
     function formatNumber(value) {
         value = Number(value) || 0;
@@ -324,7 +457,8 @@ document.addEventListener('DOMContentLoaded', function () {
         clearButton: document.getElementById('clear-button'),
         vendedorSelectBox: document.getElementById('vendedor-select-box'),
         vendedorCheckboxesContainer: document.getElementById('vendedor-checkboxes-container'),
-        vendedorSelectedText: document.getElementById('vendedor-selected-text')
+        vendedorSelectedText: document.getElementById('vendedor-selected-text'),
+        closeSidebarBtn: document.getElementById('close-sidebar-btn')
     };
 
     window.charts = {
@@ -461,7 +595,6 @@ document.addEventListener('DOMContentLoaded', function () {
         } catch (error) { console.error("Erro no gráfico cumulativo:", error); }
     }
 
-    // --- CORREÇÃO DA FUNÇÃO setInitialFilters ---
     function setInitialFilters() {
         const initialMonth = "{{ initial_month|safe }}";
         if (initialMonth && initialMonth.includes('-')) {
@@ -544,7 +677,6 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
 
-    // --- CORREÇÃO: Removido o '}' extra ---
     function handleFilterChange() { 
         loadDataFromAPI(elements.monthFilter.value, getSelectedVendors()); 
         loadTopClientesData();
@@ -553,7 +685,28 @@ document.addEventListener('DOMContentLoaded', function () {
     elements.monthFilter.addEventListener('input', handleFilterChange);
     elements.compareMonth1.addEventListener('change', loadCumulativeData);
     elements.compareMonth2.addEventListener('change', loadCumulativeData);
-    elements.menuToggle.addEventListener('click', () => elements.sidebar.classList.toggle('open'));
+    
+    // --- CORREÇÃO DA LÓGICA DO MENU ---
+    const sidebar = document.getElementById('sidebar');
+    const menuToggle = document.getElementById('menu-toggle');
+    const closeSidebarBtn = document.getElementById('close-sidebar-btn');
+
+    menuToggle.addEventListener('click', () => sidebar.classList.add('open'));
+    closeSidebarBtn.addEventListener('click', () => sidebar.classList.remove('open'));
+    
+    ['sales-file', 'portfolio-file'].forEach(id => {
+        const fileInput = document.getElementById(id);
+        const textSpan = document.querySelector(`.file-input-text[data-input-id="${id}"]`);
+        if (fileInput && textSpan) {
+            fileInput.addEventListener('change', () => {
+                if (fileInput.files.length > 0) {
+                    textSpan.textContent = fileInput.files[0].name;
+                } else {
+                    textSpan.textContent = 'Escolher arquivo...';
+                }
+            });
+        }
+    });
     
     const checkFiles = () => { elements.processButton.disabled = !(elements.salesFileInput.files.length > 0 && elements.portfolioFileInput.files.length > 0); };
     elements.salesFileInput.addEventListener('change', checkFiles);
