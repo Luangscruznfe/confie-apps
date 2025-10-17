@@ -586,6 +586,12 @@ document.addEventListener('DOMContentLoaded', function () {
         const params = new URLSearchParams();
         params.append('meses', elements.compareMonth1.value);
         params.append('meses', elements.compareMonth2.value);
+        
+        // --- CORREÇÃO AQUI ---
+        // Adiciona os vendedores selecionados no filtro principal aos parâmetros da requisição
+        const vendedores = getSelectedVendors();
+        vendedores.forEach(v => params.append('vendedor', v));
+
         try {
             const response = await fetch(`${baseUrl}/api/dados-cumulativos?${params.toString()}`);
             if (response.status === 401) { window.location.href = '/login'; return; }
@@ -680,13 +686,15 @@ document.addEventListener('DOMContentLoaded', function () {
     function handleFilterChange() { 
         loadDataFromAPI(elements.monthFilter.value, getSelectedVendors()); 
         loadTopClientesData();
+        // --- CORREÇÃO AQUI ---
+        // Recarrega o gráfico cumulativo sempre que o filtro principal mudar
+        loadCumulativeData();
     }
     
     elements.monthFilter.addEventListener('input', handleFilterChange);
     elements.compareMonth1.addEventListener('change', loadCumulativeData);
     elements.compareMonth2.addEventListener('change', loadCumulativeData);
     
-    // --- CORREÇÃO DA LÓGICA DO MENU ---
     const sidebar = document.getElementById('sidebar');
     const menuToggle = document.getElementById('menu-toggle');
     const closeSidebarBtn = document.getElementById('close-sidebar-btn');

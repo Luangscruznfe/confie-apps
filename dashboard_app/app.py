@@ -20,8 +20,6 @@ load_dotenv()
 
 logging.basicConfig(stream=sys.stdout, level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
-# --- CORREÇÃO AQUI ---
-# Adicionamos static_url_path para que o Flask gere os links corretos para os arquivos estáticos
 app = Flask(__name__, static_folder='static', template_folder='templates', static_url_path='/dashboard/static')
 
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'sua-chave-secreta-padrao-aqui')
@@ -209,14 +207,29 @@ def get_top_clientes_data():
         month_filter = request.args.get('month')
         if not month_filter:
             return jsonify({"message": "Mês é obrigatório"}), 400
+        
+        vendedores_loja_set = {'SHEILA', 'ROSANGEL', 'DELIVERY', 'CAIQUE', 'CONFIE'}
+
         if current_user.role == 'admin':
-            vendedores_filter = request.args.getlist('vendedor')
+            vendedores_selecionados = request.args.getlist('vendedor')
+            vendedores_para_query = set()
+
+            if not vendedores_selecionados:
+                 vendedores_para_query = set()
+            else:
+                if 'LOJA' in vendedores_selecionados:
+                    vendedores_para_query.update(vendedores_loja_set)
+                for vendedor in vendedores_selecionados:
+                    if vendedor != 'LOJA':
+                        vendedores_para_query.add(vendedor)
         else:
-            vendedores_filter = [current_user.username]
+            vendedores_para_query = {current_user.username}
+
         where_conditions = [f"TO_CHAR(data_venda, 'YYYY-MM') = '{month_filter}'"]
-        if vendedores_filter:
-            safe_vendedores = ["'" + v.replace("'", "''") + "'" for v in vendedores_filter]
+        if vendedores_para_query:
+            safe_vendedores = ["'" + v.replace("'", "''") + "'" for v in vendedores_para_query]
             where_conditions.append(f"vendedor IN ({','.join(safe_vendedores)})")
+
         where_clause = "WHERE " + " AND ".join(where_conditions)
         query = f"""
             SELECT nome_fantasia, SUM(valor) as total
@@ -234,6 +247,7 @@ def get_top_clientes_data():
     finally:
         if conn: conn.close()
 
+
 @dashboard_bp.route("/api/dados", methods=['GET'])
 @login_required
 def get_data():
@@ -247,18 +261,33 @@ def get_data():
             cur.execute("SELECT TO_CHAR(MAX(data_venda), 'YYYY-MM') FROM public.vendas;")
             max_month_row = cur.fetchone()
             month_filter = (max_month_row[0] if max_month_row and max_month_row[0] else datetime.now().strftime('%Y-%m'))
+        
+        vendedores_filter_req = request.args.getlist('vendedor')
+        vendedores_selecionados = []
+        vendedores_para_query = set()
+        
+        vendedores_loja_set = {'SHEILA', 'ROSANGEL', 'DELIVERY', 'CAIQUE', 'CONFIE'}
+
         if current_user.role == 'admin':
-            vendedores_filter_req = request.args.getlist('vendedor')
             default_vendedores = ['MARCELO', 'EVERTON', 'MARCOS', 'PEDRO', 'RODOLFO', 'SILVANA', 'THYAGO', 'TIAGO', 'LUIZ']
-            vendedores_filter = vendedores_filter_req if vendedores_filter_req else default_vendedores
+            vendedores_selecionados = vendedores_filter_req if vendedores_filter_req else default_vendedores
+            
+            if 'LOJA' in vendedores_selecionados:
+                vendedores_para_query.update(vendedores_loja_set)
+            
+            for vendedor in vendedores_selecionados:
+                if vendedor != 'LOJA':
+                    vendedores_para_query.add(vendedor)
         else:
-            vendedores_filter = [current_user.username]
-        results['selectedVendors'] = vendedores_filter
+            vendedores_selecionados = [current_user.username]
+            vendedores_para_query = {current_user.username}
+
+        results['selectedVendors'] = vendedores_selecionados
 
         where_conditions = [f"TO_CHAR(data_venda, 'YYYY-MM') = '{month_filter}'"]
         safe_vendedores = []
-        if vendedores_filter:
-            safe_vendedores = ["'" + v.replace("'", "''") + "'" for v in vendedores_filter]
+        if vendedores_para_query:
+            safe_vendedores = ["'" + v.replace("'", "''") + "'" for v in vendedores_para_query]
             where_conditions.append(f"vendedor IN ({','.join(safe_vendedores)})")
         where_clause = "WHERE " + " AND ".join(where_conditions) if where_conditions else ""
         
@@ -278,13 +307,14 @@ def get_data():
         faturamento_total, total_clientes_atendidos, total_pedidos = cur.fetchone() or (0, 0, 0)
         
         ticket_medio = float(faturamento_total / total_pedidos) if total_pedidos > 0 else 0.0
-        
         media_diaria_dias_uteis = float(faturamento_total / dias_uteis_passados) if dias_uteis_passados > 0 else 0.0
         
-        positivacao_carteira_where = f"WHERE Carteira.mes = '{month_filter}'"
-        if vendedores_filter:
-            positivacao_carteira_where += f" AND Carteira.vendedor IN ({','.join(safe_vendedores)})"
-        
+        positivacao_carteira_where_conditions = [f"Carteira.mes = '{month_filter}'"]
+        if vendedores_selecionados:
+            safe_vendedores_positivacao = ["'" + v.replace("'", "''") + "'" for v in vendedores_selecionados]
+            positivacao_carteira_where_conditions.append(f"Carteira.vendedor IN ({','.join(safe_vendedores_positivacao)})")
+        positivacao_carteira_where = "WHERE " + " AND ".join(positivacao_carteira_where_conditions)
+
         cur.execute(f"SELECT COALESCE(SUM(total_clientes), 0) FROM public.carteira AS Carteira {positivacao_carteira_where};")
         total_clientes_carteira = cur.fetchone()[0] or 0
         
@@ -292,7 +322,6 @@ def get_data():
         if clientes_nao_ativados < 0: clientes_nao_ativados = 0
         
         results['positivacaoGeral'] = {'ativados': int(total_clientes_atendidos), 'nao_ativados': clientes_nao_ativados}
-        
         positivacao_media = (total_clientes_atendidos / total_clientes_carteira * 100) if total_clientes_carteira > 0 else 0.0
         
         results['kpi'] = {
@@ -312,52 +341,108 @@ def get_data():
             cur.execute(query.format(where_clause=where_clause))
             results[key] = [{col.name: float(val) if isinstance(val, Decimal) else val for col, val in zip(cur.description, row)} for row in cur.fetchall()]
         
-        cur.execute(f"""
-            WITH ProdutosVendidos AS (
-                SELECT vendedor, COUNT(DISTINCT produto) AS produtos_unicos_vendidos 
-                FROM public.vendas {where_clause} 
+        vendedores_loja_list = ['SHEILA', 'ROSANGEL', 'DELIVERY', 'CAIQUE', 'CONFIE']
+        safe_vendedores_loja = ["'" + v.replace("'", "''") + "'" for v in vendedores_loja_list]
+
+        query_product_mix = f"""
+            WITH VendasProdutos AS (
+                SELECT
+                    vendedor,
+                    COUNT(DISTINCT produto) as total
+                FROM public.vendas
+                WHERE TO_CHAR(data_venda, 'YYYY-MM') = '{month_filter}'
                 GROUP BY vendedor
+
+                UNION ALL
+
+                SELECT
+                    'LOJA' as vendedor,
+                    COUNT(DISTINCT produto) as total
+                FROM public.vendas
+                WHERE TO_CHAR(data_venda, 'YYYY-MM') = '{month_filter}'
+                AND vendedor IN ({','.join(safe_vendedores_loja)})
             )
-            SELECT 
-                c.vendedor, 
-                COALESCE(pv.produtos_unicos_vendidos, 0) as total
-            FROM public.carteira AS c 
-            LEFT JOIN ProdutosVendidos pv ON c.vendedor = pv.vendedor 
+            SELECT
+                c.vendedor,
+                COALESCE(vp.total, 0) as total
+            FROM public.carteira c
+            LEFT JOIN VendasProdutos vp ON c.vendedor = vp.vendedor
             {positivacao_carteira_where.replace('Carteira', 'c')}
             ORDER BY total DESC;
-        """)
+        """
+        cur.execute(query_product_mix)
         results['productMix'] = [{col.name: val for col, val in zip(cur.description, row)} for row in cur.fetchall()]
-        
+
         fabricantes_foco = ['SELMI', 'LUCKY', 'RICLAN', 'KELLANOVA', 'TAMPICO', 'CONSABOR', 'YAI', 'TECPOLPA', 'GOLDKO']
-        focus_where = where_clause + (f" AND fabricante IN ({','.join(['%s'] * len(fabricantes_foco))})" if where_clause else f"WHERE fabricante IN ({','.join(['%s'] * len(fabricantes_foco))})")
-        cur.execute(f"SELECT fabricante, SUM(valor) as total FROM public.vendas {focus_where} GROUP BY fabricante ORDER BY total DESC;", fabricantes_foco)
+        focus_where_conditions = where_conditions.copy()
+        focus_where_conditions.append(f"fabricante IN ({','.join(['%s'] * len(fabricantes_foco))})")
+        focus_where_clause = "WHERE " + " AND ".join(focus_where_conditions)
+        cur.execute(f"SELECT fabricante, SUM(valor) as total FROM public.vendas {focus_where_clause} GROUP BY fabricante ORDER BY total DESC;", fabricantes_foco)
         results['focusManufacturers'] = [{col.name: float(val) if isinstance(val, Decimal) else val for col, val in zip(cur.description, row)} for row in cur.fetchall()]
         
-        carteira_where_conditions = [f"c.mes = '{month_filter}'", "c.meta_faturamento > 0"]
-        if vendedores_filter:
-            carteira_where_conditions.append(f"c.vendedor IN ({','.join(safe_vendedores)})")
-        carteira_where_clause = " AND ".join(carteira_where_conditions)
-        cur.execute(f"""
-            WITH VendasAtuais AS (SELECT vendedor, SUM(valor) as faturamento_atual FROM public.vendas {where_clause} GROUP BY vendedor)
-            SELECT c.vendedor, c.meta_faturamento as meta, COALESCE(va.faturamento_atual, 0) as atual
-            FROM public.carteira c LEFT JOIN VendasAtuais va ON c.vendedor = va.vendedor
-            WHERE {carteira_where_clause};
-        """)
-        sales_goals_raw = [{col.name: val for col, val in zip(cur.description, row)} for row in cur.fetchall()]
+        loja_goal_entry = None
+        cur.execute(f"SELECT meta_faturamento FROM public.carteira WHERE mes = '{month_filter}' AND vendedor = 'LOJA';")
+        meta_loja_row = cur.fetchone()
+        meta_loja = float(meta_loja_row[0]) if meta_loja_row and meta_loja_row[0] is not None else 0.0
+
+        if meta_loja > 0:
+            loja_where_conditions = [ f"TO_CHAR(data_venda, 'YYYY-MM') = '{month_filter}'", f"vendedor IN ({','.join(safe_vendedores_loja)})" ]
+            loja_where_clause = "WHERE " + " AND ".join(loja_where_conditions)
+            cur.execute(f"SELECT COALESCE(SUM(valor), 0) FROM public.vendas {loja_where_clause};")
+            faturamento_atual_loja = float(cur.fetchone()[0])
+            
+            percentual_loja = (faturamento_atual_loja / meta_loja) * 100 if meta_loja > 0 else 0.0
+            restante_loja = meta_loja - faturamento_atual_loja
+            venda_diaria_loja = (restante_loja / (total_dias_uteis_mes - dias_uteis_passados)) if (total_dias_uteis_mes - dias_uteis_passados) > 0 and restante_loja > 0 else 0.0
+            projecao_loja = (faturamento_atual_loja / dias_uteis_passados) * total_dias_uteis_mes if dias_uteis_passados > 0 else 0.0
+
+            loja_goal_entry = { 'vendedor': 'LOJA', 'meta': meta_loja, 'atual': faturamento_atual_loja, 'percentual': percentual_loja, 'venda_diaria': venda_diaria_loja, 'projecao': projecao_loja }
+
+        vendedores_para_metas_db = []
+        if not vendedores_filter_req:
+            vendedores_para_metas_db = default_vendedores
+        elif vendedores_selecionados != ['LOJA']:
+            vendedores_para_metas_db = [v for v in vendedores_selecionados if v != 'LOJA']
+
         sales_goals = []
-        for row in sales_goals_raw:
-            meta = float(row.get('meta') or 0)
-            atual = float(row.get('atual') or 0)
-            row['meta'], row['atual'] = meta, atual
-            row['percentual'] = (atual / meta) * 100 if meta > 0 else 0.0
-            restante = meta - atual
-            row['venda_diaria'] = (restante / (total_dias_uteis_mes - dias_uteis_passados)) if (total_dias_uteis_mes - dias_uteis_passados) > 0 and restante > 0 else 0.0
-            row['projecao'] = (atual / dias_uteis_passados) * total_dias_uteis_mes if dias_uteis_passados > 0 else 0.0
-            sales_goals.append(row)
+        if vendedores_para_metas_db:
+            safe_vendedores_metas = ["'" + v.replace("'", "''") + "'" for v in vendedores_para_metas_db]
+            carteira_where_clause = f"c.mes = '{month_filter}' AND c.meta_faturamento > 0 AND c.vendedor IN ({','.join(safe_vendedores_metas)})"
+            
+            cur.execute(f"""
+                WITH VendasAtuais AS (SELECT vendedor, SUM(valor) as faturamento_atual FROM public.vendas WHERE TO_CHAR(data_venda, 'YYYY-MM') = '{month_filter}' GROUP BY vendedor)
+                SELECT c.vendedor, c.meta_faturamento as meta, COALESCE(va.faturamento_atual, 0) as atual
+                FROM public.carteira c LEFT JOIN VendasAtuais va ON c.vendedor = va.vendedor
+                WHERE {carteira_where_clause};
+            """)
+            sales_goals_raw = [{col.name: val for col, val in zip(cur.description, row)} for row in cur.fetchall()]
+            
+            for row in sales_goals_raw:
+                meta = float(row.get('meta') or 0)
+                atual = float(row.get('atual') or 0)
+                row['meta'], row['atual'] = meta, atual
+                row['percentual'] = (atual / meta) * 100 if meta > 0 else 0.0
+                restante = meta - atual
+                row['venda_diaria'] = (restante / (total_dias_uteis_mes - dias_uteis_passados)) if (total_dias_uteis_mes - dias_uteis_passados) > 0 and restante > 0 else 0.0
+                row['projecao'] = (atual / dias_uteis_passados) * total_dias_uteis_mes if dias_uteis_passados > 0 else 0.0
+                sales_goals.append(row)
+        
+        if loja_goal_entry:
+            if vendedores_selecionados == ['LOJA']:
+                sales_goals = [loja_goal_entry]
+            else:
+                sales_goals.append(loja_goal_entry)
+
         results['salesGoals'] = sorted(sales_goals, key=lambda x: x['percentual'], reverse=True)
         
         cur.execute("SELECT DISTINCT vendedor FROM public.vendas WHERE vendedor IS NOT NULL AND TRIM(vendedor) <> '' ORDER BY vendedor;")
-        results['allVendors'] = [r[0] for r in cur.fetchall()]
+        all_vendors = [r[0] for r in cur.fetchall()]
+        cur.execute("SELECT 1 FROM public.carteira WHERE mes = %s AND vendedor = 'LOJA' LIMIT 1;", (month_filter,))
+        if cur.fetchone() is not None:
+            if 'LOJA' not in all_vendors:
+                all_vendors.append('LOJA')
+                all_vendors.sort()
+        results['allVendors'] = all_vendors
         
         cur.close()
         return jsonify(results)
@@ -366,6 +451,7 @@ def get_data():
         return jsonify({"message": f"Erro interno: {str(e)}"}), 500
     finally:
         if conn: conn.close()
+
 
 @dashboard_bp.route("/api/dados-cumulativos", methods=['GET'])
 @login_required
@@ -376,18 +462,45 @@ def get_cumulative_data():
         months_to_compare = request.args.getlist('meses')
         if not months_to_compare: 
             return jsonify({"message": "Mês obrigatório."}), 400
+        
         params = list(months_to_compare)
         base_query = "SELECT EXTRACT(DAY FROM data_venda) as dia, TO_CHAR(data_venda, 'YYYY-MM') as mes, SUM(valor) as total_dia FROM public.vendas"
         where_conditions = []
         month_placeholders = ','.join(['%s'] * len(months_to_compare))
         where_conditions.append(f"TO_CHAR(data_venda, 'YYYY-MM') IN ({month_placeholders})")
-        if current_user.role == 'vendedor':
-            where_conditions.append("vendedor = %s")
-            params.append(current_user.username)
+
+        # // --- LÓGICA DE FILTRO COMPLETA ADICIONADA AQUI --- //
+        vendedores_para_query = set()
+        
+        if current_user.role == 'admin':
+            vendedores_selecionados = request.args.getlist('vendedor')
+            # Se nenhum vendedor for passado, ele usa a visão padrão dos principais vendedores
+            if not vendedores_selecionados:
+                vendedores_selecionados = ['MARCELO', 'EVERTON', 'MARCOS', 'PEDRO', 'RODOLFO', 'SILVANA', 'THYAGO', 'TIAGO', 'LUIZ']
+
+            vendedores_loja_set = {'SHEILA', 'ROSANGEL', 'DELIVERY', 'CAIQUE', 'CONFIE'}
+
+            if 'LOJA' in vendedores_selecionados:
+                vendedores_para_query.update(vendedores_loja_set)
+            for vendedor in vendedores_selecionados:
+                if vendedor != 'LOJA':
+                    vendedores_para_query.add(vendedor)
+        
+        elif current_user.role == 'vendedor':
+            vendedores_para_query = {current_user.username}
+
+        # Adiciona a condição do vendedor à query se houver algum para filtrar
+        if vendedores_para_query:
+            safe_vendedores = ["'" + v.replace("'", "''") + "'" for v in vendedores_para_query]
+            where_conditions.append(f"vendedor IN ({','.join(safe_vendedores)})")
+        # // --- FIM DA LÓGICA DE FILTRO --- //
+
         final_query = f"{base_query} WHERE {' AND '.join(where_conditions)} GROUP BY 1, 2 ORDER BY 1, 2;"
         df = pd.read_sql_query(final_query, conn, params=params)
+        
         if df.empty: 
             return jsonify({"labels": list(range(1, 32)), "datasets": []})
+        
         pivot_df = df.pivot_table(index='dia', columns='mes', values='total_dia', fill_value=0)
         cumulative_df = pivot_df.cumsum().reindex(pd.Index(range(1, 32), name='dia')).ffill().fillna(0)
         datasets = []
