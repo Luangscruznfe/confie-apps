@@ -398,11 +398,17 @@ def get_data():
 
             loja_goal_entry = { 'vendedor': 'LOJA', 'meta': meta_loja, 'atual': faturamento_atual_loja, 'percentual': percentual_loja, 'venda_diaria': venda_diaria_loja, 'projecao': projecao_loja }
 
+        # // --- LÓGICA DE METAS CORRIGIDA PARA TODOS OS USUÁRIOS --- //
         vendedores_para_metas_db = []
-        if not vendedores_filter_req:
-            vendedores_para_metas_db = default_vendedores
-        elif vendedores_selecionados != ['LOJA']:
-            vendedores_para_metas_db = [v for v in vendedores_selecionados if v != 'LOJA']
+        if current_user.role == 'admin':
+            if not vendedores_filter_req: # Visão padrão do admin
+                default_vendedores = ['MARCELO', 'EVERTON', 'MARCOS', 'PEDRO', 'RODOLFO', 'SILVANA', 'THYAGO', 'TIAGO', 'LUIZ']
+                vendedores_para_metas_db = default_vendedores
+            elif vendedores_selecionados != ['LOJA']: # Filtro ativo do admin, mas não é SÓ a loja
+                vendedores_para_metas_db = [v for v in vendedores_selecionados if v != 'LOJA']
+        else: # É um vendedor ou outro role não-admin
+            vendedores_para_metas_db = [current_user.username]
+        # // --- FIM DA CORREÇÃO --- //
 
         sales_goals = []
         if vendedores_para_metas_db:
@@ -463,18 +469,17 @@ def get_cumulative_data():
         if not months_to_compare: 
             return jsonify({"message": "Mês obrigatório."}), 400
         
-        params = list(months_to_compare)
+        params = [] # Removido o conteúdo inicial para evitar erros com read_sql_query
         base_query = "SELECT EXTRACT(DAY FROM data_venda) as dia, TO_CHAR(data_venda, 'YYYY-MM') as mes, SUM(valor) as total_dia FROM public.vendas"
         where_conditions = []
         month_placeholders = ','.join(['%s'] * len(months_to_compare))
         where_conditions.append(f"TO_CHAR(data_venda, 'YYYY-MM') IN ({month_placeholders})")
+        params.extend(months_to_compare)
 
-        # // --- LÓGICA DE FILTRO COMPLETA ADICIONADA AQUI --- //
         vendedores_para_query = set()
         
         if current_user.role == 'admin':
             vendedores_selecionados = request.args.getlist('vendedor')
-            # Se nenhum vendedor for passado, ele usa a visão padrão dos principais vendedores
             if not vendedores_selecionados:
                 vendedores_selecionados = ['MARCELO', 'EVERTON', 'MARCOS', 'PEDRO', 'RODOLFO', 'SILVANA', 'THYAGO', 'TIAGO', 'LUIZ']
 
@@ -486,14 +491,13 @@ def get_cumulative_data():
                 if vendedor != 'LOJA':
                     vendedores_para_query.add(vendedor)
         
-        elif current_user.role == 'vendedor':
+        else: # Qualquer outro usuário não-admin
             vendedores_para_query = {current_user.username}
 
-        # Adiciona a condição do vendedor à query se houver algum para filtrar
         if vendedores_para_query:
-            safe_vendedores = ["'" + v.replace("'", "''") + "'" for v in vendedores_para_query]
-            where_conditions.append(f"vendedor IN ({','.join(safe_vendedores)})")
-        # // --- FIM DA LÓGICA DE FILTRO --- //
+            vendedor_placeholders = ','.join(['%s'] * len(vendedores_para_query))
+            where_conditions.append(f"vendedor IN ({vendedor_placeholders})")
+            params.extend(list(vendedores_para_query))
 
         final_query = f"{base_query} WHERE {' AND '.join(where_conditions)} GROUP BY 1, 2 ORDER BY 1, 2;"
         df = pd.read_sql_query(final_query, conn, params=params)
