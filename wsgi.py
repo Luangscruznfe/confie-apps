@@ -1,3 +1,5 @@
+# wsgi.py
+
 # =======================================================
 # ALTERAÇÃO AQUI: Adicione estas duas linhas no topo
 # =======================================================
@@ -11,9 +13,14 @@ from werkzeug.middleware.dispatcher import DispatcherMiddleware
 # Importa as suas aplicações existentes
 from conferencia_app.app import app as conferencia_app
 from pontuacao_app.app import app as pontuacao_app
-
-# Importa a nova aplicação do dashboard que criamos
 from dashboard_app.app import app as dashboard_app
+
+# =======================================================
+# ADICIONE A IMPORTAÇÃO DA NOVA APLICAÇÃO FINANCEIRA
+# =======================================================
+from financeiro_app.app import app as financeiro_app
+# =======================================================
+
 
 # (opcional) isolar sessão da Pontuação
 pontuacao_app.config.update(
@@ -32,6 +39,10 @@ def ok(): return "ok", 200
 app = DispatcherMiddleware(conferencia_app, {
     "/pontuacao": pontuacao_app,
     "/dashboard": dashboard_app,
+    # =======================================================
+    # ADICIONE A ROTA PARA A APLICAÇÃO FINANCEIRA
+    # =======================================================
+    "/financeiro": financeiro_app,
+    # =======================================================
     "/_": health,
 })
-

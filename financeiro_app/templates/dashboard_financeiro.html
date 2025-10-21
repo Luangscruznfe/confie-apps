@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Financeiro - Análise de Clientes</title>
+    <style>
+        body { font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif; padding: 2em; background-color: #f8f9fa; color: #343a40; }
+        .container { max-width: 1400px; margin: 0 auto; }
+        .header { text-align: center; margin-bottom: 1em; }
+        h1 { color: #0056b3; margin: 0; }
+        .header-actions { margin-top: 1em; }
+        .btn { padding: 10px 20px; text-decoration: none; border-radius: 5px; font-weight: 600; display: inline-block; border: none; cursor: pointer; }
+        .btn-upload-toggle { background-color: #17a2b8; color: white; }
+        .btn-upload-toggle:hover { background-color: #138496; }
+        .upload-drawer { background-color: #e9ecef; padding: 20px; border-radius: 8px; margin-bottom: 2em; transition: all 0.3s ease-in-out; overflow: hidden; }
+        .upload-drawer.hidden { max-height: 0; padding-top: 0; padding-bottom: 0; margin-bottom: 0; opacity: 0; }
+        .message { margin-bottom: 15px; padding: 10px; border-radius: 5px; }
+        .message.success { background-color: #d4edda; color: #155724; }
+        .message.error { background-color: #f8d7da; color: #721c24; }
+        .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-bottom: 2em; }
+        .kpi-card { background-color: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); text-align: center; border: 1px solid #e9ecef; }
+        .kpi-card h3 { margin: 0; color: #6c757d; font-size: 1rem; font-weight: 500; }
+        .kpi-card p { margin: 10px 0 0; color: #0056b3; font-size: 2rem; font-weight: 600; }
+        .filter-bar { display: flex; gap: 20px; margin-bottom: 2em; }
+        .filter-bar input { flex-grow: 1; padding: 12px; border: 1px solid #dee2e6; border-radius: 8px; font-size: 1rem; }
+        .table-container { max-height: 70vh; overflow-y: auto; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); border: 1px solid #dee2e6; }
+        table { width: 100%; border-collapse: collapse; background-color: #fff; }
+        th, td { border-bottom: 1px solid #dee2e6; padding: 14px 18px; text-align: left; vertical-align: middle; }
+        th { background-color: #007bff; color: white; font-weight: 600; position: sticky; top: 0; z-index: 1; }
+        tr:last-of-type td { border-bottom: none; }
+        tr:nth-child(even) { background-color: #f8f9fa; }
+        .badge { padding: 5px 10px; border-radius: 12px; font-weight: 600; font-size: 0.9em; color: #fff; text-align: center; display: inline-block; }
+        .badge-red { background-color: #dc3545; }
+        .badge-yellow { background-color: #ffc107; color: #212529; }
+        .badge-green { background-color: #28a745; }
+        .badge-blue { background-color: #17a2b8; }
+        .badge-purple { background-color: #6f42c1; }
+        .text-green { color: #28a745; }
+        .text-right { text-align: right !important; }
+        .text-muted { color: #6c757d; font-weight: 600; }
+        .currency-symbol { font-size: 0.9em; margin-right: 4px; }
+        .currency-value { font-weight: 600; }
+        .no-data { text-align: center; color: #888; padding: 40px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Análise de Perfil de Pagamento de Clientes</h1>
+            <div class="header-actions">
+                <button id="toggleUploadBtn" class="btn btn-upload-toggle">Atualizar Base de Dados</button>
+            </div>
+        </div>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="message {{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <div id="uploadDrawer" class="upload-drawer hidden">
+            <p>Envie o arquivo .xlsx para atualizar a base de dados dos clientes.</p>
+            <form method="post" enctype="multipart/form-data" action="{{ url_for('index') }}">
+                <input type="file" name="file" accept=".xlsx" required>
+                <button type="submit" class="btn btn-upload-toggle">Enviar Arquivo</button>
+            </form>
+        </div>
+
+        <div class="kpi-grid">
+            <div class="kpi-card">
+                <h3>Clientes Analisados</h3>
+                <p>{{ kpis.total_clientes }}</p>
+            </div>
+            <div class="kpi-card">
+                <h3>Pontualidade Média</h3>
+                <p>{{ "%.2f"|format(kpis.pontualidade_media) }}%</p>
+            </div>
+            <div class="kpi-card">
+                <h3>Média Geral de Atraso</h3>
+                <p>{{ "%.0f"|format(kpis.media_geral_atraso) }} dias</p>
+            </div>
+            <div class="kpi-card">
+                <h3>Valor Total Analisado</h3>
+                <p>R$ {{ "%.2f"|format(kpis.valor_total)|replace('.', ',') }}</p>
+            </div>
+        </div>
+
+        <div class="filter-bar">
+            <input type="text" id="filtroCodigo" onkeyup="filtrarTabela()" placeholder="Buscar por Código...">
+            <input type="text" id="filtroNome" onkeyup="filtrarTabela()" placeholder="Buscar por Nome...">
+        </div>
+
+        <div class="table-container">
+            {% if clientes %}
+                <table id="tabelaClientes">
+                    <thead>
+                        <tr>
+                            <th>CÓDIGO</th>
+                            <th>Cliente</th>
+                            <th>Dias de Atraso (Média)</th>
+                            <th>Pontualidade</th>
+                            <th class="text-right">Títulos Atrasados</th>
+                            <th class="text-right">Total de Títulos</th>
+                            <th class="text-right">Valor Total Pago</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for cliente in clientes %}
+                        <tr>
+                            <td class="text-muted">{{ cliente.CÓDIGO }}</td>
+                            <td class="text-muted">{{ cliente.NOME }}</td>
+                            <td>
+                                {% if cliente.DIAS_ATRASO_MEDIO > 15 %}
+                                    <span class="badge badge-red">{{ "%.0f"|format(cliente.DIAS_ATRASO_MEDIO) }}</span>
+                                {% elif cliente.DIAS_ATRASO_MEDIO > 5 %}
+                                    <span class="badge badge-yellow">{{ "%.0f"|format(cliente.DIAS_ATRASO_MEDIO) }}</span>
+                                {% elif cliente.DIAS_ATRASO_MEDIO > 0 %}
+                                    <span class="badge badge-blue">{{ "%.0f"|format(cliente.DIAS_ATRASO_MEDIO) }}</span>
+                                {% else %}
+                                    <span class="badge badge-green">0</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <span class="badge {% if cliente.PONTUALIDADE < 30 %}badge-red{% elif cliente.PONTUALIDADE < 70 %}badge-yellow{% else %}badge-green{% endif %}">
+                                    {{ "%.2f"|format(cliente.PONTUALIDADE) }}%
+                                </span>
+                            </td>
+                            <td class="text-right">
+                                {% if cliente.TITULOS_ATRASADOS > 0 %}
+                                    <span class="badge badge-red">{{ cliente.TITULOS_ATRASADOS }}</span>
+                                {% else %}
+                                    <span class="badge badge-green">0</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-right">
+                                <span class="badge badge-purple">{{ cliente.TOTAL_TITULOS }}</span>
+                            </td>
+                            <td class="text-right text-green">
+                                <span class="currency-symbol">R$</span>
+                                <span class="currency-value">{{ "%.2f"|format(cliente.VALOR_TOTAL_PAGO)|replace('.', ',') }}</span>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <div class="no-data">Nenhum dado disponível. Clique em "Atualizar Base de Dados" para carregar um arquivo.</div>
+            {% endif %}
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('toggleUploadBtn').addEventListener('click', function() {
+            document.getElementById('uploadDrawer').classList.toggle('hidden');
+        });
+        function filtrarTabela() {
+            let inputCodigo = document.getElementById('filtroCodigo').value.toUpperCase();
+            let inputNome = document.getElementById('filtroNome').value.toUpperCase();
+            let tabela = document.getElementById('tabelaClientes');
+            let tr = tabela.getElementsByTagName('tr');
+            for (let i = 1; i < tr.length; i++) {
+                let tdCodigo = tr[i].getElementsByTagName('td')[0];
+                let tdNome = tr[i].getElementsByTagName('td')[1];
+                if (tdCodigo && tdNome) {
+                    let valorCodigo = tdCodigo.textContent || tdCodigo.innerText;
+                    let valorNome = tdNome.textContent || tdNome.innerText;
+                    let correspondeCodigo = valorCodigo.toUpperCase().indexOf(inputCodigo) > -1;
+                    let correspondeNome = valorNome.toUpperCase().indexOf(inputNome) > -1;
+                    if (correspondeCodigo && correspondeNome) {
+                        tr[i].style.display = "";
+                    } else {
+                        tr[i].style.display = "none";
+                    }
+                }
+            }
+        }
+    </script>
+</body>
+</html>

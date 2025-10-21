@@ -25,218 +25,126 @@
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: 'Poppins', sans-serif; background-color: var(--secondary-color); color: var(--text-color); line-height: 1.5; }
         .container { max-width: 1600px; margin: 2rem auto; padding: 0 1rem; }
-        header { 
-            display: grid;
-            grid-template-columns: 1fr auto 1fr;
-            align-items: center; 
-            margin-bottom: 2rem;
-            padding: 0 1rem;
-        }
-        .header-logo {
-            grid-column: 2;
-            justify-self: center;
-            max-height: 300px;
-            width: auto;
-        }
-        .header-actions {
-            grid-column: 3;
-            justify-self: end;
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-        }
-        .section-title { font-size: 1.5rem; font-weight: 600; margin-bottom: 1rem; }
+        header { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; margin-bottom: 2rem; padding: 0 1rem; }
+        .header-logo { grid-column: 2; justify-self: center; max-height: 50px; width: auto; }
+        .header-actions { grid-column: 3; justify-self: end; display: flex; align-items: center; gap: 1rem; }
+        .section-title { font-size: 1.5rem; font-weight: 600; margin-bottom: 1rem; color: var(--primary-color); }
         .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1.5rem; margin-bottom: 2rem; }
-        .kpi-card { background-color: var(--card-bg); border-radius: var(--border-radius); box-shadow: var(--shadow); padding: 1.5rem; display: flex; align-items: center; }
-        .kpi-icon { font-size: 2rem; padding: 1rem; border-radius: 50%; margin-right: 1rem; color: #fff; }
+        .kpi-card { background-color: var(--card-bg); border-radius: var(--border-radius); box-shadow: var(--shadow); padding: 1.5rem; display: flex; align-items: center; transition: transform 0.2s ease; }
+        .kpi-card:hover { transform: translateY(-3px); box-shadow: 0 6px 10px rgba(0,0,0,0.12); }
+        .kpi-icon { font-size: 2rem; padding: 1rem; border-radius: 50%; margin-right: 1rem; color: #fff; width: 60px; height: 60px; display: flex; align-items: center; justify-content: center; }
         .icon-faturamento { background-color: var(--primary-color); }
         .icon-projecao { background-color: var(--light-blue-color); }
         .icon-clientes { background-color: var(--green-color); }
         .icon-positivacao { background-color: #fb6340; }
         .icon-ticket { background-color: var(--purple-color); }
-        .kpi-text h3 { font-size: 0.875rem; font-weight: 400; text-transform: uppercase; color: #8898aa; }
-        .kpi-text p { font-size: 1.25rem; font-weight: 600; }
+        .kpi-text h3 { font-size: 0.875rem; font-weight: 400; text-transform: uppercase; color: #8898aa; margin-bottom: 0.25rem; }
+        .kpi-text p { font-size: 1.25rem; font-weight: 600; color: var(--text-color); }
         .chart-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 1.5rem; margin-bottom: 2rem; }
         .chart-grid-full-width { display: grid; grid-template-columns: 1fr; gap: 1.5rem; margin-bottom: 2rem; }
-        .chart-container { position: relative; background-color: var(--card-bg); border-radius: var(--border-radius); box-shadow: var(--shadow); padding: 1.5rem; min-height: 400px; }
+        .chart-container { position: relative; background-color: var(--card-bg); border-radius: var(--border-radius); box-shadow: var(--shadow); padding: 1.5rem; min-height: 400px; display: flex; flex-direction: column;}
+        .chart-container canvas { flex-grow: 1; }
         .filters { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.5rem; background-color: var(--card-bg); padding: 1.5rem; border-radius: var(--border-radius); box-shadow: var(--shadow); margin-bottom: 2rem; }
         .filter-group { display: flex; flex-direction: column; }
-        .filter-group label { font-size: 0.8rem; margin-bottom: 0.5rem; font-weight: 600; }
-        .filter-group input { padding: 0.5rem; border: 1px solid #dee2e6; border-radius: var(--border-radius); font-family: 'Poppins', sans-serif; }
-        #error-message { color: red; text-align: center; margin: 1rem 0; }
-        #goals-table-container { background-color: var(--card-bg); border-radius: var(--border-radius); box-shadow: var(--shadow); padding: 1.5rem; overflow-x: auto; }
+        .filter-group label { font-size: 0.8rem; margin-bottom: 0.5rem; font-weight: 600; color: var(--text-color); }
+        .filter-group input[type="month"] { padding: 0.5rem; border: 1px solid #dee2e6; border-radius: var(--border-radius); font-family: 'Poppins', sans-serif; font-size: 0.9rem; }
+        #error-message { color: var(--red-color); text-align: center; margin: 1rem 0; font-weight: 600; min-height: 1.5em; }
+        #goals-table-container { background-color: var(--card-bg); border-radius: var(--border-radius); box-shadow: var(--shadow); padding: 1.5rem; overflow-x: auto; margin-bottom: 2rem; }
         .goals-table { width: 100%; border-collapse: collapse; }
-        .goals-table th, .goals-table td { padding: 0.75rem 1rem; text-align: left; border-bottom: 1px solid #e9ecef; white-space: nowrap; }
-        .goals-table th { font-weight: bold; font-size: 0.95rem; text-transform: uppercase; color: var(--gold-color); }
+        .goals-table th, .goals-table td { padding: 0.75rem 1rem; text-align: left; border-bottom: 1px solid #e9ecef; white-space: nowrap; font-size: 0.9rem; }
+        .goals-table th { font-weight: bold; font-size: 0.85rem; text-transform: uppercase; color: #8898aa; background-color: #f8f9fe; }
         .goals-table td.vendedor { color: var(--primary-color); font-weight: 600; }
         .goals-table td.meta-valor { color: var(--green-color); }
         .goals-table td.projecao { color: var(--light-blue-color); }
-        .goals-table td.venda-diaria { color: var(--purple-color); }
-        .goal-green .faturamento-valor, .goal-green .atingido { color: var(--green-color); }
-        .goal-yellow .faturamento-valor, .goal-yellow .atingido { color: var(--amber-color); }
-        .goal-red .faturamento-valor, .goal-red .atingido { color: var(--red-color); }
-        .goals-table .meta-valor, .goals-table .faturamento-valor, .goals-table .atingido, .goals-table .projecao, .goals-table .venda-diaria { font-weight: 600; }
+        .goals-table td.venda-diaria { color: var(--purple-color); } /* Corrigido */
+        .goals-table .faturamento-valor, .goals-table .atingido, .goals-table .projecao, .goals-table .venda-diaria { font-weight: 600; }
+        .goal-green .faturamento-valor, .goal-green .atingido span { color: var(--green-color); }
+        .goal-yellow .faturamento-valor, .goal-yellow .atingido span { color: var(--amber-color); }
+        .goal-red .faturamento-valor, .goal-red .atingido span { color: var(--red-color); }
         .percentage-bar { background-color: #e9ecef; border-radius: 5px; height: 12px; width: 100px; display: inline-block; vertical-align: middle; margin-left: 8px; overflow: hidden; position: relative; }
-        .percentage-fill { background-color: var(--green-color); height: 100%; border-radius: 5px; }
+        .percentage-fill { height: 100%; border-radius: 5px; transition: width 0.3s ease; }
+        .goal-green .percentage-fill { background-color: var(--green-color); }
+        .goal-yellow .percentage-fill { background-color: var(--amber-color); }
+        .goal-red .percentage-fill { background-color: var(--red-color); }
         .multiselect-container { position: relative; user-select: none; }
-        .select-box { padding: 0.5rem; border: 1px solid #dee2e6; border-radius: var(--border-radius); cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
+        .select-box { padding: 0.5rem; border: 1px solid #dee2e6; border-radius: var(--border-radius); cursor: pointer; display: flex; justify-content: space-between; align-items: center; background-color: #fff; }
         .select-box .arrow { font-size: 0.8rem; transition: transform 0.2s; }
         .select-box.open .arrow { transform: rotate(180deg); }
-        #vendedor-selected-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        #vendedor-selected-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.9rem; }
         .checkboxes-container { display: none; position: absolute; top: 100%; left: 0; right: 0; border: 1px solid #dee2e6; background: white; z-index: 100; max-height: 200px; overflow-y: auto; border-radius: 0 0 var(--border-radius) var(--border-radius); box-shadow: var(--shadow); }
         .checkboxes-container.visible { display: block; }
-        .checkboxes-container label { display: block; padding: 0.5rem 1rem; cursor: pointer; }
+        .checkboxes-container label { display: block; padding: 0.5rem 1rem; cursor: pointer; font-size: 0.9rem; }
         .checkboxes-container label:hover { background-color: #f4f5f7; }
         .checkboxes-container input[type="checkbox"] { margin-right: 0.5rem; vertical-align: middle; }
         .checkboxes-container .select-all-label { font-weight: bold; border-bottom: 1px solid #dee2e6; background-color: #fafafa; }
-        .expand-btn { position: absolute; top: 0.5rem; right: 0.5rem; cursor: pointer; padding: 0.3rem; border-radius: 50%; transition: background-color 0.2s; background: none; border: none; }
+        .expand-btn { position: absolute; top: 0.5rem; right: 0.5rem; cursor: pointer; padding: 0.3rem; border-radius: 50%; transition: background-color 0.2s; background: none; border: none; z-index: 10; }
         .expand-btn svg { width: 1.25rem; height: 1.25rem; color: #8898aa; }
+        .expand-btn:hover svg { color: var(--primary-color); }
         .chart-modal { position: fixed; inset: 0; background-color: rgba(0, 0, 0, 0.75); z-index: 2000; padding: 1rem; display: flex; align-items: center; justify-content: center; opacity: 0; visibility: hidden; pointer-events: none; transition: opacity 0.2s ease-in-out; }
         .chart-modal.visible { opacity: 1; visibility: visible; pointer-events: auto; }
         .modal-content { background-color: #2d3748; color: #e2e8f0; border-radius: var(--border-radius); box-shadow: 0 10px 25px rgba(0,0,0,0.2); width: 95vw; max-width: 1600px; height: 80vh; padding: 1.5rem; position: relative; display: flex; flex-direction: column; }
-        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; border-bottom: 1px solid #4a5568; padding-bottom: 1rem;}
         .modal-title { font-size: 1.25rem; font-weight: 600; color: #e2e8f0; }
-        .modal-close-btn { background: none; border: none; font-size: 2rem; cursor: pointer; color: #a0aec0; line-height: 1; }
+        .modal-close-btn { background: none; border: none; font-size: 2rem; cursor: pointer; color: #a0aec0; line-height: 1; transition: color 0.2s; }
+        .modal-close-btn:hover { color: #fff; }
         .modal-body { flex-grow: 1; position: relative; }
         .modal-body canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
-        .update-banner {
-            background-color: #fffbeb;
-            color: #b45309;
-            padding: 1rem;
-            text-align: center;
-            font-size: 1.1rem;
-            font-weight: 600;
-            border-radius: var(--border-radius);
-            margin-bottom: 2rem;
-            border: 1px solid #fde68a;
-        }
+        .update-banner { background-color: #fffbeb; color: #b45309; padding: 1rem; text-align: center; font-size: 1.1rem; font-weight: 600; border-radius: var(--border-radius); margin-bottom: 2rem; border: 1px solid #fde68a; }
+        .menu-toggle { font-size: 2rem; background: none; border: none; color: var(--text-color); cursor: pointer; /* Aparece via media query */ }
+        .sidebar { position: fixed; top: 0; right: -350px; width: 100%; max-width: 350px; height: 100%; background-color: #fff; box-shadow: -4px 0 10px rgba(0,0,0,0.1); padding: 2rem; transition: right 0.3s ease-in-out; z-index: 1000; overflow-y: auto; display: flex; flex-direction: column; }
+        .sidebar.open { right: 0; }
+        .sidebar .sidebar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; border-bottom: 1px solid #e9ecef; padding-bottom: 1rem;}
+        .sidebar .sidebar-header h2 { margin: 0; font-size: 1.25rem; color: var(--primary-color); }
+        .sidebar .close-btn { font-size: 2.5rem; line-height: 1; background: none; border: none; color: var(--text-color); cursor: pointer; }
+        .sidebar .form-group { margin-bottom: 1.5rem; }
+        .sidebar .file-input-wrapper { position: relative; }
+        .sidebar label { font-size: 0.8rem; margin-bottom: 0.5rem; font-weight: 600; color: var(--text-color); display: block; /* Garante que label fique acima */ }
+        .sidebar .file-input-label { display: flex; align-items: center; padding: 0.75rem 1rem; border: 2px dashed #dee2e6; border-radius: var(--border-radius); cursor: pointer; transition: background-color 0.2s; background-color: #fff; }
+        .sidebar .file-input-label:hover { background-color: #f8f9fa; border-color: var(--primary-color); }
+        .sidebar .file-input-label svg { width: 24px; height: 24px; margin-right: 0.75rem; color: var(--text-color); flex-shrink: 0; /* Evita que SVG encolha */ }
+        .sidebar .file-input-text { color: #8898aa; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 0.9rem; }
+        .sidebar input[type="file"] { position: absolute; width: 0.1px; height: 0.1px; opacity: 0; overflow: hidden; z-index: -1; }
+        .sidebar .btn-process, .sidebar .btn-clear { width: 100%; padding: 0.8rem; font-size: 1rem; font-weight: 600; border: none; border-radius: var(--border-radius); cursor: pointer; transition: background-color 0.2s, color 0.2s; }
+        .sidebar .btn-process { background-color: var(--primary-color); color: #fff; margin-top: auto; }
+        .sidebar .btn-process:disabled { background-color: #cad1f7; cursor: not-allowed; }
+        .sidebar .btn-process:hover:not(:disabled) { background-color: #4b5fbd; }
+        .sidebar .btn-clear { background: none; border: 2px solid var(--red-color); color: var(--red-color); margin-top: 1rem; }
+        .sidebar .btn-clear:hover { background-color: var(--red-color); color: #fff; }
+        #status-message { margin-top: 1rem; text-align: center; font-weight: 600; min-height: 1.2em; }
 
-        .menu-toggle {
-            font-size: 2rem;
-            background: none;
-            border: none;
-            color: var(--text-color);
-            cursor: pointer;
+        /* Estilos Clientes Não Positivados */
+        #nao-positivados-container { background-color: var(--card-bg); border-radius: var(--border-radius); box-shadow: var(--shadow); padding: 1.5rem; margin-bottom: 2rem; }
+        #nao-positivados-count { font-weight: 600; margin-bottom: 1rem; color: var(--text-color); }
+        #nao-positivados-list { list-style: none; padding: 0; margin-top: 1rem; max-height: 300px; overflow-y: auto; border: 1px solid #dee2e6; border-radius: var(--border-radius); background-color: #fff; }
+        #nao-positivados-list li { padding: 0.6rem 1rem; border-bottom: 1px solid #e9ecef; font-size: 0.85rem; color: var(--text-color); }
+        #nao-positivados-list li:last-child { border-bottom: none; }
+        #nao-positivados-list li span { display: inline-block; min-width: 100px; font-weight: 600; color: var(--primary-color); margin-right: 8px; }
+        #nao-positivados-list li strong { color: var(--purple-color); }
+        #nao-positivados-list li[style*="background-color"] { padding-top: 0.8rem; padding-bottom: 0.8rem; font-size: 0.9rem;}
+
+        /* Responsividade */
+        @media (max-width: 992px) {
+             .chart-grid { grid-template-columns: 1fr; }
         }
-        .sidebar {
-            position: fixed;
-            top: 0;
-            right: -350px;
-            width: 100%;
-            max-width: 350px;
-            height: 100%;
-            background-color: #fff;
-            box-shadow: -4px 0 10px rgba(0,0,0,0.1);
-            padding: 2rem;
-            transition: right 0.3s ease-in-out;
-            z-index: 1000;
-            overflow-y: auto;
-            display: flex;
-            flex-direction: column;
-        }
-        .sidebar.open {
-            right: 0;
-        }
-        .sidebar .sidebar-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 2rem;
-        }
-        .sidebar .sidebar-header h2 {
-            margin: 0;
-        }
-        .sidebar .close-btn {
-            font-size: 2.5rem;
-            line-height: 1;
-        }
-        .sidebar .form-group {
-            margin-bottom: 1.5rem;
-        }
-        .sidebar .file-input-wrapper {
-            position: relative;
-        }
-        .sidebar .file-input-label {
-            display: flex;
-            align-items: center;
-            padding: 0.75rem 1rem;
-            border: 2px dashed #dee2e6;
-            border-radius: var(--border-radius);
-            cursor: pointer;
-            transition: background-color 0.2s;
-        }
-        .sidebar .file-input-label:hover {
-            background-color: #f8f9fa;
-        }
-        .sidebar .file-input-label svg {
-            width: 24px;
-            height: 24px;
-            margin-right: 0.75rem;
-            color: var(--text-color);
-        }
-        .sidebar .file-input-text {
-            color: #8898aa;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-        .sidebar input[type="file"] {
-            position: absolute;
-            width: 0.1px;
-            height: 0.1px;
-            opacity: 0;
-            overflow: hidden;
-            z-index: -1;
-        }
-        .sidebar .btn-process, .sidebar .btn-clear {
-            width: 100%;
-            padding: 0.8rem;
-            font-size: 1rem;
-            font-weight: 600;
-            border: none;
-            border-radius: var(--border-radius);
-            cursor: pointer;
-            transition: background-color 0.2s, color 0.2s;
-        }
-        .sidebar .btn-process {
-            background-color: var(--primary-color);
-            color: #fff;
-            margin-top: auto;
-        }
-        .sidebar .btn-process:disabled {
-            background-color: #cad1f7;
-            cursor: not-allowed;
-        }
-        .sidebar .btn-clear {
-            background: none;
-            border: 2px solid var(--red-color);
-            color: var(--red-color);
-            margin-top: 1rem;
-        }
-        .sidebar .btn-clear:hover {
-            background-color: var(--red-color);
-            color: #fff;
-        }
-        #status-message {
-            margin-top: 1rem;
-            text-align: center;
-            font-weight: 600;
-        }
-        
         @media (max-width: 768px) {
             .container { margin-top: 1rem; padding: 0 0.75rem; }
             .header-logo { max-height: 35px; }
+            .header-actions .menu-toggle { display: block; }
+            .header-actions a[href*="logout"] { display: none; }
             .section-title { font-size: 1.25rem; }
-            .kpi-grid, .filters, .chart-grid { grid-template-columns: 1fr; }
+            .kpi-grid, .filters { grid-template-columns: 1fr; }
+            .kpi-card { padding: 1rem; }
+            .kpi-icon { font-size: 1.5rem; padding: 0.8rem; width: 50px; height: 50px; margin-right: 0.8rem;}
+            .kpi-text p { font-size: 1.1rem; }
             .modal-content { height: 90vh; padding: 1rem; }
+            .goals-table th, .goals-table td { font-size: 0.8rem; padding: 0.5rem 0.75rem;}
         }
     </style>
 </head>
 <body>
     <div class="container">
         <header>
-            <div></div> 
-            <img src="{{ url_for('static', filename='logo_confie.png') }}" alt="Logo Confie" class="header-logo">
+            <div></div> <img src="{{ url_for('static', filename='logo_confie.png') }}" alt="Logo Confie" class="header-logo">
             <div class="header-actions">
                 <a href="{{ url_for('logout') }}" style="color: var(--primary-color); text-decoration: none; font-weight: 600;">Sair</a>
                 <button class="menu-toggle" id="menu-toggle">&#9776;</button>
@@ -244,16 +152,16 @@
         </header>
 
         <div class="update-banner">
-            Última atualização de faturamento: <strong>{{ last_update_date }}</strong>
+            Última atualização de faturamento: <strong id="last-update-date">{{ last_update_date }}</strong>
         </div>
-        <div id="error-message"></div>
-        <div class="kpi-grid">
-            <div class="kpi-card"><div class="kpi-icon icon-faturamento">&#8352;$</div><div class="kpi-text"><h3>Faturamento Total</h3><p id="kpi-faturamento-total">R$ 0,00</p></div></div>
-            <div class="kpi-card"><div class="kpi-icon icon-projecao">&#128200;</div><div class="kpi-text"><h3>Projeção de Faturamento</h3><p id="kpi-projecao">R$ 0,00</p></div></div>
-            <div class="kpi-card"><div class="kpi-icon icon-clientes">&#128101;</div><div class="kpi-text"><h3>Total Clientes Atendidos</h3><p id="kpi-clientes-atendidos">0</p></div></div>
-            <div class="kpi-card"><div class="kpi-icon icon-positivacao">&#128204;</div><div class="kpi-text"><h3>Positivação Média</h3><p id="kpi-positivacao">0,00%</p></div></div>
+        <div id="error-message"></div> <div class="kpi-grid">
+            <div class="kpi-card"><div class="kpi-icon icon-faturamento">&#36;</div><div class="kpi-text"><h3>Faturamento Total</h3><p id="kpi-faturamento-total">R$ 0,00</p></div></div>
+            <div class="kpi-card"><div class="kpi-icon icon-projecao">&#128200;</div><div class="kpi-text"><h3>Projeção</h3><p id="kpi-projecao">R$ 0,00</p></div></div>
+            <div class="kpi-card"><div class="kpi-icon icon-clientes">&#128101;</div><div class="kpi-text"><h3>Clientes Atendidos</h3><p id="kpi-clientes-atendidos">0</p></div></div>
+            <div class="kpi-card"><div class="kpi-icon icon-positivacao">&#128204;</div><div class="kpi-text"><h3>Positivação Média</h3><p id="kpi-positivacao">0,0%</p></div></div>
             <div class="kpi-card"><div class="kpi-icon icon-ticket">&#1279;</div><div class="kpi-text"><h3>Ticket Médio</h3><p id="kpi-ticket-medio">R$ 0,00</p></div></div>
         </div>
+
         <div class="filters">
             {% if user_role == 'admin' %}
             <div class="filter-group">
@@ -264,186 +172,241 @@
                         <span class="arrow">&#9660;</span>
                     </div>
                     <div class="checkboxes-container" id="vendedor-checkboxes-container">
-                    </div>
+                        </div>
                 </div>
             </div>
             {% endif %}
-            <div class="filter-group"><label for="month-filter">Filtrar Mês (Análise Principal):</label><input type="month" id="month-filter"></div>
+            <div class="filter-group"><label for="month-filter">Mês Principal:</label><input type="month" id="month-filter"></div>
         </div>
-        <h2 class="section-title" style="margin-top: 2rem;">Análise Cumulativa Diária</h2>
+
+        <div id="nao-positivados-container">
+            <h2 class="section-title">Clientes Não Positivados no Mês</h2>
+            <p id="nao-positivados-count">Total: 0</p>
+            <ul id="nao-positivados-list">
+                 <li>Carregando...</li>
+            </ul>
+        </div>
+        <h2 class="section-title">Análise Cumulativa Diária</h2>
         <div class="filters">
             <div class="filter-group"><label for="compare-month-1">Comparar Mês 1:</label><input type="month" id="compare-month-1"></div>
             <div class="filter-group"><label for="compare-month-2">Comparar Mês 2:</label><input type="month" id="compare-month-2"></div>
         </div>
-        <div class="chart-grid-full-width"><div class="chart-container"><canvas id="cumulative-comparison-chart"></canvas></div></div>
-        <h2 class="section-title" style="margin-top: 2rem;">Acompanhamento de Metas</h2>
-        <div id="goals-table-container"></div>
-        <h2 class="section-title" style="margin-top: 2rem;">Análise de Faturamento Detalhada</h2>
+        <div class="chart-grid-full-width">
+            <div class="chart-container"><canvas id="cumulative-comparison-chart"></canvas></div>
+        </div>
+
+        <h2 class="section-title">Acompanhamento de Metas</h2>
+        <div id="goals-table-container">
+             <p style="text-align: center; padding: 1rem;">Carregando metas...</p>
+        </div>
+
+        <h2 class="section-title">Análise Detalhada</h2>
         <div class="chart-grid">
             <div class="chart-container"><button class="expand-btn" data-chart-id="topSellers" title="Expandir Gráfico"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m-1.5 6L3.75 20.25m0 0v-4.5m0 4.5h4.5M20.25 20.25v-4.5m0 4.5h-4.5m4.5 0L15 15" /></svg></button><canvas id="top-vendedores-chart"></canvas></div>
             <div class="chart-container"><button class="expand-btn" data-chart-id="topManufacturers" title="Expandir Gráfico"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m-1.5 6L3.75 20.25m0 0v-4.5m0 4.5h4.5M20.25 20.25v-4.5m0 4.5h-4.5m4.5 0L15 15" /></svg></button><canvas id="top-fabricantes-chart"></canvas></div>
             <div class="chart-container"><button class="expand-btn" data-chart-id="focusManufacturers" title="Expandir Gráfico"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m-1.5 6L3.75 20.25m0 0v-4.5m0 4.5h4.5M20.25 20.25v-4.5m0 4.5h-4.5m4.5 0L15 15" /></svg></button><canvas id="focus-manufacturers-chart"></canvas></div>
-        </div>
-        <div class="chart-grid">
             <div class="chart-container"><button class="expand-btn" data-chart-id="positivacao" title="Expandir Gráfico"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m-1.5 6L3.75 20.25m0 0v-4.5m0 4.5h4.5M20.25 20.25v-4.5m0 4.5h-4.5m4.5 0L15 15" /></svg></button><canvas id="positivacao-chart"></canvas></div>
             <div class="chart-container"><button class="expand-btn" data-chart-id="productMix" title="Expandir Gráfico"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m-1.5 6L3.75 20.25m0 0v-4.5m0 4.5h4.5M20.25 20.25v-4.5m0 4.5h-4.5m4.5 0L15 15" /></svg></button><canvas id="mix-produtos-chart"></canvas></div>
             <div class="chart-container"><button class="expand-btn" data-chart-id="topProducts" title="Expandir Gráfico"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m-1.5 6L3.75 20.25m0 0v-4.5m0 4.5h4.5M20.25 20.25v-4.5m0 4.5h-4.5m4.5 0L15 15" /></svg></button><canvas id="top-produtos-chart"></canvas></div>
         </div>
-        <h2 class="section-title" style="margin-top: 2rem;">Top 5 Clientes</h2>
+
+        <h2 class="section-title">Top 5 Clientes</h2>
         <div class="chart-grid-full-width">
-            <div class="chart-container">
-                <canvas id="top-clientes-chart"></canvas>
-            </div>
+            <div class="chart-container"><canvas id="top-clientes-chart"></canvas></div>
         </div>
-    </div>
-    
-    <div class="sidebar" id="sidebar">
+    </div> <div class="sidebar" id="sidebar">
         <div class="sidebar-header">
             <h2>Gestão de Dados</h2>
-            <button class="menu-toggle close-btn" id="close-sidebar-btn">&times;</button>
+            <button class="close-btn" id="close-sidebar-btn">&times;</button>
         </div>
         <div class="form-group">
             <label for="sales-file">Ficheiro de Vendas (.xlsx, .csv)</label>
             <div class="file-input-wrapper">
                 <label for="sales-file" class="file-input-label">
                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 16.5V9.75m0 0l-3.75 3.75M12 9.75l3.75 3.75M3.75 18A2.25 2.25 0 006 20.25h12A2.25 2.25 0 0020.25 18v-2.25a2.25 2.25 0 00-2.25-2.25H6.75A2.25 2.25 0 004.5 15.75V18a2.25 2.25 0 00-2.25-2.25H3.75A2.25 2.25 0 001.5 18v0A2.25 2.25 0 003.75 18z" /></svg>
-                    <span class="file-input-text" data-input-id="sales-file">Escolher arquivo...</span>
+                    <span class="file-input-text" data-input-id="sales-file">Escolher arquivo Vendas...</span>
                 </label>
                 <input type="file" id="sales-file" accept=".xlsx, .csv">
             </div>
         </div>
         <div class="form-group">
-            <label for="portfolio-file">Ficheiro da Carteira (.csv)</label>
+            <label for="portfolio-file">Ficheiro da Carteira (Resumo/Metas) (.csv)</label>
              <div class="file-input-wrapper">
                 <label for="portfolio-file" class="file-input-label">
                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 16.5V9.75m0 0l-3.75 3.75M12 9.75l3.75 3.75M3.75 18A2.25 2.25 0 006 20.25h12A2.25 2.25 0 0020.25 18v-2.25a2.25 2.25 0 00-2.25-2.25H6.75A2.25 2.25 0 004.5 15.75V18a2.25 2.25 0 00-2.25-2.25H3.75A2.25 2.25 0 001.5 18v0A2.25 2.25 0 003.75 18z" /></svg>
-                    <span class="file-input-text" data-input-id="portfolio-file">Escolher arquivo...</span>
+                    <span class="file-input-text" data-input-id="portfolio-file">Escolher arquivo Carteira (Resumo)...</span>
                 </label>
                 <input type="file" id="portfolio-file" accept=".csv">
+            </div>
+        </div>
+        <div class="form-group">
+            <label for="portfolio-clientes-file">Ficheiro da Carteira (Lista de Clientes) (.csv)</label>
+             <div class="file-input-wrapper">
+                <label for="portfolio-clientes-file" class="file-input-label">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 16.5V9.75m0 0l-3.75 3.75M12 9.75l3.75 3.75M3.75 18A2.25 2.25 0 006 20.25h12A2.25 2.25 0 0020.25 18v-2.25a2.25 2.25 0 00-2.25-2.25H6.75A2.25 2.25 0 004.5 15.75V18a2.25 2.25 0 00-2.25-2.25H3.75A2.25 2.25 0 001.5 18v0A2.25 2.25 0 003.75 18z" /></svg>
+                    <span class="file-input-text" data-input-id="portfolio-clientes-file">Escolher arquivo Carteira (Clientes)...</span>
+                </label>
+                <input type="file" id="portfolio-clientes-file" accept=".csv">
             </div>
         </div>
         <div id="status-message"></div>
         <button id="process-button" class="btn-process" disabled>Processar e Salvar</button>
         <button id="clear-button" class="btn-clear">Limpar Dados do Servidor</button>
-    </div>
-
-    <div id="chartModal" class="chart-modal">
+    </div> <div id="chartModal" class="chart-modal">
         <div class="modal-content">
-            <div class="modal-header"><h2 id="modalChartTitle" class="modal-title"></h2><button id="closeModalBtn" class="modal-close-btn">&times;</button></div>
-            <div class="modal-body"></div>
+            <div class="modal-header">
+                <h2 id="modalChartTitle" class="modal-title"></h2>
+                <button id="closeModalBtn" class="modal-close-btn">&times;</button>
+            </div>
+            <div class="modal-body">
+                </div>
         </div>
-    </div>
-
-<script>
+    </div> <script>
 document.addEventListener('DOMContentLoaded', function () {
-    // Funções de formatação (sem alterações)
-    function formatCurrency(value) { return (Number(value) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }); }
-    function formatNumber(value) {
+    // --- DEFINIÇÃO DAS CORES ---
+    const chartColors = [
+        { background: 'rgba(94, 114, 228, 0.8)', border: 'rgba(94, 114, 228, 1)' }, // Azul Primário
+        { background: 'rgba(45, 206, 137, 0.8)', border: 'rgba(45, 206, 137, 1)' },  // Verde
+        { background: 'rgba(251, 99, 64, 0.8)', border: 'rgba(251, 99, 64, 1)' },   // Laranja
+        { background: 'rgba(17, 205, 239, 0.8)', border: 'rgba(17, 205, 239, 1)' },  // Azul Claro
+        { background: 'rgba(245, 54, 92, 0.8)', border: 'rgba(245, 54, 92, 1)' },   // Rosa
+        { background: 'rgba(137, 101, 224, 0.8)', border: 'rgba(137, 101, 224, 1)' },// Roxo
+        { background: 'rgba(245, 159, 0, 0.8)', border: 'rgba(245, 159, 0, 1)' },   // Ambar/Amarelo
+        { background: 'rgba(108, 117, 125, 0.8)', border: 'rgba(108, 117, 125, 1)' } // Cinza
+    ];
+
+    // --- FUNÇÕES DE FORMATAÇÃO ---
+    function formatCurrency(value) { /* ... código igual ... */ return (Number(value) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }); }
+    function formatNumber(value) { /* ... código igual ... */
         value = Number(value) || 0;
-        if (Math.abs(value) >= 1000000) return (value / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
-        if (Math.abs(value) >= 1000) return (value / 1000).toFixed(1).replace(/\.0$/, '') + 'K';
+        if (Math.abs(value) >= 1000000) return (value / 1000000).toLocaleString('pt-BR', { maximumFractionDigits: 1 }).replace(/\.0$/, '') + 'M';
+        if (Math.abs(value) >= 1000) return (value / 1000).toLocaleString('pt-BR', { maximumFractionDigits: 1 }).replace(/\.0$/, '') + 'K';
         return value.toLocaleString('pt-BR');
     }
-    function formatPercentage(value) { return `${(Number(value) || 0).toFixed(1)}%`; }
-    function abbreviateProductName(name) {
+    function formatPercentage(value) { /* ... código igual ... */ return `${(Number(value) || 0).toFixed(1)}%`; }
+    function abbreviateProductName(name) { /* ... código igual ... */
         if (!name) return '';
         const MAX_LENGTH = 22;
-        const wordMap = { 'PANETTONE': 'PANET', 'CHOCOLATE': 'CHOC', 'SUFLAIR': 'SUFL', 'TAMPICO': 'TAMP', 'LINDOYA': 'LIND', 'PIMENTA': 'PIM', 'MEXICANA': 'MEX', 'FOFURA': 'FOF', 'TORCIDA': 'TORC', 'BATON': 'BTN', 'FRUTAS': 'FRT', 'AO LEITE': '' };
-        let processedName = name.toUpperCase();
-        for (const key in wordMap) { processedName = processedName.replace(new RegExp(key, 'g'), wordMap[key]); }
+        const wordMap = { 'PANETTONE': 'PANET', 'CHOCOLATE': 'CHOC', 'SUFLAIR': 'SUFL', 'TAMPICO': 'TAMP', 'LINDOYA': 'LIND', 'PIMENTA': 'PIM', 'MEXICANA': 'MEX', 'FOFURA': 'FOF', 'TORCIDA': 'TORC', 'BATON': 'BTN', 'FRUTAS': 'FRT', 'AO LEITE': '', ' GAROTO': '', ' NESTLE': '' };
+        let processedName = name.toUpperCase().trim();
+        for (const key in wordMap) { processedName = processedName.replace(new RegExp(key.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&'), 'g'), wordMap[key]); }
         processedName = processedName.replace(/\s+/g, ' ').trim();
         if (processedName.length > MAX_LENGTH) { return processedName.substring(0, MAX_LENGTH) + '...'; }
         return processedName;
-    }
+     }
 
-    const chartColors = [ 
-        { background: 'rgba(94, 114, 228, 0.8)', border: 'rgba(94, 114, 228, 1)' }, 
-        { background: 'rgba(245, 54, 92, 0.8)', border: 'rgba(245, 54, 92, 1)' }, 
-        { background: 'rgba(45, 206, 137, 0.8)', border: 'rgba(45, 206, 137, 1)' }, 
-        { background: 'rgba(251, 99, 64, 0.8)', border: 'rgba(251, 99, 64, 1)' }, 
-        { background: 'rgba(17, 205, 239, 0.8)', border: 'rgba(17, 205, 239, 1)' },
-        { background: 'rgba(137, 101, 224, 0.8)', border: 'rgba(137, 101, 224, 1)' },
-        { background: 'rgba(108, 117, 125, 0.8)', border: 'rgba(108, 117, 125, 1)' } 
-    ];
-
-    function createChartConfig(title, type, options = {}) {
+    // --- FUNÇÕES DE GRÁFICO ---
+    function createChartConfig(title, type, options = {}) { /* ... código igual, garantindo safeColor ... */
         const { isMultiAxis = false, color = chartColors[0], formatterType = 'number' } = options;
         const isLine = type === 'line';
         const isDoughnut = type === 'doughnut';
         let formatterFunction = (formatterType === 'percentage') ? formatPercentage : formatNumber;
         const textColor = '#525f7f';
+        const gridColor = '#e9ecef';
         const tickFormatter = (formatterType === 'percentage') ? (value) => `${value}%` : (value) => formatNumber(value);
+        const safeColor = color && typeof color === 'object' ? color : chartColors[0]; // Garante cor válida
 
-        let config = { 
-            type: type, 
-            data: { 
-                labels: [], 
-                datasets: isMultiAxis ? [] : [{ 
-                    label: title, 
-                    data: [], 
-                    backgroundColor: isLine ? color.background.replace('0.8', '0.2') : color.background, 
-                    borderColor: color.border, 
+        let config = {
+            type: type,
+            data: {
+                labels: [],
+                datasets: isMultiAxis ? [] : [{
+                    label: title,
+                    data: [],
+                    backgroundColor: isLine ? safeColor.background.replace('0.8', '0.2') : (isDoughnut ? chartColors.map(c=>c.background) : safeColor.background),
+                    borderColor: isLine ? safeColor.border : (isDoughnut ? chartColors.map(c=>c.border) : safeColor.border),
                     borderWidth: isDoughnut ? 1 : 2,
-                    fill: isLine, 
-                    tension: 0.1 
-                }] 
-            }, 
-            options: { 
-                responsive: true, 
-                maintainAspectRatio: false, 
+                    fill: isLine,
+                    tension: isLine ? 0.1 : 0
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
                 customFormatterType: formatterType,
-                plugins: { 
-                    legend: { display: isMultiAxis || isDoughnut, position: 'top' }, 
-                    title: { 
-                        display: true, 
-                        text: title, 
-                        font: { size: 16 }, 
-                        padding: { bottom: 20 },
-                        color: '#f5365c'
-                    }, 
-                    datalabels: { 
+                plugins: {
+                    legend: { display: isMultiAxis || isDoughnut, position: 'top', labels: { color: textColor } },
+                    title: {
+                        display: true,
+                        text: title,
+                        font: { size: 16, weight: '600' },
+                        padding: { top: 10, bottom: 20 },
+                        color: '#5e72e4' // Cor primária
+                    },
+                    tooltip: { /* ... callbacks iguais ... */
+                         callbacks: {
+                            label: function(context) {
+                                let label = context.dataset.label || '';
+                                if (label) { label += ': '; }
+                                let value = null;
+                                if(isDoughnut && context.parsed !== null && context.parsed !== undefined){ // Checa se parsed não é nulo
+                                    value = context.parsed;
+                                } else if (context.parsed?.y !== null && context.parsed?.y !== undefined) {
+                                    value = context.parsed.y;
+                                }
+                                if (value !== null) {
+                                     label += formatterFunction(value);
+                                }
+                                return label;
+                            }
+                        }
+                     },
+                    datalabels: { /* ... formatter igual ... */
                         display: !isLine,
                         color: isDoughnut ? '#fff' : textColor,
-                        font: { weight: 'bold' }, 
-                        formatter: formatterFunction
-                    } 
-                }, 
+                        font: { weight: 'bold', size: 11 },
+                        formatter: (value, context) => {
+                             if(isDoughnut){
+                                 const total = context.chart.data.datasets[0].data.reduce((a, b) => a + (Number(b) || 0), 0);
+                                 if(total > 0 && (Number(value) || 0) / total < 0.03) return null;
+                             }
+                             if(!isDoughnut && (Number(value) || 0) === 0) return null;
+                             return formatterFunction(value);
+                         },
+                        anchor: isDoughnut ? 'center' : 'end',
+                        align: isDoughnut ? 'center' : 'top'
+                     }
+                },
                 scales: isDoughnut ? {} : {
-                    x: { ticks: { color: textColor } },
-                    y: { ticks: { color: textColor, callback: tickFormatter } }
-                } 
-            } 
+                    x: { ticks: { color: textColor }, grid: { color: gridColor } },
+                    y: { ticks: { color: textColor, callback: tickFormatter }, grid: { color: gridColor }, beginAtZero: true }
+                }
+            }
         };
-        if (isDoughnut) {
-            delete config.options.plugins.datalabels.anchor;
-            delete config.options.plugins.datalabels.align;
-        } else {
-             config.options.plugins.datalabels.anchor = 'end';
-             config.options.plugins.datalabels.align = 'top';
-        }
         return config;
-    }
-
-    function updateChartData(chart, labels, data) {
-        if (!chart || !chart.data) return;
+     }
+    function updateChartData(chart, labels, data) { /* ... código igual ... */
+        if (!chart || !chart.data) { console.warn("updateChartData: Gráfico inválido"); return; }
+        if (!Array.isArray(labels) || !Array.isArray(data)) { console.warn("updateChartData: Labels ou Data inválidos"); return;}
         chart.data.labels = labels;
         chart.data.datasets[0].data = data;
+        if(chart.config.type === 'doughnut' || chart.config.type === 'pie') {
+            chart.data.datasets[0].backgroundColor = labels.map((_, i) => chartColors[i % chartColors.length].background);
+            chart.data.datasets[0].borderColor = labels.map((_, i) => chartColors[i % chartColors.length].border);
+        }
         chart.update();
-    }
-
-    function updateMultiLineChart(chart, labels, datasets) {
-        if (!chart || !chart.data) return;
-        const colors = ['rgba(94, 114, 228, 1)', 'rgba(245, 54, 92, 1)', 'rgba(45, 206, 137, 1)'];
-        const bgColors = ['rgba(94, 114, 228, 0.2)', 'rgba(245, 54, 92, 0.2)', 'rgba(45, 206, 137, 0.2)'];
+     }
+    function updateMultiLineChart(chart, labels, datasets) { /* ... código igual ... */
+        if (!chart || !chart.data) { console.warn("updateMultiLineChart: Gráfico inválido"); return; }
+        if (!Array.isArray(labels) || !Array.isArray(datasets)) { console.warn("updateMultiLineChart: Labels ou Datasets inválidos"); return;}
         chart.data.labels = labels;
-        chart.data.datasets = datasets.map((ds, index) => ({ label: ds.label, data: ds.data, borderColor: colors[index % colors.length], backgroundColor: bgColors[index % bgColors.length], borderWidth: 2, fill: true, tension: 0.1 }));
+        chart.data.datasets = datasets.map((ds, index) => ({
+            label: ds.label || `Dataset ${index + 1}`,
+            data: ds.data || [],
+            borderColor: chartColors[index % chartColors.length].border,
+            backgroundColor: chartColors[index % chartColors.length].background.replace('0.8','0.2'),
+            borderWidth: 2,
+            fill: true,
+            tension: 0.1
+        }));
         chart.update();
-    }
+     }
 
     Chart.register(ChartDataLabels);
 
+    // --- ELEMENTOS DO DOM --- (igual)
     const baseUrl = "/dashboard";
-    const elements = {
+    const elements = { /* ... código igual ... */
         monthFilter: document.getElementById('month-filter'),
         errorMessage: document.getElementById('error-message'),
         compareMonth1: document.getElementById('compare-month-1'),
@@ -453,73 +416,172 @@ document.addEventListener('DOMContentLoaded', function () {
         processButton: document.getElementById('process-button'),
         salesFileInput: document.getElementById('sales-file'),
         portfolioFileInput: document.getElementById('portfolio-file'),
+        portfolioClientesFileInput: document.getElementById('portfolio-clientes-file'),
         statusMessage: document.getElementById('status-message'),
         clearButton: document.getElementById('clear-button'),
         vendedorSelectBox: document.getElementById('vendedor-select-box'),
         vendedorCheckboxesContainer: document.getElementById('vendedor-checkboxes-container'),
         vendedorSelectedText: document.getElementById('vendedor-selected-text'),
-        closeSidebarBtn: document.getElementById('close-sidebar-btn')
-    };
+        closeSidebarBtn: document.getElementById('close-sidebar-btn'),
+        naoPositivadosContainer: document.getElementById('nao-positivados-container'),
+        naoPositivadosCount: document.getElementById('nao-positivados-count'),
+        naoPositivadosList: document.getElementById('nao-positivados-list'),
+        lastUpdateDateElement: document.getElementById('last-update-date')
+     };
 
-    window.charts = {
-        cumulativeComparison: new Chart(document.getElementById('cumulative-comparison-chart'), createChartConfig('Faturamento Cumulativo por Dia', 'line', { isMultiAxis: true })),
-        topSellers: new Chart(document.getElementById('top-vendedores-chart'), createChartConfig('Faturamento por Vendedor', 'bar', { color: chartColors[0], formatterType: 'number' })),
-        topManufacturers: new Chart(document.getElementById('top-fabricantes-chart'), createChartConfig('Top 10 Fabricantes', 'bar', { color: chartColors[1], formatterType: 'number' })),
-        focusManufacturers: new Chart(document.getElementById('focus-manufacturers-chart'), createChartConfig('Faturamento Fabricantes Foco', 'bar', { color: chartColors[3], formatterType: 'number' })),
-        positivacao: new Chart(document.getElementById('positivacao-chart'), createChartConfig('Positivação de Clientes', 'doughnut', { formatterType: 'number' })),
-        productMix: new Chart(document.getElementById('mix-produtos-chart'), createChartConfig('Mix de Produtos', 'bar', { color: chartColors[4], formatterType: 'number' })),
-        topProducts: new Chart(document.getElementById('top-produtos-chart'), createChartConfig('Top 10 Produtos', 'bar', { color: chartColors[5], formatterType: 'number' })),
-        topClientes: new Chart(document.getElementById('top-clientes-chart'), createChartConfig('Top 5 Clientes', 'bar', { color: chartColors[3], formatterType: 'number' }))
-    };
-    
-    async function loadDataFromAPI(month, vendedores) {
+    // --- INICIALIZAÇÃO DOS GRÁFICOS --- (igual)
+    try {
+        window.charts = { /* ... código igual ... */
+            cumulativeComparison: new Chart(document.getElementById('cumulative-comparison-chart'), createChartConfig('Faturamento Cumulativo por Dia', 'line', { isMultiAxis: true })),
+            topSellers: new Chart(document.getElementById('top-vendedores-chart'), createChartConfig('Faturamento por Vendedor', 'bar', { color: chartColors[0] })),
+            topManufacturers: new Chart(document.getElementById('top-fabricantes-chart'), createChartConfig('Top 10 Fabricantes', 'bar', { color: chartColors[1] })),
+            focusManufacturers: new Chart(document.getElementById('focus-manufacturers-chart'), createChartConfig('Faturamento Fabricantes Foco', 'bar', { color: chartColors[3] })),
+            positivacao: new Chart(document.getElementById('positivacao-chart'), createChartConfig('Positivação de Clientes', 'doughnut', { formatterType: 'number' })),
+            productMix: new Chart(document.getElementById('mix-produtos-chart'), createChartConfig('Mix de Produtos (SKUs)', 'bar', { color: chartColors[4] })),
+            topProducts: new Chart(document.getElementById('top-produtos-chart'), createChartConfig('Top 10 Produtos', 'bar', { color: chartColors[5] })),
+            topClientes: new Chart(document.getElementById('top-clientes-chart'), createChartConfig('Top 5 Clientes', 'bar', { color: chartColors[6] }))
+         };
+    } catch (e) { console.error("Erro inicializar gráficos:", e); if(elements.errorMessage) elements.errorMessage.textContent = "Erro inicializar gráficos."; }
+
+    // --- FUNÇÕES DE CARREGAMENTO DE DADOS --- (iguais, com try/catch robusto)
+    async function loadDataFromAPI(month, vendedores) { /* ... código igual ... */
         const params = new URLSearchParams();
         if (month) params.append('month', month);
-        if (elements.vendedorSelectBox) {
+        if (elements.vendedorSelectBox && vendedores.length > 0) {
             vendedores.forEach(v => params.append('vendedor', v));
         }
-        elements.errorMessage.textContent = 'Carregando...';
+        elements.errorMessage.textContent = 'Carregando KPIs e gráficos principais...';
+        console.log(`Buscando /api/dados?${params.toString()}`);
         try {
             const response = await fetch(`${baseUrl}/api/dados?${params.toString()}`);
             if (response.status === 401) { window.location.href = '/login'; return; }
             const data = await response.json();
-            if (!response.ok) throw new Error(data.message || 'Falha.');
+            if (!response.ok) throw new Error(data.message || `Falha API /dados (Status: ${response.status})`);
             updateDashboard(data);
             elements.errorMessage.textContent = '';
         } catch (error) {
-            elements.errorMessage.textContent = `Erro: ${error.message}`;
+            console.error("Erro API /dados:", error);
+            elements.errorMessage.textContent = `Erro dados principais: ${error.message}`;
+            updateDashboard({});
         }
-    }
-    
-    async function loadTopClientesData() {
+     }
+    async function loadTopClientesData() { /* ... código igual ... */
         const month = elements.monthFilter.value;
         const vendedores = getSelectedVendors();
         const params = new URLSearchParams();
         if (month) params.append('month', month);
-        vendedores.forEach(v => params.append('vendedor', v));
+        if (elements.vendedorSelectBox && vendedores.length > 0) {
+             vendedores.forEach(v => params.append('vendedor', v));
+        }
+        console.log(`Buscando /api/top-clientes?${params.toString()}`);
         try {
             const response = await fetch(`${baseUrl}/api/top-clientes?${params.toString()}`);
             if (response.status === 401) { window.location.href = '/login'; return; }
             const data = await response.json();
-            if (!response.ok) throw new Error(data.message || 'Falha.');
-            let chartTitle = "Top 5 Clientes (Geral)";
-            if (vendedores.length === 1) {
-                chartTitle = `Top 5 Clientes de ${vendedores[0]}`;
-            } else if (vendedores.length > 1) {
-                chartTitle = "Top 5 Clientes (Seleção)";
+            if (!response.ok) throw new Error(data.message || `Falha API /top-clientes (Status: ${response.status})`);
+            let chartTitle = "Top 5 Clientes (Visão Padrão)";
+            if (elements.vendedorSelectBox && vendedores.length > 0) {
+                 if (vendedores.length === 1) chartTitle = `Top 5 Clientes de ${vendedores[0]}`;
+                 else chartTitle = "Top 5 Clientes (Seleção)";
             }
-            window.charts.topClientes.options.plugins.title.text = chartTitle;
-            updateChartData(window.charts.topClientes, data.map(d => d.nome_fantasia), data.map(d => d.total));
+            if(window.charts.topClientes){
+                window.charts.topClientes.options.plugins.title.text = chartTitle;
+                updateChartData(window.charts.topClientes, data.map(d => d.nome_fantasia || 'N/A'), data.map(d => d.total));
+            }
         } catch (error) {
-            console.error("Erro ao buscar dados de top clientes:", error);
+            console.error("Erro API /top-clientes:", error);
+            if(window.charts.topClientes) updateChartData(window.charts.topClientes, [], []);
         }
-    }
+     }
+    async function loadCumulativeData() { /* ... código igual ... */
+        if (!elements.compareMonth1?.value || !elements.compareMonth2?.value) {
+            if(window.charts.cumulativeComparison) updateMultiLineChart(window.charts.cumulativeComparison, [], []);
+            return;
+        }
+        const params = new URLSearchParams();
+        params.append('meses', elements.compareMonth1.value);
+        params.append('meses', elements.compareMonth2.value);
+        const vendedores = getSelectedVendors();
+        if (elements.vendedorSelectBox && vendedores.length > 0) {
+            vendedores.forEach(v => params.append('vendedor', v));
+        }
+        console.log(`Buscando /api/dados-cumulativos?${params.toString()}`);
+        try {
+            const response = await fetch(`${baseUrl}/api/dados-cumulativos?${params.toString()}`);
+            if (response.status === 401) { window.location.href = '/login'; return; }
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.message || `Falha API /dados-cumulativos (Status: ${response.status})`);
+            if(window.charts.cumulativeComparison) updateMultiLineChart(window.charts.cumulativeComparison, data.labels || [], data.datasets || []);
+        } catch (error) {
+            console.error("Erro API /dados-cumulativos:", error);
+            if(window.charts.cumulativeComparison) updateMultiLineChart(window.charts.cumulativeComparison, [], []);
+        }
+     }
+    async function loadNaoPositivadosData() { /* ... código igual ... */
+        if (!elements.naoPositivadosList || !elements.naoPositivadosCount) return;
+        const month = elements.monthFilter.value;
+        const vendedores = getSelectedVendors();
+        if (!month) return;
+        elements.naoPositivadosList.innerHTML = '<li>Carregando...</li>';
+        elements.naoPositivadosCount.textContent = 'Total: 0';
+        const params = new URLSearchParams();
+        params.append('month', month);
+        if (elements.vendedorSelectBox && vendedores.length > 0) {
+             vendedores.forEach(v => params.append('vendedor', v));
+        }
+        console.log(`Buscando /api/clientes-nao-positivados?${params.toString()}`);
+        try {
+            const response = await fetch(`${baseUrl}/api/clientes-nao-positivados?${params.toString()}`);
+            if (response.status === 401) { window.location.href = '/login'; return; }
+            const clientes = await response.json();
+            if (!response.ok) throw new Error(clientes.message || `Falha API /clientes-nao-positivados (Status: ${response.status})`);
+            elements.naoPositivadosList.innerHTML = '';
+            elements.naoPositivadosCount.textContent = `Total: ${clientes.length}`;
+            if (clientes.length === 0) {
+                elements.naoPositivadosList.innerHTML = '<li>Nenhum cliente não positivado encontrado.</li>';
+            } else {
+                 const showVendedor = !elements.vendedorSelectBox || vendedores.length !== 1;
+                 const groupedClientes = {};
+                 if (showVendedor) {
+                     clientes.forEach(cliente => {
+                         if (!groupedClientes[cliente.vendedor]) groupedClientes[cliente.vendedor] = [];
+                         groupedClientes[cliente.vendedor].push(cliente);
+                     });
+                 }
+                if (showVendedor && Object.keys(groupedClientes).length > 0) {
+                     Object.keys(groupedClientes).sort().forEach(vendedor => {
+                         const vendedorHeader = document.createElement('li');
+                         vendedorHeader.innerHTML = `<strong>${vendedor} (${groupedClientes[vendedor].length}):</strong>`;
+                         vendedorHeader.style.backgroundColor = '#f8f9fa';
+                         vendedorHeader.style.fontWeight = 'bold';
+                         elements.naoPositivadosList.appendChild(vendedorHeader);
+                         groupedClientes[vendedor].forEach(cliente => {
+                            const listItem = document.createElement('li');
+                            listItem.innerHTML = `&nbsp;&nbsp;&nbsp;${cliente.nome_fantasia || 'N/A'} (${cliente.codigo_cliente})`;
+                            elements.naoPositivadosList.appendChild(listItem);
+                         });
+                     });
+                } else {
+                     clientes.forEach(cliente => {
+                        const listItem = document.createElement('li');
+                        listItem.innerHTML = `${cliente.nome_fantasia || 'N/A'} (${cliente.codigo_cliente})`;
+                        elements.naoPositivadosList.appendChild(listItem);
+                     });
+                }
+            }
+        } catch (error) {
+            console.error("Erro API /clientes-nao-positivados:", error);
+            elements.naoPositivadosCount.textContent = 'Erro!';
+            elements.naoPositivadosList.innerHTML = `<li style="color: red;">Erro ao carregar: ${error.message}</li>`;
+        }
+     }
 
+    // --- FUNÇÃO DE ATUALIZAÇÃO DO DASHBOARD ---
     let isInitialLoad = true;
-    function updateDashboard(data) {
-        if (isInitialLoad && data.allVendors && elements.vendedorCheckboxesContainer) {
+    function updateDashboard(data = {}) { /* ... código igual ... */
+         if (isInitialLoad && data.allVendors && elements.vendedorCheckboxesContainer) {
             const container = elements.vendedorCheckboxesContainer;
-            container.innerHTML = ''; 
+            container.innerHTML = '';
             const selectAllLabel = document.createElement('label');
             selectAllLabel.className = 'select-all-label';
             selectAllLabel.innerHTML = `<input type="checkbox" id="select-all-vendedores"> Selecionar Todos`;
@@ -532,284 +594,289 @@ document.addEventListener('DOMContentLoaded', function () {
             addVendorCheckboxListeners();
             isInitialLoad = false;
         }
-
         const kpi = data.kpi || {};
         document.getElementById("kpi-faturamento-total").textContent = formatCurrency(kpi.faturamentoTotal);
-        document.getElementById("kpi-clientes-atendidos").textContent = kpi.totalClientesAtendidos || 0;
+        document.getElementById("kpi-clientes-atendidos").textContent = formatNumber(kpi.totalClientesAtendidos);
         document.getElementById("kpi-ticket-medio").textContent = formatCurrency(kpi.ticketMedio);
-        document.getElementById("kpi-positivacao").textContent = `${(kpi.positivacaoMedia || 0).toFixed(2)}%`;
+        document.getElementById("kpi-positivacao").textContent = formatPercentage(kpi.positivacaoMedia);
         document.getElementById("kpi-projecao").textContent = formatCurrency(kpi.projecaoFaturamento);
 
-        updateChartData(window.charts.topSellers, data.topSellers.map(d => d.vendedor), data.topSellers.map(d => d.total));
-        updateChartData(window.charts.topManufacturers, data.topManufacturers.map(d => d.fabricante), data.topManufacturers.map(d => d.total));
-        
-        const positivacaoData = data.positivacaoGeral;
-        if (positivacaoData) {
-            const chart = window.charts.positivacao;
-            chart.data.labels = ['Clientes Positivados', 'Clientes Não Positivados'];
-            chart.data.datasets[0].data = [positivacaoData.ativados, positivacaoData.nao_ativados];
-            chart.data.datasets[0].backgroundColor = [
-                'rgba(45, 206, 137, 0.8)',
-                'rgba(245, 54, 92, 0.7)'
-            ];
-            chart.data.datasets[0].borderColor = [
-                'rgba(45, 206, 137, 1)',
-                'rgba(245, 54, 92, 1)'
-            ];
-            chart.update();
+        if (window.charts.topSellers) updateChartData(window.charts.topSellers, (data.topSellers || []).map(d => d.vendedor), (data.topSellers || []).map(d => d.total));
+        if (window.charts.topManufacturers) updateChartData(window.charts.topManufacturers, (data.topManufacturers || []).map(d => d.fabricante), (data.topManufacturers || []).map(d => d.total));
+        const positivacaoData = data.positivacaoGeral || { ativados: 0, nao_ativados: 0 };
+        const chartPositivacao = window.charts.positivacao;
+        if (chartPositivacao) {
+             const totalClientesPos = positivacaoData.ativados + positivacaoData.nao_ativados;
+             chartPositivacao.options.plugins.title.text = `Positivação (${formatNumber(positivacaoData.ativados)} / ${formatNumber(totalClientesPos)})`;
+             chartPositivacao.data.labels = ['Positivados', 'Não Positivados'];
+             chartPositivacao.data.datasets[0].data = [positivacaoData.ativados, positivacaoData.nao_ativados];
+             chartPositivacao.data.datasets[0].backgroundColor = [chartColors[1].background, chartColors[4].background.replace('0.8','0.7')]; // Verde e Rosa/Vermelho
+             chartPositivacao.data.datasets[0].borderColor = [chartColors[1].border, chartColors[4].border];
+             chartPositivacao.update();
         }
+        const topProducts = data.topProducts || [];
+        const abbreviatedProductNames = topProducts.map(d => abbreviateProductName(d.produto));
+        if (window.charts.topProducts) updateChartData(window.charts.topProducts, abbreviatedProductNames, topProducts.map(d => d.total));
+        if (window.charts.productMix) updateChartData(window.charts.productMix, (data.productMix || []).map(d => d.vendedor), (data.productMix || []).map(d => d.total));
+        if (window.charts.focusManufacturers) updateChartData(window.charts.focusManufacturers, (data.focusManufacturers || []).map(d => d.fabricante), (data.focusManufacturers || []).map(d => d.total));
 
-        const abbreviatedProductNames = data.topProducts.map(d => abbreviateProductName(d.produto));
-        updateChartData(window.charts.topProducts, abbreviatedProductNames, data.topProducts.map(d => d.total));
-        updateChartData(window.charts.productMix, data.productMix.map(d => d.vendedor), data.productMix.map(d => d.total));
-        updateChartData(window.charts.focusManufacturers, data.focusManufacturers.map(d => d.fabricante), data.focusManufacturers.map(d => d.total));
-    
         const goalsContainer = document.getElementById('goals-table-container');
         goalsContainer.innerHTML = '';
-        if (data.salesGoals) {
-            let tableHTML = `<table class="goals-table"><thead><tr><th>Vendedor</th><th>Meta</th><th>Faturamento Atual</th><th>% Atingido</th><th>Projeção</th><th>Venda Diária Necessária</th></tr></thead><tbody>`;
+        if (data.salesGoals && data.salesGoals.length > 0) {
+            let tableHTML = `<table class="goals-table"><thead><tr><th>Vendedor</th><th>Meta</th><th>Atual</th><th>Atingido</th><th>Projeção</th><th>Venda Diária</th></tr></thead><tbody>`;
             data.salesGoals.forEach(goal => {
-                const percentForBar = Math.min(goal.percentual, 100);
-                const rawPercent = goal.percentual;
+                const percentForBar = Math.min(goal.percentual || 0, 100);
+                const rawPercent = goal.percentual || 0;
                 let rowClass = '';
-                if (rawPercent >= 100) { rowClass = 'goal-green'; } 
-                else if (rawPercent >= 75) { rowClass = 'goal-yellow'; } 
-                else { rowClass = 'goal-red'; }
-                tableHTML += `<tr class="${rowClass}"><td class="vendedor">${goal.vendedor}</td><td class="meta-valor">${formatCurrency(goal.meta)}</td><td class="faturamento-valor">${formatCurrency(goal.atual)}</td><td class="atingido"><span>${rawPercent.toFixed(1)}%</span><div class="percentage-bar"><div class="percentage-fill" style="width: ${percentForBar.toFixed(1)}%;"></div></div></td><td class="projecao">${formatCurrency(goal.projecao)}</td><td class="venda-diaria">${formatCurrency(goal.venda_diaria)}</td></tr>`;
+                if (rawPercent >= 100) rowClass = 'goal-green';
+                else if (rawPercent >= 75) rowClass = 'goal-yellow';
+                else rowClass = 'goal-red';
+                tableHTML += `<tr class="${rowClass}">
+                                <td class="vendedor">${goal.vendedor || 'N/A'}</td>
+                                <td class="meta-valor">${formatCurrency(goal.meta)}</td>
+                                <td class="faturamento-valor">${formatCurrency(goal.atual)}</td>
+                                <td class="atingido">
+                                    <span>${rawPercent.toFixed(1)}%</span>
+                                    <div class="percentage-bar"><div class="percentage-fill" style="width: ${percentForBar.toFixed(1)}%;"></div></div>
+                                </td>
+                                <td class="projecao">${formatCurrency(goal.projecao)}</td>
+                                <td class="venda-diaria">${formatCurrency(goal.venda_diaria)}</td>
+                              </tr>`;
             });
             goalsContainer.innerHTML = tableHTML + `</tbody></table>`;
-        }
-    }
-
-    async function loadCumulativeData() {
-        if (!elements.compareMonth1.value || !elements.compareMonth2.value) return;
-        const params = new URLSearchParams();
-        params.append('meses', elements.compareMonth1.value);
-        params.append('meses', elements.compareMonth2.value);
-        
-        // --- CORREÇÃO AQUI ---
-        // Adiciona os vendedores selecionados no filtro principal aos parâmetros da requisição
-        const vendedores = getSelectedVendors();
-        vendedores.forEach(v => params.append('vendedor', v));
-
-        try {
-            const response = await fetch(`${baseUrl}/api/dados-cumulativos?${params.toString()}`);
-            if (response.status === 401) { window.location.href = '/login'; return; }
-            const data = await response.json();
-            if (!response.ok) throw new Error(data.message || 'Falha.');
-            updateMultiLineChart(window.charts.cumulativeComparison, data.labels, data.datasets);
-        } catch (error) { console.error("Erro no gráfico cumulativo:", error); }
-    }
-
-    function setInitialFilters() {
-        const initialMonth = "{{ initial_month|safe }}";
-        if (initialMonth && initialMonth.includes('-')) {
-            elements.monthFilter.value = initialMonth;
-            const [year, month] = initialMonth.split('-').map(Number);
-            const initialDate = new Date(year, month - 1, 1);
-            const previousMonth = new Date(initialDate.getFullYear(), initialDate.getMonth() - 1, 1);
-            const formatAsYYYYMM = date => `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}`;
-            elements.compareMonth1.value = formatAsYYYYMM(previousMonth);
-            elements.compareMonth2.value = initialMonth;
         } else {
-            const now = new Date();
-            const currentMonthDate = new Date(now.getFullYear(), now.getMonth(), 1);
-            const previousMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-            const formatAsYYYYMM = date => `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}`;
-            elements.monthFilter.value = formatAsYYYYMM(currentMonthDate);
-            elements.compareMonth1.value = formatAsYYYYMM(previousMonthDate);
-            elements.compareMonth2.value = formatAsYYYYMM(currentMonthDate);
+            goalsContainer.innerHTML = '<p style="text-align: center; padding: 1rem;">Nenhuma meta encontrada.</p>';
         }
-    }
-    
-    function getSelectedVendors() {
+     }
+
+    // --- FUNÇÕES AUXILIARES E EVENT LISTENERS --- (iguais)
+    function setInitialFilters() { /* ... código igual ... */
+        const initialMonth = "{{ initial_month|safe }}";
+         if (initialMonth && /^\d{4}-\d{2}$/.test(initialMonth)) {
+             elements.monthFilter.value = initialMonth;
+             const [year, month] = initialMonth.split('-').map(Number);
+             try {
+                 const initialDate = new Date(year, month - 1, 1);
+                 const previousMonthDate = new Date(initialDate);
+                 previousMonthDate.setMonth(previousMonthDate.getMonth() - 1);
+                 const formatAsYYYYMM = date => `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}`;
+                 elements.compareMonth1.value = formatAsYYYYMM(previousMonthDate);
+                 elements.compareMonth2.value = initialMonth;
+             } catch (e) { setDefaultDates(); }
+         } else { setDefaultDates(); }
+     }
+    function setDefaultDates() { /* ... código igual ... */
+        const now = new Date();
+        const currentMonthDate = new Date(now.getFullYear(), now.getMonth(), 1);
+        const previousMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        const formatAsYYYYMM = date => `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}`;
+        elements.monthFilter.value = formatAsYYYYMM(currentMonthDate);
+        elements.compareMonth1.value = formatAsYYYYMM(previousMonthDate);
+        elements.compareMonth2.value = formatAsYYYYMM(currentMonthDate);
+     }
+    function getSelectedVendors() { /* ... código igual ... */
         if (!elements.vendedorSelectBox) return [];
         const checkboxes = document.querySelectorAll('.vendedor-checkbox:checked');
         return Array.from(checkboxes).map(cb => cb.value);
-    }
-
-    function updateSelectedVendorsText() {
+     }
+    function updateSelectedVendorsText() { /* ... código igual ... */
         if (!elements.vendedorSelectedText) return;
         const selected = getSelectedVendors();
         const totalVendors = document.querySelectorAll('.vendedor-checkbox').length;
         const selectAllCheckbox = document.getElementById('select-all-vendedores');
-        if (selectAllCheckbox && selectAllCheckbox.checked && selected.length === totalVendors) {
+        if (selectAllCheckbox && selectAllCheckbox.checked && selected.length === totalVendors && totalVendors > 0) {
             elements.vendedorSelectedText.textContent = 'TODOS OS VENDEDORES';
-        } 
-        else if (selected.length === 0) {
+        } else if (selected.length === 0) {
             elements.vendedorSelectedText.textContent = 'VENDEDORES PRINCIPAIS';
-        } 
-        else if (selected.length === 1) {
+        } else if (selected.length === 1) {
             elements.vendedorSelectedText.textContent = selected[0];
         } else if (selected.length > 1 && selected.length <= 3) {
             elements.vendedorSelectedText.textContent = selected.join(', ');
-        } 
-        else {
+        } else {
             elements.vendedorSelectedText.textContent = `${selected.length} vendedores selecionados`;
         }
-    }
-    
-    function addVendorCheckboxListeners() {
+     }
+    function addVendorCheckboxListeners() { /* ... código igual ... */
         if (!elements.vendedorCheckboxesContainer) return;
         const selectAllCheckbox = document.getElementById('select-all-vendedores');
         const vendorCheckboxes = document.querySelectorAll('.vendedor-checkbox');
-        selectAllCheckbox.addEventListener('change', () => {
-            vendorCheckboxes.forEach(cb => { cb.checked = selectAllCheckbox.checked; });
-            updateSelectedVendorsText();
-            handleFilterChange();
-        });
+        if(selectAllCheckbox) {
+            selectAllCheckbox.addEventListener('change', () => {
+                vendorCheckboxes.forEach(cb => { cb.checked = selectAllCheckbox.checked; });
+                updateSelectedVendorsText();
+                handleFilterChange();
+            });
+        }
         vendorCheckboxes.forEach(checkbox => {
             checkbox.addEventListener('change', () => {
-                if (!checkbox.checked) { selectAllCheckbox.checked = false; } 
-                else { const allChecked = Array.from(vendorCheckboxes).every(cb => cb.checked); selectAllCheckbox.checked = allChecked; }
+                if(selectAllCheckbox){
+                    if (!checkbox.checked) { selectAllCheckbox.checked = false; }
+                    else { const allChecked = Array.from(vendorCheckboxes).every(cb => cb.checked); selectAllCheckbox.checked = allChecked; }
+                }
                 updateSelectedVendorsText();
                 handleFilterChange();
             });
         });
-    }
+     }
 
-    if (elements.vendedorSelectBox) {
+    if (elements.vendedorSelectBox) { /* ... código igual ... */
         elements.vendedorSelectBox.addEventListener('click', (e) => {
             e.stopPropagation();
             elements.vendedorCheckboxesContainer.classList.toggle('visible');
             elements.vendedorSelectBox.classList.toggle('open');
         });
-    }
-
-    document.addEventListener('click', function(event) {
-        if (elements.vendedorSelectBox && !elements.vendedorSelectBox.contains(event.target) && !elements.vendedorCheckboxesContainer.contains(event.target)) {
+     }
+    document.addEventListener('click', function(event) { /* ... código igual ... */
+        if (elements.vendedorSelectBox && elements.vendedorCheckboxesContainer &&
+            !elements.vendedorSelectBox.contains(event.target) &&
+            !elements.vendedorCheckboxesContainer.contains(event.target)) {
             elements.vendedorCheckboxesContainer.classList.remove('visible');
             elements.vendedorSelectBox.classList.remove('open');
         }
-    });
+     });
 
-    function handleFilterChange() { 
-        loadDataFromAPI(elements.monthFilter.value, getSelectedVendors()); 
+    function handleFilterChange() { /* ... código igual ... */
+        const selectedMonth = elements.monthFilter.value;
+        const selectedVendors = getSelectedVendors();
+        elements.errorMessage.textContent = '';
+        loadDataFromAPI(selectedMonth, selectedVendors);
         loadTopClientesData();
-        // --- CORREÇÃO AQUI ---
-        // Recarrega o gráfico cumulativo sempre que o filtro principal mudar
         loadCumulativeData();
+        loadNaoPositivadosData();
     }
-    
+
     elements.monthFilter.addEventListener('input', handleFilterChange);
     elements.compareMonth1.addEventListener('change', loadCumulativeData);
     elements.compareMonth2.addEventListener('change', loadCumulativeData);
-    
+
     const sidebar = document.getElementById('sidebar');
     const menuToggle = document.getElementById('menu-toggle');
     const closeSidebarBtn = document.getElementById('close-sidebar-btn');
+    if (menuToggle && sidebar && closeSidebarBtn) {
+        menuToggle.addEventListener('click', () => sidebar.classList.add('open'));
+        closeSidebarBtn.addEventListener('click', () => sidebar.classList.remove('open'));
+    }
 
-    menuToggle.addEventListener('click', () => sidebar.classList.add('open'));
-    closeSidebarBtn.addEventListener('click', () => sidebar.classList.remove('open'));
-    
-    ['sales-file', 'portfolio-file'].forEach(id => {
+    ['sales-file', 'portfolio-file', 'portfolio-clientes-file'].forEach(id => { /* ... código igual ... */
         const fileInput = document.getElementById(id);
         const textSpan = document.querySelector(`.file-input-text[data-input-id="${id}"]`);
         if (fileInput && textSpan) {
             fileInput.addEventListener('change', () => {
-                if (fileInput.files.length > 0) {
-                    textSpan.textContent = fileInput.files[0].name;
-                } else {
-                    textSpan.textContent = 'Escolher arquivo...';
-                }
+                let defaultText = 'Escolher arquivo...';
+                if (id === 'sales-file') defaultText = 'Escolher arquivo Vendas...';
+                if (id === 'portfolio-file') defaultText = 'Escolher arquivo Carteira (Resumo)...';
+                if (id === 'portfolio-clientes-file') defaultText = 'Escolher arquivo Carteira (Clientes)...';
+                textSpan.textContent = fileInput.files.length > 0 ? fileInput.files[0].name : defaultText;
+                checkFiles();
             });
         }
-    });
-    
-    const checkFiles = () => { elements.processButton.disabled = !(elements.salesFileInput.files.length > 0 && elements.portfolioFileInput.files.length > 0); };
-    elements.salesFileInput.addEventListener('change', checkFiles);
-    elements.portfolioFileInput.addEventListener('change', checkFiles);
-    
-    elements.clearButton.addEventListener('click', async () => {
-        if(!confirm("Tem certeza? Todos os dados serão apagados.")) return;
-        elements.statusMessage.textContent="Limpando...";
+     });
+
+    const checkFiles = () => { /* ... código igual ... */
+        elements.processButton.disabled = !(
+            elements.salesFileInput.files.length > 0 &&
+            elements.portfolioFileInput.files.length > 0 &&
+            elements.portfolioClientesFileInput.files.length > 0
+        );
+     };
+    checkFiles();
+
+    elements.clearButton.addEventListener('click', async () => { /* ... código igual ... */
+        if(!confirm("Tem certeza que deseja limpar TODOS os dados de vendas e carteira?")) return;
+        elements.statusMessage.textContent = "Limpando dados...";
+        elements.clearButton.disabled = true;
         try {
-            const res = await fetch(`${baseUrl}/api/limpar-dados`,{method:"POST"});
+            const res = await fetch(`${baseUrl}/api/limpar-dados`, { method: "POST" });
             if (res.status === 401) { window.location.href = '/login'; return; }
             const data = await res.json();
-            if(!res.ok) throw new Error(data.message);
+            if (!res.ok) throw new Error(data.message || 'Falha.');
             elements.statusMessage.textContent = data.message;
-            setTimeout(()=>location.reload(), 1500);
-        } catch(err) { elements.statusMessage.textContent = `Erro: ${err.message}`; }
+            setTimeout(() => location.reload(), 2000);
+        } catch (err) {
+            elements.statusMessage.textContent = `Erro: ${err.message}`;
+            elements.clearButton.disabled = false;
+        }
     });
-    
-    elements.processButton.addEventListener('click', async () => {
-        const formData = new FormData();
+
+    elements.processButton.addEventListener('click', async () => { /* ... código igual ... */
+         const formData = new FormData();
         formData.append("salesFile", elements.salesFileInput.files[0]);
         formData.append("portfolioFile", elements.portfolioFileInput.files[0]);
-        const replaceDataCheckbox = document.getElementById('replace-data-checkbox');
-        formData.append("replaceData", replaceDataCheckbox ? replaceDataCheckbox.checked : 'true');
-        elements.statusMessage.textContent = "Processando...";
+        formData.append("portfolioClientesFile", elements.portfolioClientesFileInput.files[0]);
+        elements.statusMessage.textContent = "Processando arquivos...";
+        elements.processButton.disabled = true;
         try {
             const res = await fetch(`${baseUrl}/api/upload/vendas`, { method: "POST", body: formData });
             if (res.status === 401) { window.location.href = '/login'; return; }
             const data = await res.json();
             if (!res.ok) {
-                throw new Error(data.message || 'Erro desconhecido no servidor.');
+                 let errorMsg = 'Erro desconhecido.';
+                 try { errorMsg = data.message || JSON.stringify(data); } catch (e) {}
+                 throw new Error(errorMsg);
             }
             elements.statusMessage.textContent = `Sucesso: ${data.message}`;
-            setTimeout(() => location.reload(), 1500);
+            setTimeout(() => location.reload(), 2000);
         } catch (err) {
             elements.statusMessage.textContent = `Erro: ${err.message}`;
+            elements.processButton.disabled = false;
         }
     });
 
-    const modal = document.getElementById('chartModal');
+    // --- LÓGICA DO MODAL --- (igual)
+    const modal = document.getElementById('chartModal'); /* ... código igual ... */
     const modalBody = modal.querySelector('.modal-body');
     const modalChartTitle = document.getElementById('modalChartTitle');
     const closeModalBtn = document.getElementById('closeModalBtn');
     let modalChartInstance = null;
-
-    document.querySelectorAll('.expand-btn').forEach(button => {
+    document.querySelectorAll('.expand-btn').forEach(button => { /* ... código igual ... */
         button.addEventListener('click', () => {
             const chartId = button.dataset.chartId;
             const originalChart = window.charts[chartId];
             if (!originalChart) return;
             if (modalChartInstance) { modalChartInstance.destroy(); modalChartInstance = null; }
             modalBody.innerHTML = '<canvas id="modalChartCanvas"></canvas>';
+            const ctx = document.getElementById('modalChartCanvas')?.getContext('2d');
+            if (!ctx) return;
             const origConfig = originalChart.config;
             const dataCopy = JSON.parse(JSON.stringify(origConfig.data));
             const optionsCopy = JSON.parse(JSON.stringify(origConfig.options));
-            const isMobile = window.innerWidth <= 768;
             const yellowColor = '#FFD700';
             const formatterFunction = (optionsCopy.customFormatterType === 'percentage') ? formatPercentage : formatNumber;
-            optionsCopy.plugins.datalabels.formatter = formatterFunction;
-            optionsCopy.plugins.datalabels.color = yellowColor;
-            
-            if (optionsCopy.scales && optionsCopy.scales.x) {
-                optionsCopy.scales.x.ticks.color = yellowColor;
+            optionsCopy.plugins.title.color = '#e2e8f0';
+            optionsCopy.plugins.legend.labels = { color: '#a0aec0' };
+            if (optionsCopy.scales) {
+                if(optionsCopy.scales.x) optionsCopy.scales.x.ticks.color = yellowColor;
+                if(optionsCopy.scales.y) optionsCopy.scales.y.ticks.color = yellowColor;
             }
-            if (optionsCopy.scales && optionsCopy.scales.y) {
-                optionsCopy.scales.y.ticks.color = yellowColor;
+            if (optionsCopy.plugins.datalabels) {
+                optionsCopy.plugins.datalabels.color = yellowColor;
+                optionsCopy.plugins.datalabels.formatter = formatterFunction;
             }
-
-            if (isMobile && origConfig.type === 'bar') {
-                optionsCopy.plugins.datalabels.align = 'end';
-                optionsCopy.plugins.datalabels.anchor = 'end';
-            }
-            const ctx = document.getElementById('modalChartCanvas').getContext('2d');
-            if (!ctx) return;
+            optionsCopy.maintainAspectRatio = false;
             try {
-                modalChartInstance = new Chart(ctx, { type: origConfig.type, data: dataCopy, options: optionsCopy, plugins: [ChartDataLabels] });
-            } catch (error) { console.error("Erro ao criar a instância do gráfico no modal:", error); }
+                modalChartInstance = new Chart(ctx, { type: origConfig.type, data: dataCopy, options: optionsCopy });
+            } catch (error) {
+                console.error("Erro chart modal:", error);
+                modalBody.innerHTML = '<p style="color: red;">Erro.</p>';
+            }
             modalChartTitle.textContent = optionsCopy.plugins.title.text;
             modal.classList.add('visible');
         });
-    });
-
-    const closeModal = () => {
-        modal.classList.remove('visible');
-        if (modalChartInstance) { modalChartInstance.destroy(); modalChartInstance = null; }
-    };
+     });
+    const closeModal = () => { /* ... código igual ... */
+         modal.classList.remove('visible');
+        if (modalChartInstance) { modalChartInstance.destroy(); modalChartInstance = null; modalBody.innerHTML = ''; }
+     };
     closeModalBtn.addEventListener('click', closeModal);
     modal.addEventListener('click', e => { if (e.target === modal) closeModal(); });
 
+    // --- CARREGAMENTO INICIAL ---
     setInitialFilters();
-    loadDataFromAPI(elements.monthFilter.value, getSelectedVendors());
-    loadCumulativeData();
-    loadTopClientesData();
+    handleFilterChange(); // Carrega tudo
 
-    console.log('Teste final do body, JS carregado');
+    console.log('Dashboard JS Loaded');
 });
 </script>
+
+</body>
 </html>
