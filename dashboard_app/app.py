@@ -365,10 +365,11 @@ def get_data():
         vendedores_para_carteira_list = []
 
         vendedores_loja_set = {'SHEILA', 'ROSANGEL', 'DELIVERY', 'CAIQUE', 'CONFIE'}
-        default_vendedores = []
+        default_vendedores = [] # Será preenchida abaixo
 
         if current_user.role == 'admin':
-            default_vendedores = ['MARCELO', 'EVERTON', 'MARCOS', 'PEDRO', 'RODOLFO', 'SILVANA', 'THYAGO', 'TIAGO', 'LUIZ']
+            # --- CORREÇÃO AQUI: Adiciona TONINHO ---
+            default_vendedores = ['MARCELO', 'EVERTON', 'MARCOS', 'PEDRO', 'RODOLFO', 'SILVANA', 'THYAGO', 'TIAGO', 'LUIZ', 'TONINHO']
             vendedores_selecionados = vendedores_filter_req if vendedores_filter_req else default_vendedores
             vendedores_para_carteira_list = vendedores_selecionados
 
@@ -377,10 +378,10 @@ def get_data():
             for vendedor in vendedores_selecionados:
                 if vendedor != 'LOJA':
                     vendedores_para_query_vendas.add(vendedor)
-            if not vendedores_filter_req:
+            if not vendedores_filter_req: # Se NENHUM filtro veio (visão padrão), query de vendas NÃO filtra vendedor
                  vendedores_para_query_vendas = set()
 
-        else:
+        else: # Vendedor normal
             vendedores_selecionados = [current_user.username]
             vendedores_para_carteira_list = vendedores_selecionados
             vendedores_para_query_vendas = {current_user.username}
@@ -390,7 +391,7 @@ def get_data():
         # --- Clausula WHERE e Params para VENDAS ---
         where_conditions_vendas = ["TO_CHAR(data_venda, 'YYYY-MM') = %s"]
         params_vendas = [month_filter]
-        if vendedores_para_query_vendas:
+        if vendedores_para_query_vendas: # Só adiciona filtro IN se houver vendedores para filtrar
             placeholders = ','.join(['%s'] * len(vendedores_para_query_vendas))
             where_conditions_vendas.append(f"vendedor IN ({placeholders})")
             params_vendas.extend(list(vendedores_para_query_vendas))
@@ -401,7 +402,6 @@ def get_data():
         params_carteira = [month_filter]
         # Aplica filtro de vendedor na carteira APENAS se houver seleção explícita OU se for vendedor
         if vendedores_filter_req or current_user.role != 'admin':
-            # Usa a lista da seleção original (pode incluir LOJA aqui, ok para carteira resumo)
             if vendedores_para_carteira_list:
                 placeholders = ','.join(['%s'] * len(vendedores_para_carteira_list))
                 where_conditions_carteira.append(f"c.vendedor IN ({placeholders})")
@@ -448,6 +448,7 @@ def get_data():
              mix_where_conditions_carteira.append(f"c.vendedor IN ({placeholders})")
              mix_params_carteira.extend(vendedores_mix)
         mix_where_clause_carteira = "WHERE " + " AND ".join(mix_where_conditions_carteira)
+        safe_vendedores_loja_sql = ["'" + v.replace("'", "''") + "'" for v in vendedores_loja_set] # Seguro para injeção
         query_product_mix = f"""
             WITH VendasProdutos AS (
                 SELECT vendedor, COUNT(DISTINCT produto) as total
@@ -477,7 +478,7 @@ def get_data():
         vendedores_para_exibir_metas = []
         if current_user.role == 'admin':
              vendedores_para_exibir_metas = vendedores_filter_req if vendedores_filter_req else default_vendedores
-             if not vendedores_filter_req:
+             if not vendedores_filter_req: # Adiciona LOJA à exibição padrão se ela existir
                  cur.execute("SELECT 1 FROM public.carteira WHERE mes = %s AND vendedor = 'LOJA' LIMIT 1;", (month_filter,))
                  if cur.fetchone() and 'LOJA' not in vendedores_para_exibir_metas:
                      vendedores_para_exibir_metas.append('LOJA')
@@ -486,32 +487,28 @@ def get_data():
 
         sales_goals = []
         if vendedores_para_exibir_metas:
-            # Prepara parâmetros para a cláusula WHERE da carteira nesta query
-            params_metas_carteira = [month_filter] # Param 3: month_filter para c.mes
+            params_metas_carteira = [month_filter]
             placeholders_metas = ','.join(['%s'] * len(vendedores_para_exibir_metas))
             where_metas_carteira = f"WHERE c.mes = %s AND c.meta_faturamento > 0 AND c.vendedor IN ({placeholders_metas})"
-            params_metas_carteira.extend(vendedores_para_exibir_metas) # Params 4..N
+            params_metas_carteira.extend(vendedores_para_exibir_metas)
 
-            # Query para buscar metas e faturamento atual
             safe_vendedores_loja_sql = ["'" + v.replace("'", "''") + "'" for v in vendedores_loja_set]
             query_metas = f"""
                 WITH VendasIndividuais AS (
                     SELECT vendedor, SUM(valor) as faturamento_atual
-                    FROM public.vendas WHERE TO_CHAR(data_venda, 'YYYY-MM') = %s GROUP BY vendedor -- Param 1
+                    FROM public.vendas WHERE TO_CHAR(data_venda, 'YYYY-MM') = %s GROUP BY vendedor
                 ), VendasLoja AS (
                     SELECT 'LOJA' as vendedor, COALESCE(SUM(valor), 0) as faturamento_atual
-                    FROM public.vendas WHERE TO_CHAR(data_venda, 'YYYY-MM') = %s AND vendedor IN ({','.join(safe_vendedores_loja_sql)}) -- Param 2
+                    FROM public.vendas WHERE TO_CHAR(data_venda, 'YYYY-MM') = %s AND vendedor IN ({','.join(safe_vendedores_loja_sql)})
                 ), VendasCombinadas AS (
                     SELECT vendedor, faturamento_atual FROM VendasIndividuais WHERE vendedor <> 'LOJA'
                     UNION ALL SELECT vendedor, faturamento_atual FROM VendasLoja
                 )
                 SELECT c.vendedor, c.meta_faturamento as meta, COALESCE(vc.faturamento_atual, 0) as atual
                 FROM public.carteira c LEFT JOIN VendasCombinadas vc ON c.vendedor = vc.vendedor
-                {where_metas_carteira}; -- Params 3..N
+                {where_metas_carteira};
             """
-            # --- CORREÇÃO DA MONTAGEM DOS PARÂMETROS ---
-            params_query_metas = tuple([month_filter, month_filter] + params_metas_carteira) # Usa a lista params_metas_carteira completa
-            # --- FIM DA CORREÇÃO ---
+            params_query_metas = tuple([month_filter, month_filter] + params_metas_carteira)
 
             cur.execute(query_metas, params_query_metas)
             sales_goals_raw = [{col.name: val for col, val in zip(cur.description, row)} for row in cur.fetchall()]
@@ -541,7 +538,6 @@ def get_data():
     except IndexError as ie:
         app.logger.error(f"Erro de índice (provavelmente parâmetros vs placeholders): {ie}", exc_info=True)
         try:
-             # Tentativa segura de logar para debug
              app.logger.error(f"Query Bruta (Metas): {query_metas}")
              app.logger.error(f"Parâmetros Tentados (Metas): {params_query_metas}")
              app.logger.error(f"Params Metas Carteira Base: {params_metas_carteira}")
@@ -617,8 +613,8 @@ def get_cumulative_data():
 @login_required
 def get_clientes_nao_positivados():
     conn = None
-    query = "" # Inicializa a variável query
-    params = [] # Inicializa a variável params
+    query = ""
+    params = []
     try:
         conn = get_db_connection()
         cur = conn.cursor()
@@ -629,17 +625,16 @@ def get_clientes_nao_positivados():
         vendedores_para_consulta = []
 
         if current_user.role == 'admin':
-            if not vendedores_selecionados_req:
-                vendedores_para_consulta = ['MARCELO', 'EVERTON', 'MARCOS', 'PEDRO', 'RODOLFO', 'SILVANA', 'THYAGO', 'TIAGO', 'LUIZ']
-                # Não inclui LOJA por padrão aqui
-            else:
+            if not vendedores_selecionados_req: # Visão padrão admin (sem LOJA)
+                vendedores_para_consulta = ['MARCELO', 'EVERTON', 'MARCOS', 'PEDRO', 'RODOLFO', 'SILVANA', 'THYAGO', 'TIAGO', 'LUIZ', 'TONINHO'] # Adicionado TONINHO
+            else: # Admin com filtro (remove LOJA se estiver selecionada)
                 vendedores_para_consulta = [v for v in vendedores_selecionados_req if v != 'LOJA']
-        else:
+        else: # Vendedor
             vendedores_para_consulta = [current_user.username]
             if 'LOJA' in vendedores_para_consulta: vendedores_para_consulta.remove('LOJA')
 
         if not vendedores_para_consulta:
-             return jsonify([]) # Retorna lista vazia se só sobrou LOJA ou nenhum vendedor
+             return jsonify([])
 
         # --- Montagem da Query ---
         params = [month_filter] # 1º %s (vendas.data_venda)
