@@ -90,7 +90,7 @@
         .modal-body { flex-grow: 1; position: relative; }
         .modal-body canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
         .update-banner { background-color: #fffbeb; color: #b45309; padding: 1rem; text-align: center; font-size: 1.1rem; font-weight: 600; border-radius: var(--border-radius); margin-bottom: 2rem; border: 1px solid #fde68a; }
-        .menu-toggle { font-size: 2rem; background: none; border: none; color: var(--text-color); cursor: pointer; display: none; }
+        .menu-toggle { font-size: 2rem; background: none; border: none; color: var(--text-color); cursor: pointer; }
         .sidebar { position: fixed; top: 0; right: -350px; width: 100%; max-width: 350px; height: 100%; background-color: #fff; box-shadow: -4px 0 10px rgba(0,0,0,0.1); padding: 2rem; transition: right 0.3s ease-in-out; z-index: 1000; overflow-y: auto; display: flex; flex-direction: column; }
         .sidebar.open { right: 0; }
         .sidebar .sidebar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; border-bottom: 1px solid #e9ecef; padding-bottom: 1rem;}
@@ -129,8 +129,10 @@
         @media (max-width: 768px) {
             .container { margin-top: 1rem; padding: 0 0.75rem; }
             .header-logo { max-height: 35px; }
-            .header-actions .menu-toggle { display: block; }
-            .header-actions a[href*="logout"] { display: none; }
+            /* --- CORREÇÃO AQUI: Adicionado {} e a regra que faltava --- */
+            .header-actions .menu-toggle { display: block; } /* Mostra o botão hambúrguer */
+            .header-actions a[href*="logout"] { display: none; } /* Esconde o link 'Sair' */
+            /* --- FIM DA CORREÇÃO --- */
             .section-title { font-size: 1.25rem; }
             .kpi-grid, .filters { grid-template-columns: 1fr; }
             .kpi-card { padding: 1rem; }
