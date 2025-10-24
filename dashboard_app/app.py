@@ -365,11 +365,10 @@ def get_data():
         vendedores_para_carteira_list = []
 
         vendedores_loja_set = {'SHEILA', 'ROSANGEL', 'DELIVERY', 'CAIQUE', 'CONFIE'}
-        default_vendedores = [] # Será preenchida abaixo
+        default_vendedores = []
 
         if current_user.role == 'admin':
-            # --- CORREÇÃO AQUI: Adiciona TONINHO ---
-            default_vendedores = ['MARCELO', 'EVERTON', 'MARCOS', 'PEDRO', 'RODOLFO', 'SILVANA', 'THYAGO', 'TIAGO', 'LUIZ', 'TONINHO']
+            default_vendedores = ['MARCELO', 'EVERTON', 'MARCOS', 'PEDRO', 'RODOLFO', 'SILVANA', 'THYAGO', 'TIAGO', 'LUIZ', 'TONINHO'] # TONINHO adicionado
             vendedores_selecionados = vendedores_filter_req if vendedores_filter_req else default_vendedores
             vendedores_para_carteira_list = vendedores_selecionados
 
@@ -378,10 +377,10 @@ def get_data():
             for vendedor in vendedores_selecionados:
                 if vendedor != 'LOJA':
                     vendedores_para_query_vendas.add(vendedor)
-            if not vendedores_filter_req: # Se NENHUM filtro veio (visão padrão), query de vendas NÃO filtra vendedor
+            if not vendedores_filter_req:
                  vendedores_para_query_vendas = set()
 
-        else: # Vendedor normal
+        else:
             vendedores_selecionados = [current_user.username]
             vendedores_para_carteira_list = vendedores_selecionados
             vendedores_para_query_vendas = {current_user.username}
@@ -391,7 +390,7 @@ def get_data():
         # --- Clausula WHERE e Params para VENDAS ---
         where_conditions_vendas = ["TO_CHAR(data_venda, 'YYYY-MM') = %s"]
         params_vendas = [month_filter]
-        if vendedores_para_query_vendas: # Só adiciona filtro IN se houver vendedores para filtrar
+        if vendedores_para_query_vendas:
             placeholders = ','.join(['%s'] * len(vendedores_para_query_vendas))
             where_conditions_vendas.append(f"vendedor IN ({placeholders})")
             params_vendas.extend(list(vendedores_para_query_vendas))
@@ -400,7 +399,6 @@ def get_data():
         # --- Clausula WHERE e Params para CARTEIRA ---
         where_conditions_carteira = ["c.mes = %s"]
         params_carteira = [month_filter]
-        # Aplica filtro de vendedor na carteira APENAS se houver seleção explícita OU se for vendedor
         if vendedores_filter_req or current_user.role != 'admin':
             if vendedores_para_carteira_list:
                 placeholders = ','.join(['%s'] * len(vendedores_para_carteira_list))
@@ -448,7 +446,7 @@ def get_data():
              mix_where_conditions_carteira.append(f"c.vendedor IN ({placeholders})")
              mix_params_carteira.extend(vendedores_mix)
         mix_where_clause_carteira = "WHERE " + " AND ".join(mix_where_conditions_carteira)
-        safe_vendedores_loja_sql = ["'" + v.replace("'", "''") + "'" for v in vendedores_loja_set] # Seguro para injeção
+        safe_vendedores_loja_sql = ["'" + v.replace("'", "''") + "'" for v in vendedores_loja_set]
         query_product_mix = f"""
             WITH VendasProdutos AS (
                 SELECT vendedor, COUNT(DISTINCT produto) as total
@@ -463,7 +461,7 @@ def get_data():
         results['productMix'] = [{col.name: val for col, val in zip(cur.description, row)} for row in cur.fetchall()]
 
 
-        # Fabricantes Foco
+        # Fabricantes Foco - Faturamento
         fabricantes_foco = ['SELMI', 'LUCKY', 'RICLAN', 'KELLANOVA', 'TAMPICO', 'CONSABOR', 'YAI', 'TECPOLPA', 'GOLDKO']
         focus_where_conditions = where_conditions_vendas.copy()
         focus_params = list(params_vendas)
@@ -474,11 +472,28 @@ def get_data():
         cur.execute(f"SELECT fabricante, SUM(valor) as total FROM public.vendas {focus_where_clause} GROUP BY fabricante ORDER BY total DESC;", tuple(focus_params))
         results['focusManufacturers'] = [{col.name: float(val) if isinstance(val, Decimal) else val for col, val in zip(cur.description, row)} for row in cur.fetchall()]
 
+        # --- NOVA QUERY: Fabricantes Foco - Positivação (Contagem de Clientes) ---
+        # Reutiliza focus_where_clause e focus_params
+        query_focus_positivacao = f"""
+            SELECT fabricante, COUNT(DISTINCT cliente) as total_clientes
+            FROM public.vendas {focus_where_clause}
+            GROUP BY fabricante ORDER BY total_clientes DESC;
+        """
+        cur.execute(query_focus_positivacao, tuple(focus_params))
+        # Armazena em uma nova chave no results
+        results['focusManufacturersPositivacao'] = [
+            # Converte total_clientes para int explicitamente
+            {col.name: int(val) if col.name == 'total_clientes' else val for col, val in zip(cur.description, row)}
+            for row in cur.fetchall()
+        ]
+        # --- FIM DA NOVA QUERY ---
+
+
         # --- Lógica de Metas ---
         vendedores_para_exibir_metas = []
         if current_user.role == 'admin':
              vendedores_para_exibir_metas = vendedores_filter_req if vendedores_filter_req else default_vendedores
-             if not vendedores_filter_req: # Adiciona LOJA à exibição padrão se ela existir
+             if not vendedores_filter_req:
                  cur.execute("SELECT 1 FROM public.carteira WHERE mes = %s AND vendedor = 'LOJA' LIMIT 1;", (month_filter,))
                  if cur.fetchone() and 'LOJA' not in vendedores_para_exibir_metas:
                      vendedores_para_exibir_metas.append('LOJA')
@@ -532,6 +547,11 @@ def get_data():
         cur.execute("SELECT 1 FROM public.carteira WHERE mes = %s AND vendedor = 'LOJA' LIMIT 1;", (month_filter,))
         if cur.fetchone() is not None:
             if 'LOJA' not in all_vendors: all_vendors.append('LOJA'); all_vendors.sort()
+        # Adiciona TONINHO ao filtro se ele não estiver nas vendas, mas tiver carteira
+        cur.execute("SELECT 1 FROM public.carteira WHERE mes = %s AND vendedor = 'TONINHO' LIMIT 1;", (month_filter,))
+        if cur.fetchone() is not None:
+            if 'TONINHO' not in all_vendors: all_vendors.append('TONINHO'); all_vendors.sort()
+
         results['allVendors'] = all_vendors
         cur.close()
         return jsonify(results)
@@ -625,9 +645,9 @@ def get_clientes_nao_positivados():
         vendedores_para_consulta = []
 
         if current_user.role == 'admin':
-            if not vendedores_selecionados_req: # Visão padrão admin (sem LOJA)
-                vendedores_para_consulta = ['MARCELO', 'EVERTON', 'MARCOS', 'PEDRO', 'RODOLFO', 'SILVANA', 'THYAGO', 'TIAGO', 'LUIZ', 'TONINHO'] # Adicionado TONINHO
-            else: # Admin com filtro (remove LOJA se estiver selecionada)
+            if not vendedores_selecionados_req: # Visão padrão admin (sem LOJA, com TONINHO)
+                vendedores_para_consulta = ['MARCELO', 'EVERTON', 'MARCOS', 'PEDRO', 'RODOLFO', 'SILVANA', 'THYAGO', 'TIAGO', 'LUIZ', 'TONINHO']
+            else: # Admin com filtro (remove LOJA)
                 vendedores_para_consulta = [v for v in vendedores_selecionados_req if v != 'LOJA']
         else: # Vendedor
             vendedores_para_consulta = [current_user.username]
