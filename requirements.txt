@@ -4,14 +4,14 @@ Werkzeug
 psycopg2-binary
 pandas
 openpyxl
+xlsxwriter
 python-dotenv
 gunicorn
 waitress
 dash
+dash-bootstrap-components
 plotly
-python-dateutil
-requests
 SQLAlchemy
-xlsxwriter
 cloudinary
 PyMuPDF
+requests
