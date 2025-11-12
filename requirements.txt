@@ -14,3 +14,4 @@ requests
 SQLAlchemy
 xlsxwriter
 cloudinary
+PyMuPDF
