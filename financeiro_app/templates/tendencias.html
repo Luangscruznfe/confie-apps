@@ -7,142 +7,199 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         body { font-family: system-ui, sans-serif; padding: 2em; background-color: #f8f9fa; }
-        .container { max-width: 1200px; margin: 0 auto; } /* Aumentei a largura */
-        h1 { color: #0056b3; text-align: center; margin-bottom: 1em; }
-        .chart-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 2em; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        h1 { color: #0056b3; text-align: center; margin-bottom: 0.5em; }
+        .filter-form { text-align: center; margin-bottom: 2em; background-color: #fff; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); display: flex; justify-content: center; align-items: center; gap: 15px; }
+        .filter-form label { font-weight: 600; color: #495057;}
+        .filter-form input[type="month"], .filter-form button, .filter-form a { padding: 8px 12px; border: 1px solid #ced4da; border-radius: 4px; font-size: 1rem; }
+        .filter-form button, .filter-form a { background-color: #007bff; color: white; cursor: pointer; text-decoration: none; }
+        .filter-form button:hover, .filter-form a:hover { background-color: #0056b3; }
+        .filter-form a { background-color: #6c757d; }
+        .filter-form a:hover { background-color: #5a6268; }
+        .chart-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 25px; margin-top: 2em; }
         .chart-container { background-color: #fff; padding: 2em; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-        .chart-container-full { grid-column: 1 / -1; }
-        .back-link { display: block; text-align: center; margin-top: 2em; font-size: 1.1em; }
+        h2 { margin-top: 0; color: #495057; font-size: 1.2em; text-align: center; margin-bottom: 1.5em;}
+        
+        /* === MUDANÇA 1: Ajuste no CSS do link 'Voltar' === */
+        .back-link { 
+            display: block; 
+            text-align: center; 
+            margin-bottom: 2em; /* Alterado de margin-top para margin-bottom */
+            font-size: 1.1em; 
+        }
+        .no-data-message { text-align: center; color: #6c757d; font-size: 1.1em; margin-top: 1em;}
+        
+        .chart-container-seller {
+            /* grid-column: 1 / -1; */ 
+            height: 600px; 
+            position: relative; 
+        }
+
+        .chart-container-seller canvas {
+            display: block;
+            width: 100% !important;
+            height: 100% !important;
+        }
+        .message { margin-bottom: 15px; padding: 10px; border-radius: 5px; text-align: center; }
+        .message.success { background-color: #d1e7dd; color: #0f5132; border: 1px solid #badbcc;}
+        .message.error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c2c7;}
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>Análise de Tendências Mensais (Baseado na Data de Pagamento)</h1>
+        <h1>Análise de Tendências {% if is_monthly_view %} - {{ selected_month }}{% else %} - Geral{% endif %}</h1>
 
-        <div class="chart-grid">
+        <a href="{{ url_for('index') }}" class="back-link">Voltar ao Dashboard Principal</a>
 
-            <div class="chart-container chart-container-full">
-                <h2>Evolução Mensal: Pontualidade Média (Clientes) vs Atraso Médio (Títulos)</h2>
-                <canvas id="graficoPontualidadeAtraso"></canvas>
+        <form method="GET" action="{{ url_for('tendencias') }}" class="filter-form">
+            </form>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+           {% endwith %}
+
+        {% if (labels and labels|length > 0) or (valores_risco and valores_risco|sum > 0) or (valores_vendedor_atrasados and valores_vendedor_atrasados|length > 0) %}
+            
+            <div class="chart-grid">
+
+                <div class="chart-container"><h2>{{ 'Evolução da Pontualidade Média (Clientes)' if not is_monthly_view else 'Pontualidade Média no Mês' }}</h2><canvas id="graficoPontualidade"></canvas></div>
+                <div class="chart-container"><h2>{{ 'Evolução do Atraso Médio (Títulos Atrasados)' if not is_monthly_view else 'Atraso Médio no Mês' }}</h2><canvas id="graficoAtrasoMedio"></canvas></div>
+                <div class="chart-container"><h2>{{ 'Contagem Mensal de Títulos Pagos com Atraso' if not is_monthly_view else 'Títulos Pagos com Atraso no Mês' }}</h2><canvas id="graficoContagemAtrasados"></canvas></div>
+                <div class="chart-container"><h2>{{ 'Receita Mensal: Total vs Em Risco' if not is_monthly_view else 'Receita no Mês: Total vs Em Risco' }}</h2><canvas id="graficoReceita"></canvas></div>
+                 
+                <div class="chart-container"><h2>Distribuição de Risco {% if is_monthly_view %}(Clientes do Mês){% else %}(Visão Geral){% endif %}</h2><canvas id="graficoRisco"></canvas></div>
+                <div class="chart-container chart-container-seller"> <h2>Títulos Atrasados por Vendedor {% if is_monthly_view %}(Mês Selecionado){% else %}(Visão Geral){% endif %}</h2>
+                    <canvas id="graficoVendedorAtraso"></canvas>
+                </div>
+
             </div>
-
-            <div class="chart-container">
-                <h2>Contagem Mensal de Títulos Pagos com Atraso</h2>
-                <canvas id="graficoContagemAtrasados"></canvas>
-            </div>
-
-            <div class="chart-container">
-                <h2>Receita Mensal: Total vs Em Risco</h2>
-                <canvas id="graficoReceita"></canvas>
-            </div>
-
-             <div class="chart-container">
-                <h2>Distribuição de Risco (Clientes do Último Mês)</h2>
-                <canvas id="graficoRisco"></canvas>
-            </div>
+        {% else %}
+             <p class="no-data-message">Nenhum dado encontrado para o período selecionado ou a base está vazia.</p>
+             <p style="text-align:center; font-style: italic; color: #6c757d;">(Debug: NENHUM dado recebido para renderizar gráficos)</p>
+        {% endif %}
 
         </div>
 
-        <a href="{{ url_for('index') }}" class="back-link">Voltar ao Dashboard Principal</a>
-    </div>
-
     <script>
-        const labels = {{ labels | tojson }}; // Labels unificados por mês
+        // Dados do backend
+        const labels = {{ labels | default([]) | tojson }};
+        const isMonthlyView = {{ is_monthly_view | default(false) | tojson }};
+        const lineChartType = isMonthlyView ? 'bar' : 'line';
+        const valoresPontualidade = {{ valores_pontualidade | default([]) | tojson }};
+        const valoresAtrasoMedio = {{ valores_atraso_medio_titulos | default([]) | tojson }};
+        const valoresContagemAtrasados = {{ valores_contagem_atrasados | default([]) | tojson }};
+        const valoresReceita = {{ valores_receita | default([]) | tojson }};
+        const valoresReceitaRisco = {{ valores_receita_risco | default([]) | tojson }};
+        const labelsRisco = {{ labels_risco | default([]) | tojson }};
+        const valoresRisco = {{ valores_risco | default([0,0,0]) | tojson }};
+        const labelsVendedor = {{ labels_vendedor | default([]) | tojson }};
+        const valoresVendedorAtrasados = {{ valores_vendedor_atrasados | default([]) | tojson }};
 
-        // --- Gráfico 1: Pontualidade (Média dos Clientes) vs Atraso Médio (dos Títulos) ---
-        new Chart(document.getElementById('graficoPontualidadeAtraso'), {
-            type: 'line',
-            data: {
-                labels: labels,
-                datasets: [
-                    {
-                        label: 'Pontualidade Média (Clientes)',
-                        data: {{ valores_pontualidade | tojson }},
-                        borderColor: 'rgb(0, 123, 255)',
-                        backgroundColor: 'rgba(0, 123, 255, 0.1)',
-                        yAxisID: 'yPontualidade', // Eixo Y esquerdo para %
-                        tension: 0.1
-                    },
-                    {
-                        label: 'Atraso Médio (Títulos)',
-                        data: {{ valores_atraso_medio_titulos | tojson }},
-                        borderColor: 'rgb(255, 193, 7)',
-                        backgroundColor: 'rgba(255, 193, 7, 0.1)',
-                        yAxisID: 'yAtraso', // Eixo Y direito para dias
-                        tension: 0.1
-                    }
-                ]
-            },
-            options: {
-                scales: {
-                    yPontualidade: { // Eixo Y esquerdo
-                        type: 'linear',
-                        display: true,
-                        position: 'left',
-                         ticks: { callback: value => value + '%' }
-                    },
-                    yAtraso: { // Eixo Y direito
-                        type: 'linear',
-                        display: true,
-                        position: 'right',
-                        grid: { drawOnChartArea: false }, // Não desenhar grid para este eixo
-                        ticks: { callback: value => value + 'd' }
-                    }
-                }
+        // Função auxiliar para 'sem dados' (apenas loga e esconde)
+        function showNoData(canvasId, defaultTitle) {
+             console.warn(`showNoData chamado para ${canvasId}. Dados insuficientes.`);
+             const chartElement = document.getElementById(canvasId);
+             if (chartElement && chartElement.parentElement) {
+                 if (!chartElement.parentElement.querySelector('.no-data-message')) {
+                     const titleEl = chartElement.parentElement.querySelector('h2');
+                     const title = titleEl ? titleEl.outerHTML : `<h2>${defaultTitle}</h2>`;
+                     chartElement.remove(); // Remove o canvas
+                     chartElement.parentElement.innerHTML = title + '<p class="no-data-message" style="margin-top:1em;">Dados insuficientes para este período.</p>';
+                 }
+             } else {
+                 console.error(`showNoData: Elemento ou pai não encontrado para canvas ${canvasId}`);
+             }
+         }
+
+        console.log("--- Iniciando renderização dos gráficos ---");
+
+        // --- Gráfico 1: Pontualidade Média ---
+        try {
+            const canvas1 = document.getElementById('graficoPontualidade');
+            if (canvas1 && valoresPontualidade.length > 0) {
+                new Chart(canvas1, { type: lineChartType, data: { labels: labels, datasets: [{ label: 'Pontualidade Média (%)', data: valoresPontualidade, borderColor: 'rgb(0, 123, 255)', backgroundColor: lineChartType === 'line' ? 'rgba(0, 123, 255, 0.1)' : 'rgba(0, 123, 255, 0.7)', fill: lineChartType === 'line', tension: 0.2 }] }, options: { scales: { y: { beginAtZero: false, ticks: { callback: value => value + '%' } } } } });
+            } else if (canvas1) { 
+                console.warn("Sem dados para Gráfico 1 (Pontualidade)"); 
+                canvas1.style.display='none'; 
+                canvas1.parentElement.querySelector('h2').style.display='none';
             }
-        });
+        } catch(e) { console.error("Erro ao renderizar Gráfico 1 (Pontualidade):", e); }
 
-        // --- Gráfico 2: Contagem Títulos Atrasados ---
-        new Chart(document.getElementById('graficoContagemAtrasados'), {
-            type: 'bar',
-            data: {
-                labels: labels,
-                datasets: [{
-                    label: 'Títulos Pagos Atrasados',
-                    data: {{ valores_contagem_atrasados | tojson }},
-                    backgroundColor: 'rgb(220, 53, 69)'
-                }]
-            },
-            options: { scales: { y: { beginAtZero: true } } }
-        });
-
-        // --- Gráfico 3: Receita Total vs Receita em Risco ---
-        new Chart(document.getElementById('graficoReceita'), {
-            type: 'bar', // Mudado para barras para melhor comparação
-            data: {
-                labels: labels,
-                datasets: [
-                    {
-                        label: 'Receita Total no Mês',
-                        data: {{ valores_receita | tojson }},
-                        backgroundColor: 'rgba(0, 123, 255, 0.7)'
-                    },
-                    {
-                        label: 'Receita em Risco no Mês',
-                        data: {{ valores_receita_risco | tojson }},
-                        backgroundColor: 'rgba(220, 53, 69, 0.7)'
-                    }
-                ]
-            },
-             options: { scales: { y: { beginAtZero: true } } }
-        });
-
-        // --- Gráfico 4: Distribuição de Risco (Pizza) ---
-        new Chart(document.getElementById('graficoRisco'), {
-            type: 'doughnut',
-            data: {
-                labels: {{ labels_risco | tojson }},
-                datasets: [{
-                    label: 'Contagem de Clientes (Último Mês)',
-                    data: {{ valores_risco | tojson }},
-                    backgroundColor: [
-                        'rgb(40, 167, 69)',  // Baixo
-                        'rgb(255, 193, 7)', // Médio
-                        'rgb(220, 53, 69)'  // Alto
-                    ]
-                }]
+        // --- Gráfico 2: Atraso Médio ---
+        try {
+            const canvas2 = document.getElementById('graficoAtrasoMedio');
+            if (canvas2 && valoresAtrasoMedio.length > 0) {
+                new Chart(canvas2, { type: lineChartType, data: { labels: labels, datasets: [{ label: 'Atraso Médio (dias)', data: valoresAtrasoMedio, borderColor: 'rgb(255, 193, 7)', backgroundColor: lineChartType === 'line' ? 'rgba(255, 193, 7, 0.1)' : 'rgba(255, 193, 7, 0.7)', fill: lineChartType === 'line', tension: 0.2 }] }, options: { scales: { y: { beginAtZero: true, ticks: { callback: value => value + 'd' } } } } });
+            } else if (canvas2) { 
+                console.warn("Sem dados para Gráfico 2 (Atraso Médio)"); 
+                canvas2.style.display='none';
+                canvas2.parentElement.querySelector('h2').style.display='none';
             }
-        });
+        } catch(e) { console.error("Erro ao renderizar Gráfico 2 (Atraso Médio):", e); }
+
+        // --- Gráfico 3: Contagem Títulos Atrasados ---
+        try {
+            const canvas3 = document.getElementById('graficoContagemAtrasados');
+            if (canvas3 && valoresContagemAtrasados.length > 0) {
+                new Chart(canvas3, { type: 'bar', data: { labels: labels, datasets: [{ label: 'Títulos Pagos Atrasados', data: valoresContagemAtrasados, backgroundColor: 'rgb(220, 53, 69)' }] }, options: { scales: { y: { beginAtZero: true } } } });
+            } else if (canvas3) { 
+                console.warn("Sem dados para Gráfico 3 (Contagem Atraso)"); 
+                canvas3.style.display='none';
+                canvas3.parentElement.querySelector('h2').style.display='none';
+            }
+        } catch(e) { console.error("Erro ao renderizar Gráfico 3 (Contagem Atraso):", e); }
+
+        // --- Gráfico 4: Receita Total vs Receita em Risco ---
+        try {
+            const canvas4 = document.getElementById('graficoReceita');
+            if (canvas4 && valoresReceita.length > 0) {
+                new Chart(canvas4, { type: 'bar', data: { labels: labels, datasets: [ { label: 'Receita Total', data: valoresReceita, backgroundColor: 'rgba(0, 123, 255, 0.7)' }, { label: 'Receita em Risco', data: valoresReceitaRisco, backgroundColor: 'rgba(220, 53, 69, 0.7)' } ] }, options: { scales: { y: { beginAtZero: true } } } });
+            } else if (canvas4) { 
+                console.warn("Sem dados para Gráfico 4 (Receita)"); 
+                canvas4.style.display='none';
+                canvas4.parentElement.querySelector('h2').style.display='none';
+            }
+        } catch(e) { console.error("Erro ao renderizar Gráfico 4 (Receita):", e); }
+
+        // --- Gráfico 5: Distribuição de Risco (Pizza) ---
+        try {
+            const canvas5 = document.getElementById('graficoRisco');
+            if (canvas5 && valoresRisco.some(v => v > 0)) {
+                new Chart(canvas5, { type: 'doughnut', data: { labels: labelsRisco, datasets: [{ label: 'Clientes', data: valoresRisco, backgroundColor: [ 'rgb(40, 167, 69)', 'rgb(255, 193, 7)', 'rgb(220, 53, 69)' ] }] }, options: { plugins: { legend: { position: 'top' } } } });
+            } else if (canvas5) { 
+                console.warn("Sem dados para Gráfico 5 (Risco)"); 
+                canvas5.style.display='none';
+                canvas5.parentElement.querySelector('h2').style.display='none';
+            }
+        } catch(e) { console.error("Erro ao renderizar Gráfico 5 (Risco):", e); }
+
+        // --- Gráfico 6: Vendedor Atraso ---
+        try {
+            const canvas6 = document.getElementById('graficoVendedorAtraso');
+            console.log("Graf 6 - Vendedor - Canvas?", !!canvas6, "Labels:", labelsVendedor.length, "Valores:", valoresVendedorAtrasados.length); // Debug extra
+            if (canvas6 && valoresVendedorAtrasados.length > 0) {
+                new Chart(canvas6, {
+                    type: 'bar',
+                    data: { labels: labelsVendedor, datasets: [{ label: 'Títulos Atrasados', data: valoresVendedorAtrasados, backgroundColor: 'rgba(111, 66, 193, 0.7)', borderColor: 'rgba(111, 66, 193, 1)', borderWidth: 1, grouped: false }] },
+                    options: {
+                        indexAxis: 'y',
+                        responsive: true,
+                        maintainAspectRatio: false, // ESSENCIAL para usar altura do CSS
+                        scales: { x: { beginAtZero: true, stacked: false }, y: { ticks: { autoSkip: false }, stacked: false } },
+                        plugins: {
+                             legend: { display: false },
+                             tooltip: { mode: 'nearest', axis: 'y', intersect: true, callbacks: { title: function(context) { return context[0]?.label || ''; }, label: function(context) { let valor = context.raw; let labelDataset = context.dataset.label || ''; return `${labelDataset}: ${valor}`; } } }
+                        }
+                    }
+                });
+            } else if (canvas6) { 
+                console.warn("Sem dados para Gráfico 6 (Vendedor)"); 
+                canvas6.style.display='none';
+                canvas6.parentElement.querySelector('h2').style.display='none';
+            }
+        } catch(e) { console.error("Erro ao renderizar Gráfico 6 (Vendedor):", e); }
+
+
+        console.log("--- Renderização dos gráficos concluída ---");
     </script>
 </body>
 </html>

@@ -368,7 +368,8 @@ def get_data():
         default_vendedores = []
 
         if current_user.role == 'admin':
-            default_vendedores = ['MARCELO', 'EVERTON', 'MARCOS', 'PEDRO', 'RODOLFO', 'SILVANA', 'THYAGO', 'TIAGO', 'LUIZ', 'TONINHO'] # TONINHO adicionado
+            # --- MUDANÇA AQUI: Adicionado 'ALEX' ---
+            default_vendedores = ['MARCELO', 'EVERTON', 'MARCOS', 'PEDRO', 'RODOLFO', 'SILVANA', 'THYAGO', 'TIAGO', 'LUIZ', 'TONINHO', 'ALEX']
             vendedores_selecionados = vendedores_filter_req if vendedores_filter_req else default_vendedores
             vendedores_para_carteira_list = vendedores_selecionados
 
@@ -472,21 +473,17 @@ def get_data():
         cur.execute(f"SELECT fabricante, SUM(valor) as total FROM public.vendas {focus_where_clause} GROUP BY fabricante ORDER BY total DESC;", tuple(focus_params))
         results['focusManufacturers'] = [{col.name: float(val) if isinstance(val, Decimal) else val for col, val in zip(cur.description, row)} for row in cur.fetchall()]
 
-        # --- NOVA QUERY: Fabricantes Foco - Positivação (Contagem de Clientes) ---
-        # Reutiliza focus_where_clause e focus_params
+        # Fabricantes Foco - Positivação (Contagem de Clientes)
         query_focus_positivacao = f"""
             SELECT fabricante, COUNT(DISTINCT cliente) as total_clientes
             FROM public.vendas {focus_where_clause}
             GROUP BY fabricante ORDER BY total_clientes DESC;
         """
         cur.execute(query_focus_positivacao, tuple(focus_params))
-        # Armazena em uma nova chave no results
         results['focusManufacturersPositivacao'] = [
-            # Converte total_clientes para int explicitamente
             {col.name: int(val) if col.name == 'total_clientes' else val for col, val in zip(cur.description, row)}
             for row in cur.fetchall()
         ]
-        # --- FIM DA NOVA QUERY ---
 
 
         # --- Lógica de Metas ---
@@ -547,22 +544,15 @@ def get_data():
         cur.execute("SELECT 1 FROM public.carteira WHERE mes = %s AND vendedor = 'LOJA' LIMIT 1;", (month_filter,))
         if cur.fetchone() is not None:
             if 'LOJA' not in all_vendors: all_vendors.append('LOJA'); all_vendors.sort()
-        # Adiciona TONINHO ao filtro se ele não estiver nas vendas, mas tiver carteira
-        cur.execute("SELECT 1 FROM public.carteira WHERE mes = %s AND vendedor = 'TONINHO' LIMIT 1;", (month_filter,))
-        if cur.fetchone() is not None:
-            if 'TONINHO' not in all_vendors: all_vendors.append('TONINHO'); all_vendors.sort()
+        # Adiciona TONINHO e ALEX ao filtro se eles não estiverem nas vendas, mas tiverem carteira
+        for v in ['TONINHO', 'ALEX']:
+            cur.execute("SELECT 1 FROM public.carteira WHERE mes = %s AND vendedor = %s LIMIT 1;", (month_filter, v))
+            if cur.fetchone() is not None:
+                if v not in all_vendors: all_vendors.append(v); all_vendors.sort()
 
         results['allVendors'] = all_vendors
         cur.close()
         return jsonify(results)
-    except IndexError as ie:
-        app.logger.error(f"Erro de índice (provavelmente parâmetros vs placeholders): {ie}", exc_info=True)
-        try:
-             app.logger.error(f"Query Bruta (Metas): {query_metas}")
-             app.logger.error(f"Parâmetros Tentados (Metas): {params_query_metas}")
-             app.logger.error(f"Params Metas Carteira Base: {params_metas_carteira}")
-        except Exception as log_e: app.logger.error(f"Erro ao logar query/params para IndexError: {log_e}")
-        return jsonify({"message": f"Erro interno: Descompasso query/parâmetros ({str(ie)})"}), 500
     except Exception as e:
         app.logger.error(f"Erro crítico na função get_data: {e}", exc_info=True)
         return jsonify({"message": f"Erro interno: {str(e)}"}), 500

@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Histórico - {{ nome_cliente if nome_cliente else 'Cliente' }}</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { font-family: system-ui, sans-serif; padding: 2em; background-color: #f8f9fa; }
+        .container { max-width: 900px; margin: 0 auto; }
+        h1 { color: #0056b3; text-align: center; margin-bottom: 1em; }
+        .search-form { text-align: center; margin-bottom: 2em; background-color: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); display: flex; gap: 15px; align-items: flex-end; justify-content: center; }
+        .filter-group { display: flex; flex-direction: column; align-items: flex-start; }
+        .filter-group label { font-weight: 600; margin-bottom: 5px; color: #495057; font-size: 0.9em;}
+        .search-form input[type="text"] { padding: 10px 15px; border: 1px solid #ced4da; border-radius: 4px; font-size: 1rem; }
+        .search-form button { padding: 10px 20px; border: none; background-color: #007bff; color: white; border-radius: 4px; font-size: 1rem; cursor: pointer; height: 40px; }
+        .search-form button:hover { background-color: #0056b3; }
+        .client-info { text-align: center; margin-bottom: 2em; }
+        .client-info h2 { color: #0056b3; margin-bottom: 0.2em; }
+        .client-info h3 { color: #6c757d; font-weight: normal; margin-top: 0; }
+        .chart-container { background-color: #fff; padding: 2em; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-top: 2em; }
+        h2.chart-title { margin-top: 0; color: #495057; font-size: 1.2em; text-align: center; margin-bottom: 1.5em;}
+        .back-link { display: block; text-align: center; margin-top: 2em; font-size: 1.1em; }
+        .message { margin-top: 1em; margin-bottom: 1em; padding: 10px; border-radius: 5px; text-align: center; }
+        .message.error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c2c7;}
+        .message.info { background-color: #cff4fc; color: #055160; border: 1px solid #b6effb;}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Histórico do Cliente</h1>
+
+        <form method="GET" action="{{ url_for('historico_cliente') }}" class="search-form">
+            <div class="filter-group">
+                <label for="busca_codigo">Buscar por Código:</label>
+                <input type="text" name="busca_codigo" id="busca_codigo" value="{{ busca_codigo if busca_codigo else '' }}">
+            </div>
+             <div class="filter-group">
+                <label for="busca_nome">Buscar por Nome:</label>
+                <input type="text" name="busca_nome" id="busca_nome" value="{{ busca_nome if busca_nome else '' }}">
+            </div>
+            <button type="submit">Buscar</button>
+        </form>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="message {{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        {% if cliente %}
+            <div class="client-info">
+                <h2>{{ nome_cliente }}</h2>
+                <h3>Código: {{ codigo_cliente }}</h3>
+            </div>
+
+            {% if labels_atraso %}
+                <div class="chart-container">
+                    <h2 class="chart-title">Evolução do Atraso Médio por Mês de Pagamento</h2>
+                    <canvas id="graficoEvolucaoAtraso"></canvas>
+                </div>
+            {% else %}
+                 <p style="text-align: center; color: #6c757d;">Nenhum histórico de pagamento encontrado para este cliente.</p>
+            {% endif %} {# Fim do if labels_atraso #}
+
+        {% elif (busca_codigo or busca_nome) and not get_flashed_messages() %}
+             <p style="text-align: center; color: #6c757d;">Nenhum cliente encontrado para os critérios fornecidos.</p>
+        {% endif %} {# Fim do if cliente #}
+
+
+        <a href="{{ url_for('index') }}" class="back-link">Voltar ao Dashboard Principal</a>
+    </div>
+
+    <script>
+        // ✅ Script usa as variáveis corretas: labels_atraso e valores_atraso
+        const labelsAtraso = {{ labels_atraso | default([]) | tojson }};
+        const valoresAtraso = {{ valores_atraso | default([]) | tojson }};
+        const chartElement = document.getElementById('graficoEvolucaoAtraso');
+
+        // Só executa se o canvas existir E houver dados
+        if (chartElement && labelsAtraso.length > 0) {
+            new Chart(chartElement, {
+                type: 'line',
+                data: {
+                    labels: labelsAtraso, // Meses YYYY-MM
+                    datasets: [{
+                        label: 'Atraso Médio (dias)',
+                        data: valoresAtraso,
+                        borderColor: 'rgb(255, 193, 7)', // Amarelo para atraso
+                        backgroundColor: 'rgba(255, 193, 7, 0.1)',
+                        fill: true,
+                        tension: 0.2
+                    }]
+                },
+                options: {
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: { display: true, text: 'Dias de Atraso Médio (Títulos Atrasados)' },
+                            ticks: { callback: value => value + 'd' }
+                        },
+                        x: {
+                             title: { display: true, text: 'Mês de Pagamento' }
+                        }
+                    },
+                     plugins: {
+                         legend: { display: true, position: 'top' }
+                    }
+                }
+            });
+        }
+        // Não precisa de 'else' aqui, a mensagem HTML já trata o caso sem dados
+    </script>
+</body>
+</html>
