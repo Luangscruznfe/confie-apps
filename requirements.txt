@@ -16,3 +16,4 @@ SQLAlchemy
 cloudinary
 PyMuPDF
 requests
+dash-ag-grid
