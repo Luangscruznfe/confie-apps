@@ -1,5 +1,6 @@
 Flask
 flask_login
+flask-sqlalchemy
 Werkzeug
 psycopg2-binary
 pandas
