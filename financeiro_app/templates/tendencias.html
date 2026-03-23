@@ -49,7 +49,7 @@
     <div class="container">
         <h1>Análise de Tendências {% if is_monthly_view %} - {{ selected_month }}{% else %} - Geral{% endif %}</h1>
 
-        <a href="{{ url_for('index') }}" class="back-link">Voltar ao Dashboard Principal</a>
+        <a href="{{ url_for('index_liquidados') }}" class="back-link">Voltar ao Dashboard Principal</a>
 
         <form method="GET" action="{{ url_for('tendencias') }}" class="filter-form">
             </form>

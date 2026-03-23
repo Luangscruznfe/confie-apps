@@ -1,0 +1,124 @@
+/* financeiro_app/assets/style.css */
+
+/* --- Fontes e Ícones (Importados no app.py, mas bom ter aqui) --- */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+@import url("https://use.fontawesome.com/releases/v6.4.2/css/all.css");
+
+/* --- Estilo Base (Corpo) --- */
+body, html {
+    font-family: 'Inter', sans-serif;
+    margin: 0;
+    padding: 0;
+}
+
+/* O 'root' do Dash onde o conteúdo da página é renderizado */
+#page-content-financeiro {
+    /* O degradê que você pediu */
+    background: linear-gradient(135deg, #e9f2f7 0%, #fefefe 100%);
+    min-height: 100vh; /* Garante que o degradê cubra a tela toda */
+    padding-top: 80px;  /* Espaço para o Navbar fixo */
+    padding-bottom: 2rem;
+}
+
+/* --- Navbar (Cabeçalho) --- */
+/* Esta é a classe que o app.py usa! */
+.custom-navbar {
+    background-color: #ffffff;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+    height: 70px;
+    padding: 0 1rem;
+    font-weight: 600;
+    font-size: 1.25rem;
+    color: #003366; /* Um tom de azul escuro */
+}
+
+.custom-navbar .navbar-brand img {
+    height: 40px; /* Ajuste a altura do seu logo */
+    margin-right: 10px;
+}
+
+/* --- Títulos --- */
+.page-title {
+    font-weight: 700;
+    color: #003366;
+    text-align: center;
+    margin-top: 2rem;
+    margin-bottom: 1rem;
+}
+
+.page-subtitle {
+    font-weight: 400;
+    color: #555;
+    text-align: center;
+    margin-bottom: 3rem;
+    font-size: 1.1rem;
+}
+
+/* --- Cartões de Navegação (Home) --- */
+/* Esta é a classe que o app.py usa! */
+.nav-card {
+    border-radius: 20px; /* Bordas arredondadas */
+    border: none;
+    box-shadow: 0 8px 15px rgba(0,0,0,0.07); /* Sombra suave */
+    transition: all 0.3s ease; /* Animação */
+    display: flex;
+    flex-direction: column;
+    height: 100%; /* Faz os cards terem a mesma altura */
+    background-color: #fff; /* Garante fundo branco */
+}
+
+/* Animação de Hover */
+.nav-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 20px rgba(0,0,0,0.12);
+}
+
+.nav-card .card-body {
+    padding: 2rem;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    flex-grow: 1;
+}
+
+.nav-card .icon-container {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+}
+
+/* Cores dos Ícones (Classes do app.py) */
+.icon-cr { color: #28a745; } /* Verde - Contas a Receber */
+.icon-liq { color: #007bff; } /* Azul - Liquidados */
+.icon-cp { color: #fd7e14; } /* Laranja - Contas a Pagar */
+
+.nav-card .card-title {
+    font-weight: 600;
+    font-size: 1.5rem;
+    margin-bottom: 0.5rem;
+    color: #003366;
+}
+
+.nav-card .card-text {
+    color: #6c757d;
+    font-size: 1rem;
+    flex-grow: 1; /* Empurra o botão para baixo */
+    margin-bottom: 1.5rem;
+}
+
+.nav-card .btn {
+    font-weight: 600;
+    border-radius: 30px; /* Botões arredondados */
+    padding: 0.75rem 1.5rem;
+}
+
+/* --- Estilos para as páginas internas (Liquidados, CR) --- */
+.content-container {
+    background-color: #ffffff;
+    padding: 2rem;
+    border-radius: 15px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.btn-voltar {
+    margin-bottom: 1.5rem;
+}

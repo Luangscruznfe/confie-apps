@@ -74,7 +74,7 @@
 
         <div id="uploadDrawer" class="upload-drawer hidden">
              <p>Envie o arquivo .xlsx para atualizar a base (um novo histórico será criado).</p>
-             <form method="post" enctype="multipart/form-data" action="{{ url_for('index') }}"> <input type="file" name="file" accept=".xlsx" required> <button type="submit" class="btn btn-upload-toggle" style="margin-left: 10px;">Enviar Arquivo</button> </form>
+             <form method="post" enctype="multipart/form-data" action="{{ url_for('index_liquidados') }}"> <input type="file" name="file" accept=".xlsx" required> <button type="submit" class="btn btn-upload-toggle" style="margin-left: 10px;">Enviar Arquivo</button> </form>
         </div>
 
         <div class="kpi-grid">
