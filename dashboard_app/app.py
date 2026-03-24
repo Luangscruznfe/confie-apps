@@ -555,38 +555,48 @@ def get_data():
             cur.execute(query_metas, params_query_metas)
             sales_goals_raw = [{col.name: val for col, val in zip(cur.description, row)} for row in cur.fetchall()]
 
-            # --- NOVO BLOCO DE CÁLCULO INDIVIDUAL ---
+            # --- BLOCO DE CÁLCULO RESTAURADO (PROPORÇÃO DO MÊS) ---
             total_projecao_acumulada = 0
+            hoje = datetime.now()
             
+            # Pega o dia atual (ex: 23). Se o mês filtrado já passou, usa o último dia dele.
+            analysis_year, analysis_month = map(int, month_filter.split('-'))
+            if hoje.year == analysis_year and hoje.month == analysis_month:
+                dia_atual_progresso = hoje.day
+            else:
+                dia_atual_progresso = calendar.monthrange(analysis_year, analysis_month)[1]
+
             for row in sales_goals_raw:
                 meta = float(row.get('meta') or 0)
                 atual = float(row.get('atual') or 0)
-                dias_p = int(row.get('dias_p') or 0) # Dias que ele realmente faturou
-                dias_t = int(row.get('dias_t') or 0) # Dias que você pos na planilha
+                dias_t = int(row.get('dias_t') or 0) # Os 22 ou 26 da sua planilha
                 
                 row['meta'], row['atual'] = meta, atual
                 row['percentual'] = (atual / meta) * 100 if meta > 0 else 0.0
                 
-                # Projeção individual: velocidade real x capacidade do mês
-                if dias_p > 0 and dias_t > 0:
-                    proj_vendedor = (atual / dias_p) * dias_t
+                # Projeção baseada no progresso real do mês corrido (Igual ao seu backup)
+                if dia_atual_progresso > 0:
+                    proj_vendedor = (atual / dia_atual_progresso) * dias_t
                 else:
-                    proj_vendedor = atual # Se não tem dia útil definido, mantém o atual
+                    proj_vendedor = atual
                 
                 row['projecao'] = proj_vendedor
-                total_projecao_acumulada += proj_vendedor # Soma para o KPI geral
+                total_projecao_acumulada += proj_vendedor
                 
-                # Venda diária necessária para bater a meta
-                restante = meta - atual
-                dias_restantes = dias_t - dias_p
-                if dias_restantes > 0 and restante > 0:
-                    row['venda_diaria'] = restante / dias_restantes
+                # Venda diária necessária baseada nos dias que faltam na planilha
+                # Usamos uma estimativa de dias passados proporcional (dias_t * progresso_mensal)
+                progresso_mensal = dia_atual_progresso / calendar.monthrange(analysis_year, analysis_month)[1]
+                dias_passados_est = dias_t * progresso_mensal
+                dias_restantes = dias_t - dias_passados_est
+                
+                if dias_restantes > 0 and (meta - atual) > 0:
+                    row['venda_diaria'] = (meta - atual) / dias_restantes
                 else:
                     row['venda_diaria'] = 0.0
                 
                 sales_goals.append(row)
 
-            # Atualiza o KPI Geral do topo do Dashboard com a soma das projeções
+            # Atualiza o KPI Geral com a soma correta
             results['kpi']['projecaoFaturamento'] = total_projecao_acumulada
 
 
