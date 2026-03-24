@@ -481,7 +481,7 @@ def get_data():
 
 
         # Fabricantes Foco - Faturamento
-        fabricantes_foco = fabricantes_foco = ['SELMI', 'LUCKY', 'RICLAN', 'KELLANOVA', 'TAMPICO', 'CONSABOR', 'YAI', 'TECPOLPA', 'GOLDKO', 'RST']
+        fabricantes_foco = ['SELMI', 'LUCKY', 'RICLAN', 'KELLANOVA', 'TAMPICO', 'CONSABOR', 'YAI', 'TECPOLPA', 'GOLDKO', 'RST']
         focus_where_conditions = where_conditions_vendas.copy()
         focus_params = list(params_vendas)
         placeholders_foco = ','.join(['%s'] * len(fabricantes_foco))
@@ -556,37 +556,29 @@ def get_data():
             sales_goals_raw = [{col.name: val for col, val in zip(cur.description, row)} for row in cur.fetchall()]
 
             # --- NOVO BLOCO DE CÁLCULO INDIVIDUAL ---
-            total_projecao_somada = 0
+            total_projecao_acumulada = 0
             
             for row in sales_goals_raw:
                 meta = float(row.get('meta') or 0)
                 atual = float(row.get('atual') or 0)
-                dias_p_banco = int(row.get('dias_p') or 0) # Dias que ele faturou
-                dias_t_planilha = int(row.get('dias_t') or 0) # Dias uteis totais (20 ou 26)
-
-                # --- LÓGICA DE PROJEÇÃO DINÂMICA ---
-                # Se o vendedor (Marcelo) só operou 4 dias, dividimos por 4.
-                # Se a Loja operou 6 dias, dividimos por 6.
-                # Isso respeita o 'ritmo' individual de cada um.
+                dias_p = int(row.get('dias_p') or 0) # Dias que ele realmente faturou
+                dias_t = int(row.get('dias_t') or 0) # Dias que você pos na planilha
                 
-                divisor = dias_p_banco if dias_p_banco > 0 else 1
-                
-                # Cálculo da projeção baseada no ritmo real do vendedor
-                proj_vendedor = (atual / divisor) * dias_t_planilha
-                
-                # Caso o vendedor já tenha faturado mais que a projeção (raro), mantém o atual
-                if proj_vendedor < atual:
-                    proj_vendedor = atual
-
-                row['projecao'] = proj_vendedor
                 row['meta'], row['atual'] = meta, atual
                 row['percentual'] = (atual / meta) * 100 if meta > 0 else 0.0
                 
-                total_projecao_somada += proj_vendedor
+                # Projeção individual: velocidade real x capacidade do mês
+                if dias_p > 0 and dias_t > 0:
+                    proj_vendedor = (atual / dias_p) * dias_t
+                else:
+                    proj_vendedor = atual # Se não tem dia útil definido, mantém o atual
+                
+                row['projecao'] = proj_vendedor
+                total_projecao_acumulada += proj_vendedor # Soma para o KPI geral
                 
                 # Venda diária necessária para bater a meta
                 restante = meta - atual
-                dias_restantes = dias_t_planilha - dias_p_banco
+                dias_restantes = dias_t - dias_p
                 if dias_restantes > 0 and restante > 0:
                     row['venda_diaria'] = restante / dias_restantes
                 else:
@@ -594,8 +586,9 @@ def get_data():
                 
                 sales_goals.append(row)
 
-            # Atualiza o KPI Principal com a soma das projeções individuais
-            results['kpi']['projecaoFaturamento'] = total_projecao_somada
+            # Atualiza o KPI Geral do topo do Dashboard com a soma das projeções
+            results['kpi']['projecaoFaturamento'] = total_projecao_acumulada
+
 
         # Lista de vendedores para o filtro
         cur.execute("SELECT DISTINCT vendedor FROM public.vendas WHERE vendedor IS NOT NULL AND TRIM(vendedor) <> '' ORDER BY vendedor;")
