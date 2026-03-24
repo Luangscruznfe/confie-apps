@@ -481,7 +481,7 @@ def get_data():
 
 
         # Fabricantes Foco - Faturamento
-        fabricantes_foco = ['SELMI', 'LUCKY', 'RICLAN', 'KELLANOVA', 'TAMPICO', 'CONSABOR', 'YAI', 'TECPOLPA', 'GOLDKO', 'RST']
+        fabricantes_foco = ['SELMI', 'LUCKY', 'RICLAN', 'KELLANOVA', 'TAMPICO', 'CONSABOR', 'YAI', 'TECPOLPA', 'GOLDKO']
         focus_where_conditions = where_conditions_vendas.copy()
         focus_params = list(params_vendas)
         placeholders_foco = ','.join(['%s'] * len(fabricantes_foco))
@@ -555,49 +555,50 @@ def get_data():
             cur.execute(query_metas, params_query_metas)
             sales_goals_raw = [{col.name: val for col, val in zip(cur.description, row)} for row in cur.fetchall()]
 
-            # --- BLOCO DE CÁLCULO RESTAURADO (PROPORÇÃO DO MÊS) ---
+            # --- CÁLCULO DE METAS E PROJEÇÃO (RESTAURADO PARA 1.2M) ---
             total_projecao_acumulada = 0
             hoje = datetime.now()
             
-            # Pega o dia atual (ex: 23). Se o mês filtrado já passou, usa o último dia dele.
+            # Define o dia atual como divisor (Hoje é dia 23)
             analysis_year, analysis_month = map(int, month_filter.split('-'))
             if hoje.year == analysis_year and hoje.month == analysis_month:
-                dia_atual_progresso = hoje.day
+                dia_divisor = dias_uteis_passados
             else:
-                dia_atual_progresso = calendar.monthrange(analysis_year, analysis_month)[1]
+                dia_divisor = calendar.monthrange(analysis_year, analysis_month)[1]
 
             for row in sales_goals_raw:
                 meta = float(row.get('meta') or 0)
                 atual = float(row.get('atual') or 0)
-                dias_t = int(row.get('dias_t') or 0) # Os 22 ou 26 da sua planilha
+                
+                # Recupera dias_t da planilha; se estiver Vazio/Null, usa padrão 22 ou 26
+                vendedor_nome = row.get('vendedor', '').upper()
+                padrao_dias = 26 if 'LOJA' in vendedor_nome else 22
+                dias_t = int(row.get('dias_t') or padrao_dias)
                 
                 row['meta'], row['atual'] = meta, atual
                 row['percentual'] = (atual / meta) * 100 if meta > 0 else 0.0
                 
-                # Projeção baseada no progresso real do mês corrido (Igual ao seu backup)
-                if dia_atual_progresso > 0:
-                    proj_vendedor = (atual / dia_atual_progresso) * dias_t
+                # Lógica de Projeção: (Faturamento / 23 dias passados) * Dias Totais do Mês
+                if dia_divisor > 0:
+                    proj_vendedor = (atual / dia_divisor) * dias_t
                 else:
                     proj_vendedor = atual
                 
                 row['projecao'] = proj_vendedor
                 total_projecao_acumulada += proj_vendedor
                 
-                # Venda diária necessária baseada nos dias que faltam na planilha
-                # Usamos uma estimativa de dias passados proporcional (dias_t * progresso_mensal)
-                progresso_mensal = dia_atual_progresso / calendar.monthrange(analysis_year, analysis_month)[1]
-                dias_passados_est = dias_t * progresso_mensal
-                dias_restantes = dias_t - dias_passados_est
-                
-                if dias_restantes > 0 and (meta - atual) > 0:
+                # Venda diária necessária baseada nos dias que faltam (Estimativa)
+                dias_restantes = dias_t - (dias_t * (dia_divisor / 31))
+                if dias_restantes > 1 and (meta - atual) > 0:
                     row['venda_diaria'] = (meta - atual) / dias_restantes
                 else:
                     row['venda_diaria'] = 0.0
                 
                 sales_goals.append(row)
 
-            # Atualiza o KPI Geral com a soma correta
+            # Atualiza o KPI Geral
             results['kpi']['projecaoFaturamento'] = total_projecao_acumulada
+  
 
 
         # Lista de vendedores para o filtro
