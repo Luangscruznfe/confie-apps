@@ -463,7 +463,7 @@ def get_data():
 
 
         # Fabricantes Foco - Faturamento
-        fabricantes_foco = ['SELMI', 'LUCKY', 'RICLAN', 'KELLANOVA', 'TAMPICO', 'CONSABOR', 'YAI', 'TECPOLPA', 'GOLDKO']
+        fabricantes_foco = ['SELMI', 'LUCKY', 'RICLAN', 'KELLANOVA', 'TAMPICO', 'CONSABOR', 'YAI', 'TECPOLPA', 'GOLDKO', 'RST']
         focus_where_conditions = where_conditions_vendas.copy()
         focus_params = list(params_vendas)
         placeholders_foco = ','.join(['%s'] * len(fabricantes_foco))
