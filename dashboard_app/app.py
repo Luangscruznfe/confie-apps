@@ -224,51 +224,32 @@ def upload_data():
             execute_values(cur, sql_insert_sales, data_to_insert_sales, page_size=1000)
             app.logger.info(f"{len(data_to_insert_sales)} registros de vendas inseridos.")
 
-       # --- Processamento Carteira Resumo ---
+        # --- Processamento Carteira Resumo ---
         if not portfolio_file.filename.endswith('.csv'):
              raise ValueError("Formato de ficheiro de carteira (resumo) inválido. Use .csv")
         portfolio_file.stream.seek(0)
         portfolio_df = pd.read_csv(portfolio_file.stream, sep=';', encoding='latin1')
         first_col_name = portfolio_df.columns[0]
-
         if ';' in first_col_name:
             split_data = portfolio_df[first_col_name].str.split(';', n=1, expand=True)
             portfolio_df['vendedor'], portfolio_df['total_clientes'] = split_data[0].str.strip('" '), split_data[1].str.strip('" ')
-            # Ajuste para renomear incluindo a nova coluna de Dias Úteis
-            portfolio_df.rename(columns={
-                portfolio_df.columns[1]: 'total_produtos', 
-                portfolio_df.columns[2]: 'meta_faturamento',
-                portfolio_df.columns[3]: 'dias_uteis' # <--- NOVO: Pegando a 4ª coluna (índice 3)
-            }, inplace=True)
-            portfolio_df = portfolio_df[['vendedor', 'total_clientes', 'total_produtos', 'meta_faturamento', 'dias_uteis']] # <--- NOVO
+            portfolio_df.rename(columns={portfolio_df.columns[1]: 'total_produtos', portfolio_df.columns[2]: 'meta_faturamento'}, inplace=True)
+            portfolio_df = portfolio_df[['vendedor', 'total_clientes', 'total_produtos', 'meta_faturamento']]
         else:
-            portfolio_df.rename(columns={
-                portfolio_df.columns[0]: 'vendedor', 
-                portfolio_df.columns[1]: 'total_clientes', 
-                portfolio_df.columns[2]: 'total_produtos', 
-                portfolio_df.columns[3]: 'meta_faturamento',
-                portfolio_df.columns[4]: 'dias_uteis' # <--- NOVO: Pegando a 5ª coluna (índice 4)
-            }, inplace=True)
-
-        # Incluímos 'dias_uteis' no tratamento de números
-        for col in ['total_clientes', 'total_produtos', 'meta_faturamento', 'dias_uteis']: # <--- NOVO
-            if col in portfolio_df.columns and portfolio_df[col].dtype == 'object':
+            portfolio_df.rename(columns={portfolio_df.columns[0]: 'vendedor', portfolio_df.columns[1]: 'total_clientes', portfolio_df.columns[2]: 'total_produtos', portfolio_df.columns[3]: 'meta_faturamento'}, inplace=True)
+        for col in ['total_clientes', 'total_produtos', 'meta_faturamento']:
+            if portfolio_df[col].dtype == 'object':
                  portfolio_df[col] = portfolio_df[col].astype(str).str.replace(r'[^\d,.]', '', regex=True).str.replace(',', '.')
             portfolio_df[col] = pd.to_numeric(portfolio_df[col], errors='coerce')
-
         portfolio_df.dropna(subset=['vendedor'], inplace=True)
         portfolio_df['vendedor'] = portfolio_df['vendedor'].astype(str).str.strip().str.upper()
         portfolio_df['mes'] = upload_month
         df_for_db_portfolio = portfolio_df.astype(object).where(pd.notnull(portfolio_df), None)
-
         with conn.cursor() as cur:
             app.logger.info(f"Deletando carteira (resumo) do mês {upload_month}...")
             cur.execute("DELETE FROM public.carteira WHERE mes = %s", (upload_month,))
             app.logger.info("Inserindo nova carteira (resumo)...")
-            
-            # ADICIONADO dias_uteis no INSERT abaixo:
-            sql_insert_portfolio = "INSERT INTO public.carteira (vendedor, total_clientes, total_produtos, meta_faturamento, dias_uteis, mes) VALUES %s" # <--- NOVO
-            
+            sql_insert_portfolio = "INSERT INTO public.carteira (vendedor, total_clientes, total_produtos, meta_faturamento, mes) VALUES %s"
             execute_values(cur, sql_insert_portfolio, [tuple(row) for row in df_for_db_portfolio.itertuples(index=False)])
             app.logger.info(f"{len(df_for_db_portfolio)} registros de carteira (resumo) inseridos.")
 
@@ -387,7 +368,8 @@ def get_data():
         default_vendedores = []
 
         if current_user.role == 'admin':
-            default_vendedores = ['MARCELO', 'EVERTON', 'MARCOS', 'PEDRO', 'RODOLFO', 'SILVANA', 'THYAGO', 'TIAGO', 'LUIZ', 'TONINHO'] # TONINHO adicionado
+            # --- MUDANÇA AQUI: Adicionado 'ALEX' ---
+            default_vendedores = ['MARCELO', 'EVERTON', 'MARCOS', 'PEDRO', 'RODOLFO', 'SILVANA', 'THYAGO', 'TIAGO', 'LUIZ', 'TONINHO', 'ALEX']
             vendedores_selecionados = vendedores_filter_req if vendedores_filter_req else default_vendedores
             vendedores_para_carteira_list = vendedores_selecionados
 
@@ -491,21 +473,17 @@ def get_data():
         cur.execute(f"SELECT fabricante, SUM(valor) as total FROM public.vendas {focus_where_clause} GROUP BY fabricante ORDER BY total DESC;", tuple(focus_params))
         results['focusManufacturers'] = [{col.name: float(val) if isinstance(val, Decimal) else val for col, val in zip(cur.description, row)} for row in cur.fetchall()]
 
-        # --- NOVA QUERY: Fabricantes Foco - Positivação (Contagem de Clientes) ---
-        # Reutiliza focus_where_clause e focus_params
+        # Fabricantes Foco - Positivação (Contagem de Clientes)
         query_focus_positivacao = f"""
             SELECT fabricante, COUNT(DISTINCT cliente) as total_clientes
             FROM public.vendas {focus_where_clause}
             GROUP BY fabricante ORDER BY total_clientes DESC;
         """
         cur.execute(query_focus_positivacao, tuple(focus_params))
-        # Armazena em uma nova chave no results
         results['focusManufacturersPositivacao'] = [
-            # Converte total_clientes para int explicitamente
             {col.name: int(val) if col.name == 'total_clientes' else val for col, val in zip(cur.description, row)}
             for row in cur.fetchall()
         ]
-        # --- FIM DA NOVA QUERY ---
 
 
         # --- Lógica de Metas ---
@@ -529,24 +507,16 @@ def get_data():
             safe_vendedores_loja_sql = ["'" + v.replace("'", "''") + "'" for v in vendedores_loja_set]
             query_metas = f"""
                 WITH VendasIndividuais AS (
-                    SELECT vendedor, 
-                           SUM(valor) as faturamento_atual,
-                           COUNT(DISTINCT data_venda) as dias_trabalhados -- CONTA OS DIAS REAIS
+                    SELECT vendedor, SUM(valor) as faturamento_atual
                     FROM public.vendas WHERE TO_CHAR(data_venda, 'YYYY-MM') = %s GROUP BY vendedor
                 ), VendasLoja AS (
-                    SELECT 'LOJA' as vendedor, 
-                           COALESCE(SUM(valor), 0) as faturamento_atual,
-                           COUNT(DISTINCT data_venda) as dias_trabalhados
+                    SELECT 'LOJA' as vendedor, COALESCE(SUM(valor), 0) as faturamento_atual
                     FROM public.vendas WHERE TO_CHAR(data_venda, 'YYYY-MM') = %s AND vendedor IN ({','.join(safe_vendedores_loja_sql)})
                 ), VendasCombinadas AS (
-                    SELECT vendedor, faturamento_atual, dias_trabalhados FROM VendasIndividuais WHERE vendedor <> 'LOJA'
-                    UNION ALL SELECT vendedor, faturamento_atual, dias_trabalhados FROM VendasLoja
+                    SELECT vendedor, faturamento_atual FROM VendasIndividuais WHERE vendedor <> 'LOJA'
+                    UNION ALL SELECT vendedor, faturamento_atual FROM VendasLoja
                 )
-                SELECT c.vendedor, 
-                       c.meta_faturamento as meta, 
-                       COALESCE(vc.faturamento_atual, 0) as atual,
-                       COALESCE(vc.dias_trabalhados, 0) as dias_p, -- DIAS QUE TRABALHOU
-                       COALESCE(c.dias_uteis, 0) as dias_t      -- DIAS ÚTEIS DA PLANILHA
+                SELECT c.vendedor, c.meta_faturamento as meta, COALESCE(vc.faturamento_atual, 0) as atual
                 FROM public.carteira c LEFT JOIN VendasCombinadas vc ON c.vendedor = vc.vendedor
                 {where_metas_carteira};
             """
@@ -555,50 +525,17 @@ def get_data():
             cur.execute(query_metas, params_query_metas)
             sales_goals_raw = [{col.name: val for col, val in zip(cur.description, row)} for row in cur.fetchall()]
 
-            # --- CÁLCULO DE METAS E PROJEÇÃO (RESTAURADO PARA 1.2M) ---
-            total_projecao_acumulada = 0
-            hoje = datetime.now()
-            
-            # Define o dia atual como divisor (Hoje é dia 23)
-            analysis_year, analysis_month = map(int, month_filter.split('-'))
-            if hoje.year == analysis_year and hoje.month == analysis_month:
-                dia_divisor = dias_uteis_passados
-            else:
-                dia_divisor = calendar.monthrange(analysis_year, analysis_month)[1]
-
             for row in sales_goals_raw:
-                meta = float(row.get('meta') or 0)
-                atual = float(row.get('atual') or 0)
-                
-                # Recupera dias_t da planilha; se estiver Vazio/Null, usa padrão 22 ou 26
-                vendedor_nome = row.get('vendedor', '').upper()
-                padrao_dias = 26 if 'LOJA' in vendedor_nome else 22
-                dias_t = int(row.get('dias_t') or padrao_dias)
-                
+                meta = float(row.get('meta') or 0); atual = float(row.get('atual') or 0)
                 row['meta'], row['atual'] = meta, atual
                 row['percentual'] = (atual / meta) * 100 if meta > 0 else 0.0
-                
-                # Lógica de Projeção: (Faturamento / 23 dias passados) * Dias Totais do Mês
-                if dia_divisor > 0:
-                    proj_vendedor = (atual / dia_divisor) * dias_t
-                else:
-                    proj_vendedor = atual
-                
-                row['projecao'] = proj_vendedor
-                total_projecao_acumulada += proj_vendedor
-                
-                # Venda diária necessária baseada nos dias que faltam (Estimativa)
-                dias_restantes = dias_t - (dias_t * (dia_divisor / 31))
-                if dias_restantes > 1 and (meta - atual) > 0:
-                    row['venda_diaria'] = (meta - atual) / dias_restantes
-                else:
-                    row['venda_diaria'] = 0.0
-                
+                restante = meta - atual
+                dias_restantes = total_dias_uteis_mes - dias_uteis_passados
+                row['venda_diaria'] = (restante / dias_restantes) if dias_restantes > 0 and restante > 0 else 0.0
+                row['projecao'] = (atual / dias_uteis_passados) * total_dias_uteis_mes if dias_uteis_passados > 0 else 0.0
                 sales_goals.append(row)
 
-            # Atualiza o KPI Geral
-            results['kpi']['projecaoFaturamento'] = total_projecao_acumulada
-  
+        results['salesGoals'] = sorted(sales_goals, key=lambda x: x.get('percentual', 0), reverse=True)
 
 
         # Lista de vendedores para o filtro
@@ -607,22 +544,15 @@ def get_data():
         cur.execute("SELECT 1 FROM public.carteira WHERE mes = %s AND vendedor = 'LOJA' LIMIT 1;", (month_filter,))
         if cur.fetchone() is not None:
             if 'LOJA' not in all_vendors: all_vendors.append('LOJA'); all_vendors.sort()
-        # Adiciona TONINHO ao filtro se ele não estiver nas vendas, mas tiver carteira
-        cur.execute("SELECT 1 FROM public.carteira WHERE mes = %s AND vendedor = 'TONINHO' LIMIT 1;", (month_filter,))
-        if cur.fetchone() is not None:
-            if 'TONINHO' not in all_vendors: all_vendors.append('TONINHO'); all_vendors.sort()
+        # Adiciona TONINHO e ALEX ao filtro se eles não estiverem nas vendas, mas tiverem carteira
+        for v in ['TONINHO', 'ALEX']:
+            cur.execute("SELECT 1 FROM public.carteira WHERE mes = %s AND vendedor = %s LIMIT 1;", (month_filter, v))
+            if cur.fetchone() is not None:
+                if v not in all_vendors: all_vendors.append(v); all_vendors.sort()
 
         results['allVendors'] = all_vendors
         cur.close()
         return jsonify(results)
-    except IndexError as ie:
-        app.logger.error(f"Erro de índice (provavelmente parâmetros vs placeholders): {ie}", exc_info=True)
-        try:
-             app.logger.error(f"Query Bruta (Metas): {query_metas}")
-             app.logger.error(f"Parâmetros Tentados (Metas): {params_query_metas}")
-             app.logger.error(f"Params Metas Carteira Base: {params_metas_carteira}")
-        except Exception as log_e: app.logger.error(f"Erro ao logar query/params para IndexError: {log_e}")
-        return jsonify({"message": f"Erro interno: Descompasso query/parâmetros ({str(ie)})"}), 500
     except Exception as e:
         app.logger.error(f"Erro crítico na função get_data: {e}", exc_info=True)
         return jsonify({"message": f"Erro interno: {str(e)}"}), 500
