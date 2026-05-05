@@ -122,6 +122,42 @@
         #nao-positivados-list li strong { color: var(--purple-color); }
         #nao-positivados-list li[style*="background-color"] { padding-top: 0.8rem; padding-bottom: 0.8rem; font-size: 0.9rem;}
 
+.smart-questions {
+    margin-bottom: 2rem;
+}
+
+.smart-questions-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1rem;
+}
+
+.smart-question-card {
+    background: var(--card-bg);
+    border-radius: var(--border-radius);
+    padding: 1.2rem;
+    box-shadow: var(--shadow);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    transition: all 0.2s ease;
+}
+
+.smart-question-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+}
+
+.question-icon {
+    font-size: 1.5rem;
+}
+
+.question-text {
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
         /* Responsividade */
         @media (max-width: 992px) {
              .chart-grid { grid-template-columns: 1fr; }
@@ -157,6 +193,33 @@
             Última atualização de faturamento: <strong id="last-update-date">{{ last_update_date }}</strong>
         </div>
         <div id="error-message"></div>
+
+
+<section class="smart-questions">
+    <h2 class="section-title">O que você quer saber hoje?</h2>
+
+    <div class="smart-questions-grid">
+        <div class="smart-question-card" data-question="venda-diaria">
+            <span class="question-icon">💰</span>
+            <span class="question-text">Quanto preciso vender por dia para bater minha meta?</span>
+        </div>
+
+        <div class="smart-question-card" data-question="falta-meta">
+            <span class="question-icon">🎯</span>
+            <span class="question-text">Quanto falta para bater minha meta?</span>
+        </div>
+
+        <div class="smart-question-card" data-question="vai-bater">
+            <span class="question-icon">📈</span>
+            <span class="question-text">Vou bater minha meta nesse ritmo?</span>
+        </div>
+
+        <div class="smart-question-card" data-question="projecao">
+            <span class="question-icon">🔮</span>
+            <span class="question-text">Qual é minha projeção de faturamento no mês?</span>
+        </div>
+    </div>
+</section>
 
         <div class="kpi-grid">
             <div class="kpi-card"><div class="kpi-icon icon-faturamento">&#36;</div><div class="kpi-text"><h3>Faturamento Total</h3><p id="kpi-faturamento-total">R$ 0,00</p></div></div>
@@ -502,6 +565,58 @@ document.addEventListener('DOMContentLoaded', function () {
         } catch (error) { console.error("Erro API /clientes-nao-positivados:", error); elements.naoPositivadosCount.textContent = 'Erro!'; elements.naoPositivadosList.innerHTML = `<li style="color: red;">Erro: ${error.message}</li>`; }
      }
 
+function setupSmartQuestions(data) {
+    const cards = document.querySelectorAll(".smart-question-card");
+
+    if (!data.salesGoals) return;
+
+    let metaTotal = 0;
+let atualTotal = 0;
+let vendaDiariaTotal = 0;
+
+data.salesGoals.forEach(goal => {
+    metaTotal += goal.meta || 0;
+    atualTotal += goal.atual || 0;
+    vendaDiariaTotal += goal.venda_diaria || 0;
+});
+
+const projecaoTotal = data.kpi?.projecaoFaturamento || 0;
+const falta = Math.max(metaTotal - atualTotal, 0);
+const vaiBater = projecaoTotal >= metaTotal;
+
+    cards.forEach(card => {
+        card.addEventListener("click", function () {
+            if (this.classList.contains("answered")) return;
+
+            const type = this.dataset.question;
+            let resposta = "";
+
+            switch (type) {
+                case "venda-diaria":
+                    resposta = `💰 ${formatCurrency(vendaDiariaTotal)} por dia`;
+                    break;
+
+                case "falta-meta":
+                    resposta = `🎯 Faltam ${formatCurrency(falta)}`;
+                    break;
+
+                case "vai-bater":
+                    resposta = vaiBater
+                        ? "📈 Ótimo ritmo — você vai bater a meta🚀"
+                        : "⚠️ Você ainda pode bater a meta — bora pra cima🚀";
+                    break;
+
+                case "projecao":
+                    resposta = `🔮 ${formatCurrency(projecaoTotal)} projetados`;
+                    break;
+            }
+
+            this.innerHTML = resposta;
+            this.classList.add("answered");
+        });
+    });
+}
+
     // --- FUNÇÃO DE ATUALIZAÇÃO DO DASHBOARD ---
     let isInitialLoad = true;
     function updateDashboard(data = {}) {
@@ -550,8 +665,14 @@ document.addEventListener('DOMContentLoaded', function () {
                 tableHTML += `<tr class="${rowClass}"><td class="vendedor">${goal.vendedor || 'N/A'}</td><td class="meta-valor">${formatCurrency(goal.meta)}</td><td class="faturamento-valor">${formatCurrency(goal.atual)}</td><td class="atingido"><span>${rawPercent.toFixed(1)}%</span><div class="percentage-bar"><div class="percentage-fill" style="width: ${percentForBar.toFixed(1)}%;"></div></div></td><td class="projecao">${formatCurrency(goal.projecao)}</td><td class="venda-diaria">${formatCurrency(goal.venda_diaria)}</td></tr>`;
             });
             goalsContainer.innerHTML = tableHTML + `</tbody></table>`;
-        } else { goalsContainer.innerHTML = '<p style="text-align: center; padding: 1rem;">Nenhuma meta encontrada.</p>'; }
-     }
+	    setupSmartQuestions(data);
+
+	    } else {
+    		goalsContainer.innerHTML = '<p style="text-align: center; padding: 1rem;">Nenhuma meta encontrada.</p>';
+	    }
+
+	// FECHA A FUNÇÃO updateDashboard
+	    }
 
     // --- FUNÇÕES AUXILIARES E EVENT LISTENERS ---
     function setInitialFilters() {
