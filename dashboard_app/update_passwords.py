@@ -11,7 +11,9 @@ users_to_update = {
     'THYAGO':  'thyago04',
     'TIAGO':   'tiago40',
     'LUIZ':    'ConfiDis320*',
-    'LUAN':    'ConfiDis320*'
+    'LUAN':    'ConfiDis320*',
+    'SIMONE': 'simone65',
+    'WAGNER': 'wagner28'
 }
 
 print("-- Copie e execute estes comandos no seu banco de dados para ATUALIZAR as senhas:")
