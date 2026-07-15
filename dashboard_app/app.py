@@ -313,7 +313,7 @@ def get_top_clientes_data():
         cur = conn.cursor()
         month_filter = request.args.get('month')
         if not month_filter: return jsonify({"message": "Mês é obrigatório"}), 400
-        vendedores_loja_set = {'SHEILA', 'ROSANGEL', 'DELIVERY', 'CAIQUE', 'CONFIE'}
+        vendedores_loja_set = {'SHEILA', 'ROSANGEL', 'DELIVERY', 'CAIQUE', 'CONFIE', 'VIVIANE'}
         vendedores_para_query_set = set()
         if current_user.role == 'admin':
             vendedores_selecionados = request.args.getlist('vendedor')
@@ -364,7 +364,7 @@ def get_data():
         vendedores_para_query_vendas = set()
         vendedores_para_carteira_list = []
 
-        vendedores_loja_set = {'SHEILA', 'ROSANGEL', 'DELIVERY', 'CAIQUE', 'CONFIE'}
+        vendedores_loja_set = {'SHEILA', 'ROSANGEL', 'DELIVERY', 'CAIQUE', 'CONFIE', 'VIVIANE'}
         default_vendedores = []
 
         if current_user.role == 'admin':
@@ -580,7 +580,7 @@ def get_cumulative_data():
         if current_user.role == 'admin':
             vendedores_selecionados = request.args.getlist('vendedor')
             if vendedores_selecionados:
-                vendedores_loja_set = {'SHEILA', 'ROSANGEL', 'DELIVERY', 'CAIQUE', 'CONFIE'}
+                vendedores_loja_set = {'SHEILA', 'ROSANGEL', 'DELIVERY', 'CAIQUE', 'CONFIE', 'VIVIANE'}
                 if 'LOJA' in vendedores_selecionados: vendedores_para_query_set.update(vendedores_loja_set)
                 for vendedor in vendedores_selecionados:
                     if vendedor != 'LOJA': vendedores_para_query_set.add(vendedor)
