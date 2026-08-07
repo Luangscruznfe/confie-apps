@@ -80,6 +80,8 @@ def init_db():
     # Garante que as novas colunas existem no banco de dados
     cur.execute("ALTER TABLE IF EXISTS carga_grupos ADD COLUMN IF NOT EXISTS separador_nome TEXT;")
     cur.execute("ALTER TABLE IF EXISTS carga_itens ADD COLUMN IF NOT EXISTS qtd_separada INTEGER;")
+    cur.execute("ALTER TABLE IF EXISTS pedidos ADD COLUMN IF NOT EXISTS conferente TEXT;")
+    cur.execute("ALTER TABLE IF EXISTS pedidos ADD COLUMN IF NOT EXISTS conferente_em_andamento TEXT;")
     # ===============================
 
     conn.commit()
@@ -345,30 +347,55 @@ def detalhe_pedido(pedido_id):
 
 @app.route('/api/upload/<nome_da_carga>', methods=['POST'])
 def upload_files(nome_da_carga):
-    if 'files[]' not in request.files: 
+    if 'files[]' not in request.files:
         return jsonify({"sucesso": False, "erro": "Nenhum arquivo enviado."}), 400
+
     files = request.files.getlist('files[]')
     erros, sucessos = [], 0
+
     for file in files:
-        if file.filename == '': 
+        if file.filename == '':
             continue
+
         filename = secure_filename(file.filename)
+
         try:
             pdf_bytes = file.read()
-            dados_extraidos = extrair_dados_do_pdf(nome_da_carga=nome_da_carga, nome_arquivo=filename, stream=pdf_bytes)
+
+            dados_extraidos = extrair_dados_do_pdf(
+                nome_da_carga=nome_da_carga,
+                nome_arquivo=filename,
+                stream=pdf_bytes
+            )
+
             if "erro" in dados_extraidos:
-                erros.append(f"Arquivo '{filename}': {dados_extraidos['erro']}")
+                erros.append(
+                    f"Arquivo '{filename}': {dados_extraidos['erro']}"
+                )
                 continue
-            upload_result = cloudinary.uploader.upload(pdf_bytes, resource_type="raw", public_id=f"pedidos/{filename}")
-            dados_extraidos['url_pdf'] = upload_result['secure_url']
+
+            dados_extraidos['url_pdf'] = None
+
             salvar_no_banco_de_dados(dados_extraidos)
             sucessos += 1
+
         except Exception as e:
             import traceback
-            erros.append(f"Arquivo '{filename}': Falha inesperada no processamento. {traceback.format_exc()}")
-    if erros: 
-        return jsonify({"sucesso": False, "erro": f"{sucessos} arquivo(s) processado(s). ERROS: {'; '.join(erros)}"})
-    return jsonify({"sucesso": True, "mensagem": f"Todos os {sucessos} arquivo(s) da carga '{nome_da_carga}' foram processados."})
+            erros.append(
+                f"Arquivo '{filename}': Falha inesperada no processamento. "
+                f"{traceback.format_exc()}"
+            )
+
+    if erros:
+        return jsonify({
+            "sucesso": False,
+            "erro": f"{sucessos} arquivo(s) processado(s). ERROS: {'; '.join(erros)}"
+        })
+
+    return jsonify({
+        "sucesso": True,
+        "mensagem": f"Todos os {sucessos} arquivo(s) da carga '{nome_da_carga}' foram processados."
+    })
 
 @app.route('/api/cargas')
 def api_cargas():
@@ -390,6 +417,89 @@ def api_pedidos_por_carga(nome_da_carga):
     conn.close()
     return jsonify(pedidos)
 
+@app.route('/api/pedido/iniciar-conferencia', methods=['POST'])
+def iniciar_conferencia_pedido():
+    dados = request.get_json() or {}
+
+    pedido_id = dados.get('pedido_id')
+    conferente = (dados.get('conferente') or '').upper()
+
+    if not pedido_id or not conferente:
+        return jsonify({
+            "sucesso": False,
+            "erro": "Pedido ou conferente não informado."
+        }), 400
+
+    conn = None
+
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+
+        cur.execute("""
+            UPDATE pedidos
+            SET conferente_em_andamento = %s
+            WHERE numero_pedido = %s
+              AND status_conferencia <> 'Finalizado'
+              AND (
+                  conferente_em_andamento IS NULL
+                  OR conferente_em_andamento = ''
+                  OR conferente_em_andamento = %s
+              )
+            RETURNING numero_pedido, conferente_em_andamento;
+        """, (
+            conferente,
+            pedido_id,
+            conferente
+        ))
+
+        pedido = cur.fetchone()
+
+        if pedido:
+            conn.commit()
+
+            return jsonify({
+                "sucesso": True,
+                "conferente": conferente
+            })
+
+        cur.execute("""
+            SELECT conferente_em_andamento, status_conferencia
+            FROM pedidos
+            WHERE numero_pedido = %s;
+        """, (pedido_id,))
+
+        pedido_atual = cur.fetchone()
+
+        if not pedido_atual:
+            return jsonify({
+                "sucesso": False,
+                "erro": "Pedido não encontrado."
+            }), 404
+
+        return jsonify({
+            "sucesso": False,
+            "ocupado": True,
+            "conferente": pedido_atual['conferente_em_andamento'],
+            "erro": f"Este pedido já está sendo conferido por {pedido_atual['conferente_em_andamento']}."
+        }), 409
+
+    except Exception as e:
+        if conn:
+            conn.rollback()
+
+        return jsonify({
+            "sucesso": False,
+            "erro": str(e)
+        }), 500
+
+    finally:
+        if conn:
+            if 'cur' in locals():
+                cur.close()
+
+            conn.close()
+
 # =====================  (ALTERADO)  =====================
 @app.route('/api/item/update', methods=['POST'])
 def update_item_status():
@@ -402,6 +512,7 @@ def update_item_status():
         
         pedido_id = dados_recebidos.get('pedido_id')
         produto_index = dados_recebidos.get('produto_index')
+        conferente = (dados_recebidos.get('conferente') or '').upper()
 
         if produto_index is None:
             return jsonify({"sucesso": False, "erro": "Índice do produto não fornecido."}), 400
@@ -450,8 +561,39 @@ def update_item_status():
         todos_conferidos = all(p['status'] != 'Pendente' for p in produtos_atualizados)
         novo_status_conferencia = 'Finalizado' if todos_conferidos else 'Pendente'
 
-        sql_update = "UPDATE pedidos SET produtos = %s, status_conferencia = %s WHERE numero_pedido = %s;"
-        cur.execute(sql_update, (json.dumps(produtos_atualizados), novo_status_conferencia, pedido_id))
+        if novo_status_conferencia == 'Finalizado' and conferente:
+            sql_update = """
+                UPDATE pedidos
+                SET produtos = %s,
+                    status_conferencia = %s,
+                    conferente = %s,
+		    conferente_em_andamento = NULL
+                WHERE numero_pedido = %s;
+            """
+            cur.execute(
+                sql_update,
+                (
+                    json.dumps(produtos_atualizados),
+                    novo_status_conferencia,
+                    conferente,
+                    pedido_id
+                )
+            )
+        else:
+            sql_update = """
+                UPDATE pedidos
+                SET produtos = %s,
+                    status_conferencia = %s
+                WHERE numero_pedido = %s;
+            """
+            cur.execute(
+                sql_update,
+                (
+                    json.dumps(produtos_atualizados),
+                    novo_status_conferencia,
+                    pedido_id
+                )
+            )
         conn.commit()
         
         return jsonify({"sucesso": True, "status_final": status_final})
@@ -532,6 +674,7 @@ def api_cortes():
                         "numero_pedido": pedido.get('numero_pedido'),
                         "nome_cliente": pedido.get('nome_cliente'),
                         "vendedor": pedido.get('vendedor'),
+			"conferente": pedido.get('conferente'),
                         "observacao": produto.get('observacao', ''),
                         "produto": produto
                     })

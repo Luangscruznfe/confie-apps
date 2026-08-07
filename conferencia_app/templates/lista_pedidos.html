@@ -147,16 +147,82 @@
 <div class="main-container">
     <a href="/conferencia" class="btn btn-outline-secondary mb-4">&larr; Voltar para Seleção de Cargas</a>
     <h1 class="main-title mb-4">Pedidos da Carga: <span class="carga-name">{{ nome_da_carga }}</span></h1>
+    <div class="mb-4 d-flex align-items-center gap-2">
+        <span id="conferenteAtual" class="text-light"></span>
+
+        <button type="button" class="btn btn-sm btn-outline-primary" id="btnTrocarConferente">
+            Trocar
+        </button>
+    </div>
 
     <div id="pedidos-container" class="list-group">
         <p class="text-center text-muted">A carregar pedidos...</p>
     </div>
 </div>
 
+<!-- Modal de seleção do conferente -->
+<div class="modal fade" id="modalConferente" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content bg-dark text-light">
+
+            <div class="modal-header">
+                <h5 class="modal-title">Quem irá conferir este pedido?</h5>
+            </div>
+
+            <div class="modal-body">
+
+                <div class="form-check">
+                    <input class="form-check-input" type="radio" name="conferente" id="moacir" value="Moacir">
+                    <label class="form-check-label" for="moacir">Moacir</label>
+                </div>
+
+                <div class="form-check mt-2">
+                    <input class="form-check-input" type="radio" name="conferente" id="vitor" value="Vitor">
+                    <label class="form-check-label" for="vitor">Vitor</label>
+                </div>
+
+                <div class="form-check mt-2">
+                    <input class="form-check-input" type="radio" name="conferente" id="yves" value="Yves">
+                    <label class="form-check-label" for="yves">Yves</label>
+                </div>
+
+                <div class="form-check mt-2">
+                    <input class="form-check-input" type="radio" name="conferente" id="luan" value="Luan">
+                    <label class="form-check-label" for="luan">Luan</label>
+                </div>
+
+            </div>
+
+            <div class="modal-footer">
+                <button class="btn btn-primary" id="btnConfirmarConferente">
+                    Iniciar Conferência
+                </button>
+            </div>
+
+        </div>
+    </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    let pedidoPendente = null;
+    const modalConferente = new bootstrap.Modal(document.getElementById('modalConferente'));
     const nomeDaCarga = "{{ nome_da_carga }}";
     const container = document.getElementById('pedidos-container');
+    const conferenteAtual = document.getElementById('conferenteAtual');
+    const btnTrocarConferente = document.getElementById('btnTrocarConferente');
+
+    function atualizarConferenteNaTela() {
+        const conferente = localStorage.getItem('conferente');
+
+        if (conferente) {
+            conferenteAtual.textContent = `👤 Conferente: ${conferente}`;
+        } else {
+            conferenteAtual.textContent = '👤 Conferente: não selecionado';
+        }
+    }
+
+    atualizarConferenteNaTela();
     
     // 1. Chave única para o localStorage baseada no nome da carga
     const localStorageKey = `ultimoPedidoClicado_${nomeDaCarga}`;
@@ -173,17 +239,31 @@ document.addEventListener('DOMContentLoaded', function() {
 
             pedidos.forEach(pedido => {
                 let statusClasse = '';
-                let itemClasse = ''; 
+                let itemClasse = '';
                 let statusTexto = pedido.status_conferencia || 'Pendente';
 
-                switch (statusTexto) {
+                if (
+                    pedido.status_conferencia !== 'Finalizado' &&
+                    pedido.conferente_em_andamento
+                ) {
+                    statusTexto = 'Em conferência';
+                    statusClasse = 'bg-warning text-dark';
+                }
+
+                                switch (statusTexto) {
                     case 'Finalizado':
                         statusClasse = 'bg-success';
                         itemClasse = 'item-finalizado';
                         break;
+
+                    case 'Em conferência':
+                        statusClasse = 'bg-warning text-dark';
+                        break;
+
                     case 'Pendente':
                         statusClasse = 'bg-warning text-dark';
                         break;
+
                     default:
                         statusClasse = 'bg-secondary';
                 }
@@ -198,7 +278,15 @@ document.addEventListener('DOMContentLoaded', function() {
                             <div class="cliente-nome">${pedido.nome_cliente}</div>
                             <div class="arquivo-nome">Arquivo: ${pedido.nome_arquivo}</div>
                         </div>
-                        <span class="badge ${statusClasse} rounded-pill">${statusTexto}</span>
+                        <div class="text-end">
+                            <span class="badge ${statusClasse} rounded-pill">${statusTexto}</span>
+
+                            ${(pedido.conferente_em_andamento || pedido.conferente) ? `
+                                <div class="mt-2 small text-info fw-semibold">
+                                    👤 ${pedido.conferente_em_andamento || pedido.conferente}
+                                </div>
+                            ` : ''}
+                        </div>
                     </a>
                 `;
                 container.innerHTML += pedidoHtml;
@@ -217,21 +305,108 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             }
 
-            // 3. Lógica para salvar a posição do próximo clique
-            container.addEventListener('click', function(event) {
-                // Encontra o link do pedido que foi clicado
-                const linkDoPedido = event.target.closest('a.list-group-item');
-                if (linkDoPedido) {
-                    const pedidoId = linkDoPedido.dataset.pedidoId;
-                    // Salva o ID do pedido clicado no localStorage
-                    localStorage.setItem(localStorageKey, pedidoId);
-                }
-            });
+            // 3. Lógica para identificar o conferente antes de abrir o pedido
+	    container.addEventListener('click', function(event) {
+
+    		const linkDoPedido = event.target.closest('a.list-group-item');
+
+    		if (!linkDoPedido) return;
+
+    		event.preventDefault();
+
+    		const pedidoId = linkDoPedido.dataset.pedidoId;
+
+    		// Mantém a lógica existente de lembrar o último pedido clicado
+    		localStorage.setItem(localStorageKey, pedidoId);
+
+    		            // Verifica se já existe um conferente selecionado
+            const conferente = localStorage.getItem('conferente');
+
+            if (conferente) {
+
+                               fetch('/api/pedido/iniciar-conferencia', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        pedido_id: pedidoId,
+                        conferente: conferente
+                    })
+                })
+                .then(response => response.json())
+                .then(resultado => {
+
+                    if (resultado.sucesso) {
+                        window.location.href = linkDoPedido.href;
+                    } else {
+
+                        const desejaEntrar = confirm(
+                            `${resultado.erro}\n\nDeseja entrar mesmo assim?`
+                        );
+
+                        if (desejaEntrar) {
+                            window.location.href = linkDoPedido.href;
+                        }
+
+                    }
+
+                });
+
+                return;
+            }
+
+    		// Se não houver conferente, guarda o pedido que a pessoa tentou abrir
+    		pedidoPendente = linkDoPedido.href;
+
+    		// Abre o modal para selecionar o nome
+    		modalConferente.show();
+	    });
         })
         .catch(error => {
             console.error('Erro:', error);
             container.innerHTML = '<div class="alert alert-danger">Falha ao carregar os pedidos.</div>';
         });
+// Confirma o conferente escolhido
+document.getElementById('btnConfirmarConferente').addEventListener('click', function () {
+
+    const selecionado = document.querySelector('input[name="conferente"]:checked');
+
+    if (!selecionado) {
+        alert("Selecione seu nome.");
+        return;
+    }
+
+    // Salva o conferente
+    localStorage.setItem('conferente', selecionado.value);
+    atualizarConferenteNaTela();
+
+    // Fecha o modal
+    modalConferente.hide();
+
+    // Abre o pedido que estava pendente    // Se o modal abriu porque o usuário clicou em um pedido,
+    // abre o pedido normalmente.
+    // Se abriu pelo botão "Trocar", apenas permanece na carga atual.
+    if (pedidoPendente) {
+        window.location.href = pedidoPendente;
+    } else {
+        modalConferente.hide();
+    }
+
+});
+    btnTrocarConferente.addEventListener('click', function () {
+
+        localStorage.removeItem('conferente');
+
+        document.querySelectorAll('input[name="conferente"]').forEach(input => {
+            input.checked = false;
+        });
+
+        atualizarConferenteNaTela();
+
+        modalConferente.show();
+
+    });
 });
 </script>
 

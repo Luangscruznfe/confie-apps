@@ -274,7 +274,8 @@ function atualizarItem(index, quantidadeEntregue, observacao = '') {
             produto_nome: produtoNome,
             produto_index: index, // A versão correta com o índice
             quantidade_entregue: quantidadeEntregue,
-            observacao: observacao
+            observacao: observacao,
+	    conferente: localStorage.getItem('conferente')
         }),
     })
     .then(response => response.json())
