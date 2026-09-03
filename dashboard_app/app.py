@@ -71,14 +71,34 @@ def load_user(user_id):
 
 def count_weekdays(year, month, up_to_day=None):
     last_day = up_to_day if up_to_day is not None else calendar.monthrange(year, month)[1]
+
+    feriados = {
+        (1, 1),    # Confraternização Universal
+        (4, 21),   # Tiradentes
+        (5, 1),    # Dia do Trabalho
+        (9, 7),    # Independência do Brasil
+        (10, 12),  # Nossa Senhora Aparecida
+        (11, 2),   # Finados
+        (11, 15),  # Proclamação da República
+        (11, 20),  # Consciência Negra
+        (12, 25),  # Natal
+    }
+
     count = 0
+
     for day in range(1, last_day + 1):
         try:
             current_date = datetime(year, month, day)
-            if current_date.weekday() < 5:
+
+            eh_dia_util = current_date.weekday() < 5
+            eh_feriado = (month, day) in feriados
+
+            if eh_dia_util and not eh_feriado:
                 count += 1
+
         except ValueError:
             break
+
     return count
 
 
