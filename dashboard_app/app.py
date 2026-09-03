@@ -82,6 +82,9 @@ def count_weekdays(year, month, up_to_day=None):
     return count
 
 
+VENDEDORES_DASHBOARD = ['EVERTON', 'MARCELO', 'SIMONE', 'PEDRO', 'RODOLFO', 'TIAGO', 'MARCOS', 'JOICE']
+
+
 # --- Rotas Principais ---
 @app.route("/login", methods=['GET', 'POST'])
 def login():
@@ -315,13 +318,22 @@ def get_top_clientes_data():
         if not month_filter: return jsonify({"message": "Mês é obrigatório"}), 400
         vendedores_loja_set = {'SHEILA', 'ROSANGEL', 'DELIVERY', 'CAIQUE', 'CONFIE', 'VIVIANE'}
         vendedores_para_query_set = set()
+
         if current_user.role == 'admin':
-            vendedores_selecionados = request.args.getlist('vendedor')
+            vendedores_selecionados = [v for v in request.args.getlist('vendedor') if v in VENDEDORES_DASHBOARD]
+
             if vendedores_selecionados:
-                if 'LOJA' in vendedores_selecionados: vendedores_para_query_set.update(vendedores_loja_set)
+                if 'LOJA' in vendedores_selecionados:
+                    vendedores_para_query_set.update(vendedores_loja_set)
+
                 for vendedor in vendedores_selecionados:
-                    if vendedor != 'LOJA': vendedores_para_query_set.add(vendedor)
-        else: vendedores_para_query_set = {current_user.username}
+                    if vendedor != 'LOJA':
+                        vendedores_para_query_set.add(vendedor)
+            else:
+                vendedores_para_query_set = set(VENDEDORES_DASHBOARD)
+
+        else:
+            vendedores_para_query_set = {current_user.username}
 
         where_conditions = ["TO_CHAR(data_venda, 'YYYY-MM') = %s"]
         params = [month_filter]
@@ -359,7 +371,7 @@ def get_data():
             max_month_row = cur.fetchone()
             month_filter = (max_month_row[0] if max_month_row and max_month_row[0] else datetime.now().strftime('%Y-%m'))
 
-        vendedores_filter_req = request.args.getlist('vendedor')
+        vendedores_filter_req = [v for v in request.args.getlist('vendedor') if v in VENDEDORES_DASHBOARD]
         vendedores_selecionados = []
         vendedores_para_query_vendas = set()
         vendedores_para_carteira_list = []
@@ -368,8 +380,7 @@ def get_data():
         default_vendedores = []
 
         if current_user.role == 'admin':
-            # --- MUDANÇA AQUI: Adicionado 'ALEX' ---
-            default_vendedores = ['MARCELO', 'EVERTON', 'MARCOS', 'PEDRO', 'RODOLFO', 'SILVANA', 'THYAGO', 'TIAGO', 'LUIZ', 'TONINHO', 'ALEX', 'SIMONE', 'WAGNER']
+            default_vendedores = VENDEDORES_DASHBOARD
             vendedores_selecionados = vendedores_filter_req if vendedores_filter_req else default_vendedores
             vendedores_para_carteira_list = vendedores_selecionados
 
@@ -379,7 +390,7 @@ def get_data():
                 if vendedor != 'LOJA':
                     vendedores_para_query_vendas.add(vendedor)
             if not vendedores_filter_req:
-                 vendedores_para_query_vendas = set()
+                 vendedores_para_query_vendas = set(VENDEDORES_DASHBOARD)
 
         else:
             vendedores_selecionados = [current_user.username]
@@ -400,11 +411,11 @@ def get_data():
         # --- Clausula WHERE e Params para CARTEIRA ---
         where_conditions_carteira = ["c.mes = %s"]
         params_carteira = [month_filter]
-        if vendedores_filter_req or current_user.role != 'admin':
-            if vendedores_para_carteira_list:
-                placeholders = ','.join(['%s'] * len(vendedores_para_carteira_list))
-                where_conditions_carteira.append(f"c.vendedor IN ({placeholders})")
-                params_carteira.extend(vendedores_para_carteira_list)
+        if vendedores_para_carteira_list:
+            placeholders = ','.join(['%s'] * len(vendedores_para_carteira_list))
+            where_conditions_carteira.append(f"c.vendedor IN ({placeholders})")
+            params_carteira.extend(vendedores_para_carteira_list)
+
         where_clause_carteira = "WHERE " + " AND ".join(where_conditions_carteira)
 
 
@@ -488,14 +499,11 @@ def get_data():
 
         # --- Lógica de Metas ---
         vendedores_para_exibir_metas = []
+
         if current_user.role == 'admin':
-             vendedores_para_exibir_metas = vendedores_filter_req if vendedores_filter_req else default_vendedores
-             if not vendedores_filter_req:
-                 cur.execute("SELECT 1 FROM public.carteira WHERE mes = %s AND vendedor = 'LOJA' LIMIT 1;", (month_filter,))
-                 if cur.fetchone() and 'LOJA' not in vendedores_para_exibir_metas:
-                     vendedores_para_exibir_metas.append('LOJA')
+            vendedores_para_exibir_metas = vendedores_filter_req if vendedores_filter_req else default_vendedores
         else:
-             vendedores_para_exibir_metas = [current_user.username]
+            vendedores_para_exibir_metas = [current_user.username]
 
         sales_goals = []
         if vendedores_para_exibir_metas:
@@ -550,7 +558,10 @@ def get_data():
             if cur.fetchone() is not None:
                 if v not in all_vendors: all_vendors.append(v); all_vendors.sort()
 
+        all_vendors = VENDEDORES_DASHBOARD.copy()
+
         results['allVendors'] = all_vendors
+
         cur.close()
         return jsonify(results)
     except Exception as e:
@@ -578,12 +589,14 @@ def get_cumulative_data():
 
         vendedores_para_query_set = set()
         if current_user.role == 'admin':
-            vendedores_selecionados = request.args.getlist('vendedor')
+            vendedores_selecionados = [v for v in request.args.getlist('vendedor') if v in VENDEDORES_DASHBOARD]
             if vendedores_selecionados:
                 vendedores_loja_set = {'SHEILA', 'ROSANGEL', 'DELIVERY', 'CAIQUE', 'CONFIE', 'VIVIANE'}
                 if 'LOJA' in vendedores_selecionados: vendedores_para_query_set.update(vendedores_loja_set)
                 for vendedor in vendedores_selecionados:
                     if vendedor != 'LOJA': vendedores_para_query_set.add(vendedor)
+            else:
+                vendedores_para_query_set = set(VENDEDORES_DASHBOARD)
         else:
             vendedores_para_query_set = {current_user.username}
 
@@ -631,20 +644,19 @@ def get_clientes_nao_positivados():
         month_filter = request.args.get('month')
         if not month_filter: return jsonify({"message": "Mês é obrigatório"}), 400
 
-        vendedores_selecionados_req = request.args.getlist('vendedor')
+        vendedores_selecionados_req = [v for v in request.args.getlist('vendedor') if v in VENDEDORES_DASHBOARD]
         vendedores_para_consulta = []
 
         if current_user.role == 'admin':
-            if not vendedores_selecionados_req: # Visão padrão admin (sem LOJA, com TONINHO)
-                vendedores_para_consulta = ['MARCELO', 'EVERTON', 'MARCOS', 'PEDRO', 'RODOLFO', 'SILVANA', 'THYAGO', 'TIAGO', 'LUIZ', 'TONINHO']
-            else: # Admin com filtro (remove LOJA)
-                vendedores_para_consulta = [v for v in vendedores_selecionados_req if v != 'LOJA']
-        else: # Vendedor
+            if not vendedores_selecionados_req:
+                vendedores_para_consulta = VENDEDORES_DASHBOARD.copy()
+            else:
+                vendedores_para_consulta = vendedores_selecionados_req
+        else:
             vendedores_para_consulta = [current_user.username]
-            if 'LOJA' in vendedores_para_consulta: vendedores_para_consulta.remove('LOJA')
 
         if not vendedores_para_consulta:
-             return jsonify([])
+            return jsonify([])
 
         # --- Montagem da Query ---
         params = [month_filter] # 1º %s (vendas.data_venda)

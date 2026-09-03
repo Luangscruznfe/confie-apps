@@ -716,9 +716,9 @@ const vaiBater = projecaoTotal >= metaTotal;
         const totalVendors = document.querySelectorAll('.vendedor-checkbox').length;
         const selectAllCheckbox = document.getElementById('select-all-vendedores');
         if (selectAllCheckbox && selectAllCheckbox.checked && selected.length === totalVendors && totalVendors > 0) {
-            elements.vendedorSelectedText.textContent = 'TODOS OS VENDEDORES';
-        } else if (selected.length === 0) {
             elements.vendedorSelectedText.textContent = 'VENDEDORES PRINCIPAIS';
+        } else if (selected.length === 0) {
+            elements.vendedorSelectedText.textContent = 'TODOS OS VENDEDORES';
         } else if (selected.length === 1) {
             elements.vendedorSelectedText.textContent = selected[0];
         } else if (selected.length > 1 && selected.length <= 3) {
