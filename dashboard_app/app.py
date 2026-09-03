@@ -545,19 +545,10 @@ def get_data():
 
         results['salesGoals'] = sorted(sales_goals, key=lambda x: x.get('percentual', 0), reverse=True)
 
-
         # Lista de vendedores para o filtro
-        cur.execute("SELECT DISTINCT vendedor FROM public.vendas WHERE vendedor IS NOT NULL AND TRIM(vendedor) <> '' ORDER BY vendedor;")
-        all_vendors = [r[0] for r in cur.fetchall()]
-        cur.execute("SELECT 1 FROM public.carteira WHERE mes = %s AND vendedor = 'LOJA' LIMIT 1;", (month_filter,))
-        if cur.fetchone() is not None:
-            if 'LOJA' not in all_vendors: all_vendors.append('LOJA'); all_vendors.sort()
-        # Adiciona TONINHO e ALEX ao filtro se eles não estiverem nas vendas, mas tiverem carteira
-        for v in ['TONINHO', 'ALEX']:
-            cur.execute("SELECT 1 FROM public.carteira WHERE mes = %s AND vendedor = %s LIMIT 1;", (month_filter, v))
-            if cur.fetchone() is not None:
-                if v not in all_vendors: all_vendors.append(v); all_vendors.sort()
-
+        all_vendors = VENDEDORES_DASHBOARD.copy()
+        results['allVendors'] = all_vendors
+        
         all_vendors = VENDEDORES_DASHBOARD.copy()
 
         results['allVendors'] = all_vendors
