@@ -650,27 +650,35 @@ def get_clientes_nao_positivados():
             return jsonify([])
 
         # --- Montagem da Query ---
-        params = [month_filter] # 1º %s (vendas.data_venda)
-
         placeholders = ','.join(['%s'] * len(vendedores_para_consulta))
-        where_vendas_clause = f"AND v.vendedor IN ({placeholders})"
-        params.extend(vendedores_para_consulta) # Adiciona vendedores para vendas
 
-        params.append(month_filter) # 2º %s (cc.mes)
-
-        where_carteira_clause = f"AND cc.vendedor IN ({placeholders})"
-        params.extend(vendedores_para_consulta) # Adiciona os MESMOS vendedores para carteira
+        data_inicio = f"{month_filter}-01"
 
         query = f"""
-        SELECT cc.nome_fantasia, cc.codigo_cliente, cc.vendedor
+        SELECT
+            cc.nome_fantasia,
+            cc.codigo_cliente,
+            cc.vendedor
         FROM public.carteira_clientes cc
-        LEFT JOIN (
-            SELECT DISTINCT v.cliente FROM public.vendas v
-            WHERE TO_CHAR(v.data_venda, 'YYYY-MM') = %s {where_vendas_clause}
-        ) AS clientes_positivados ON cc.codigo_cliente = clientes_positivados.cliente
-        WHERE cc.mes = %s {where_carteira_clause} AND clientes_positivados.cliente IS NULL
+        WHERE cc.mes = %s
+          AND cc.vendedor IN ({placeholders})
+          AND NOT EXISTS (
+              SELECT 1
+              FROM public.vendas v
+              WHERE v.cliente = cc.codigo_cliente
+                AND v.vendedor IN ({placeholders})
+                AND v.data_venda >= %s::date
+                AND v.data_venda < (%s::date + INTERVAL '1 month')
+          )
         ORDER BY cc.vendedor, cc.nome_fantasia;
         """
+
+        params = (
+            [month_filter]
+            + vendedores_para_consulta
+            + vendedores_para_consulta
+            + [data_inicio, data_inicio]
+        )
 
         cur.execute(query, tuple(params))
         clientes = [{"nome_fantasia": row[0], "codigo_cliente": row[1], "vendedor": row[2]} for row in cur.fetchall()]
