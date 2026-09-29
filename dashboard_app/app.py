@@ -102,7 +102,7 @@ def count_weekdays(year, month, up_to_day=None):
     return count
 
 
-VENDEDORES_DASHBOARD = ['EVERTON', 'MARCELO', 'SIMONE', 'PEDRO', 'RODOLFO', 'TIAGO', 'MARCOS', 'JOICE']
+VENDEDORES_DASHBOARD = ['EVERTON', 'MARCELO', 'SIMONE', 'PEDRO', 'RODOLFO', 'TIAGO', 'MARCOS', 'JOICE', 'TONINHO']
 
 
 # --- Rotas Principais ---
