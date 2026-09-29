@@ -220,9 +220,9 @@ def upload_data():
         # --- Processamento Vendas ---
         if not sales_file.filename.endswith(('.xlsx', '.csv')):
              raise ValueError("Formato de ficheiro de vendas inválido. Use .xlsx ou .csv")
-        usecols_spec, col_names = "B,C,G,H,M,N,P,U,W", ['data_venda', 'nota_fiscal', 'cliente', 'nome_fantasia', 'produto', 'quantidade', 'valor', 'fabricante', 'vendedor']
+        usecols_spec, col_names = "B,C,G,H,K,M,N,P,U,W", ['data_venda', 'nota_fiscal', 'cliente', 'nome_fantasia', 'cidade', 'produto', 'quantidade', 'valor', 'fabricante', 'vendedor']
         sales_file.stream.seek(0)
-        sales_df = pd.read_excel(sales_file.stream, skiprows=9, usecols=usecols_spec, header=None, dtype={'cliente': str, 'nota_fiscal': str}) if sales_file.filename.endswith('.xlsx') else pd.read_csv(sales_file.stream, sep=';', skiprows=9, usecols=[1, 2, 6, 7, 12, 13, 15, 20, 22], header=None, encoding='latin1', dtype={'cliente': str, 'nota_fiscal': str})
+        sales_df = pd.read_excel(sales_file.stream, skiprows=9, usecols=usecols_spec, header=None, dtype={'cliente': str, 'nota_fiscal': str}) if sales_file.filename.endswith('.xlsx') else pd.read_csv(sales_file.stream, sep=';', skiprows=9, usecols=[1, 2, 6, 7, 10, 12, 13, 15, 20, 22], header=None, encoding='latin1', dtype={'cliente': str, 'nota_fiscal': str})
         sales_df.columns = col_names
         sales_df['data_venda'] = pd.to_datetime(sales_df['data_venda'], dayfirst=True, errors='coerce')
         sales_df.dropna(subset=['data_venda'], inplace=True)
@@ -233,7 +233,7 @@ def upload_data():
                 sales_df[col] = sales_df[col].astype(str).str.replace(r'[^\d,.]', '', regex=True).str.replace(',', '.')
             sales_df[col] = pd.to_numeric(sales_df[col], errors='coerce')
         sales_df.dropna(subset=['valor', 'produto'], inplace=True)
-        for col in ['cliente', 'nome_fantasia', 'produto', 'fabricante', 'vendedor', 'nota_fiscal']:
+        for col in ['cliente', 'nome_fantasia', 'cidade', 'produto', 'fabricante', 'vendedor', 'nota_fiscal']:
             if col in sales_df.columns:
                  sales_df[col] = sales_df[col].astype(str).str.strip().str.upper()
                  sales_df[col] = sales_df[col].replace({'NONE': None, 'NAN': None, '': None, 'NULL': None})
@@ -243,7 +243,7 @@ def upload_data():
             cur.execute("DELETE FROM public.vendas WHERE TO_CHAR(data_venda, 'YYYY-MM') = %s", (upload_month,))
             app.logger.info("Inserindo novas vendas...")
             data_to_insert_sales = [tuple(row) for row in sales_df[col_names].where(pd.notnull(sales_df[col_names]), None).itertuples(index=False)]
-            sql_insert_sales = "INSERT INTO public.vendas (data_venda, nota_fiscal, cliente, nome_fantasia, produto, quantidade, valor, fabricante, vendedor) VALUES %s"
+            sql_insert_sales = "INSERT INTO public.vendas (data_venda, nota_fiscal, cliente, nome_fantasia, cidade, produto, quantidade, valor, fabricante, vendedor) VALUES %s"
             execute_values(cur, sql_insert_sales, data_to_insert_sales, page_size=1000)
             app.logger.info(f"{len(data_to_insert_sales)} registros de vendas inseridos.")
 
@@ -678,8 +678,19 @@ def get_clientes_nao_positivados():
         SELECT
             cc.nome_fantasia,
             cc.codigo_cliente,
-            cc.vendedor
+            cc.vendedor,
+            COALESCE(ultima_cidade.cidade, 'SEM CIDADE') AS cidade
         FROM public.carteira_clientes cc
+        LEFT JOIN (
+            SELECT DISTINCT ON (cliente)
+                cliente,
+                cidade
+            FROM public.vendas
+            WHERE cidade IS NOT NULL
+              AND TRIM(cidade) <> ''
+            ORDER BY cliente, data_venda DESC
+        ) AS ultima_cidade
+            ON TRIM(cc.codigo_cliente::text) = TRIM(ultima_cidade.cliente::text)
         WHERE cc.mes = %s
           AND cc.vendedor IN ({placeholders})
           AND NOT EXISTS (
@@ -690,7 +701,7 @@ def get_clientes_nao_positivados():
                 AND v.data_venda >= %s::date
                 AND v.data_venda < (%s::date + INTERVAL '1 month')
           )
-        ORDER BY cc.vendedor, cc.nome_fantasia;
+        ORDER BY cc.vendedor, cidade, cc.nome_fantasia;
         """
 
         params = (
@@ -701,7 +712,7 @@ def get_clientes_nao_positivados():
         )
 
         cur.execute(query, tuple(params))
-        clientes = [{"nome_fantasia": row[0], "codigo_cliente": row[1], "vendedor": row[2]} for row in cur.fetchall()]
+        clientes = [{"nome_fantasia": row[0], "codigo_cliente": row[1], "vendedor": row[2], "cidade": row[3]} for row in cur.fetchall()]
         cur.close()
         return jsonify(clientes)
 

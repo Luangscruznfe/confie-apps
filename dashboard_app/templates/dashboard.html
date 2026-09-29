@@ -558,9 +558,9 @@ document.addEventListener('DOMContentLoaded', function () {
                  if (showVendedor && Object.keys(groupedClientes).length > 0) {
                      Object.keys(groupedClientes).sort().forEach(vendedor => {
                          const vHeader = document.createElement('li'); vHeader.innerHTML = `<strong>${vendedor} (${groupedClientes[vendedor].length}):</strong>`; vHeader.style.cssText = 'background-color:#f8f9fa; font-weight:bold;'; elements.naoPositivadosList.appendChild(vHeader);
-                         groupedClientes[vendedor].forEach(cliente => { const li = document.createElement('li'); li.innerHTML = `&nbsp;&nbsp;&nbsp;${cliente.nome_fantasia || 'N/A'} (${cliente.codigo_cliente})`; elements.naoPositivadosList.appendChild(li); });
+                         groupedClientes[vendedor].forEach(cliente => { const li = document.createElement('li'); li.innerHTML = `&nbsp;&nbsp;&nbsp;${cliente.nome_fantasia || 'N/A'} (${cliente.codigo_cliente}) — ${cliente.cidade || 'SEM CIDADE'}`; elements.naoPositivadosList.appendChild(li); });
                      });
-                 } else { clientes.forEach(cliente => { const li = document.createElement('li'); li.innerHTML = `${cliente.nome_fantasia || 'N/A'} (${cliente.codigo_cliente})`; elements.naoPositivadosList.appendChild(li); }); }
+                 } else { clientes.forEach(cliente => { const li = document.createElement('li'); li.innerHTML = `${cliente.nome_fantasia || 'N/A'} (${cliente.codigo_cliente}) — ${cliente.cidade || 'SEM CIDADE'}`; elements.naoPositivadosList.appendChild(li); }); }
             }
         } catch (error) { console.error("Erro API /clientes-nao-positivados:", error); elements.naoPositivadosCount.textContent = 'Erro!'; elements.naoPositivadosList.innerHTML = `<li style="color: red;">Erro: ${error.message}</li>`; }
      }
